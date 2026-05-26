@@ -1,0 +1,80 @@
+# GLOBTRADE S.A. — Docker Compose (MongoDB / ELT)
+# Uso: docker compose up -d --build
+# ELT: docker compose --profile etl-mongo run --rm etl-mongo
+
+name: globtrade
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: globtrade-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: globtrade-api
+    restart: unless-stopped
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONPATH: /app/backend
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: globtrade_dw
+      POCKETBASE_COLLECTION: sales_records
+      CSV_SOURCE: /app/data/sales.csv
+    volumes:
+      - ./data:/app/data
+      - ./scripts:/app/scripts:ro
+      - ./backend/config:/app/backend/config:ro
+      - ./backend/etl:/app/backend/etl:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  web:
+    build: .
+    container_name: globtrade-web
+    restart: unless-stopped
+    command: python frontend/app.py
+    ports:
+      - "5000:5000"
+    environment:
+      PYTHONPATH: /app/backend
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: globtrade_dw
+      WEB_PORT: "5000"
+    volumes:
+      - ./data:/app/data
+      - ./frontend/static:/app/frontend/static:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  etl-mongo:
+    build: .
+    profiles: ["etl-mongo"]
+    command: python -m etl.run_pipeline_mongo
+    environment:
+      PYTHONPATH: /app/backend
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: globtrade_dw
+      POCKETBASE_COLLECTION: sales_records
+      CSV_SOURCE: /app/data/sales.csv
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo_data:

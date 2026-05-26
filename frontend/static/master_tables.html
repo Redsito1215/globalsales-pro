@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GLOBTRADE — Tablas maestras</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#060a0f; --surface:#0d1520; --surface2:#111d2e; --border:#1a2f47;
+  --accent:#00e5a0; --text:#e8edf5; --muted:#6b8299;
+  --font:'Syne',sans-serif; --mono:'DM Mono',monospace;
+}
+body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; }
+.layout { display:flex; min-height:100vh; }
+.sidebar {
+  width:240px; background:var(--surface); border-right:1px solid var(--border);
+  padding:24px 16px; display:flex; flex-direction:column; gap:8px;
+}
+.logo-mark { font-size:20px; font-weight:800; color:var(--accent); letter-spacing:2px; }
+.logo-sub { font-family:var(--mono); font-size:9px; color:var(--muted); margin-top:4px; }
+.back-btn {
+  margin-top:20px; padding:10px 14px; border-radius:8px; border:1px solid var(--border);
+  background:transparent; color:var(--muted); font-family:var(--font); font-weight:600;
+  cursor:pointer; text-align:left;
+}
+.back-btn:hover { color:var(--text); background:var(--surface2); }
+.main { flex:1; padding:28px 32px; overflow:auto; }
+h1 { font-size:22px; font-weight:800; margin-bottom:6px; }
+.sub { font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:24px; }
+.master-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px;
+  margin-bottom:24px;
+}
+.master-btn {
+  padding:14px 12px; border-radius:10px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); cursor:pointer; text-align:left;
+  transition:all .15s;
+}
+.master-btn:hover { border-color:var(--accent); }
+.master-btn.active { border-color:var(--accent); background:rgba(0,229,160,.08); color:var(--accent); }
+.master-btn .name { font-size:13px; font-weight:700; }
+.master-btn .cnt { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:6px; }
+.toolbar {
+  display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
+  padding:16px; background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; margin-bottom:16px;
+}
+.toolbar label { font-family:var(--mono); font-size:10px; color:var(--muted); display:block; margin-bottom:4px; }
+.toolbar input, .toolbar select {
+  background:var(--bg); border:1px solid var(--border); color:var(--text);
+  padding:8px 10px; border-radius:8px; font-family:var(--mono); font-size:12px;
+}
+.btn {
+  padding:9px 16px; border-radius:8px; border:none; font-weight:700;
+  font-family:var(--font); cursor:pointer; font-size:12px;
+}
+.btn-primary { background:var(--accent); color:#060a0f; }
+.btn-ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
+.table-wrap {
+  overflow:auto; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface);
+}
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; }
+th { font-family:var(--mono); font-size:10px; color:var(--muted); position:sticky; top:0; background:var(--surface2); }
+td { font-family:var(--mono); font-size:11px; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pager { margin-top:12px; display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:11px; color:var(--muted); }
+#db-status { color:var(--accent); font-family:var(--mono); font-size:10px; margin-top:auto; padding-top:16px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo-mark">GLOBTRADE</div>
+    <div class="logo-sub">Tablas maestras · MongoDB</div>
+    <button class="back-btn" onclick="location.href='/'">← Volver al Dashboard</button>
+    <div id="db-status">Conectando…</div>
+  </aside>
+  <main class="main">
+    <h1>Tablas maestras</h1>
+    <p class="sub">Selecciona una colección para ver y filtrar sus registros (10 catálogos/dimensiones).</p>
+    <div id="build-banner" style="display:none;margin-bottom:16px;padding:16px;border-radius:12px;border:1px solid rgba(245,166,35,.4);background:rgba(245,166,35,.08)">
+      <p style="font-size:13px;margin-bottom:10px;color:#e8edf5">
+        Las tablas maestras están vacías. Con <strong>sales_records</strong> cargado, puedes generarlas en un clic (1–3 min).
+      </p>
+      <button class="btn btn-primary" id="btn-build" onclick="buildMasterTables()">⚙ Construir tablas maestras desde sales_records</button>
+      <span id="build-status" style="margin-left:12px;font-family:var(--mono);font-size:11px;color:var(--muted)"></span>
+    </div>
+    <div class="master-grid" id="master-grid"></div>
+    <div class="toolbar">
+      <div>
+        <label>Tabla activa</label>
+        <strong id="active-table-name">—</strong>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <label>Buscar en columnas</label>
+        <input id="master-q" placeholder="Texto o número…" style="width:100%" onkeydown="if(event.key==='Enter')loadRows()"/>
+      </div>
+      <div>
+        <label>Filas por página</label>
+        <select id="master-limit" onchange="masterPage=1;loadRows()">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="masterPage=1;loadRows()">Filtrar</button>
+      <button class="btn btn-ghost" onclick="clearFilter()">Limpiar</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="master-head"></thead>
+        <tbody id="master-body"><tr><td>Cargando…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button class="btn btn-ghost" onclick="prevPage()">‹ Anterior</button>
+      <span id="master-page-info"></span>
+      <button class="btn btn-ghost" onclick="nextPage()">Siguiente ›</button>
+    </div>
+  </main>
+</div>
+<script>
+const API = (window.location.origin || 'http://127.0.0.1:5000') + '/api';
+let masterCurrent = 'dim_region';
+let masterPage = 1;
+let masterTotal = 0;
+
+async function get(path) {
+  try {
+    const r = await fetch(API + path);
+    if (!r.ok) throw new Error(r.statusText);
+    document.getElementById('db-status').textContent = '🟢 MongoDB conectado';
+    return await r.json();
+  } catch (e) {
+    document.getElementById('db-status').textContent = '🔴 Sin conexión';
+    return null;
+  }
+}
+
+async function needsBuild(tables) {
+  const dims = [
+    'dim_region','dim_pais','dim_categoria','dim_producto',
+    'dim_canal','dim_prioridad','dim_cliente','dim_tiempo'
+  ];
+  const empty = dims.filter(id => {
+    const t = tables.find(x => x.id === id);
+    return !t || (t.count || 0) === 0;
+  });
+  const summary = await get('/summary'); // total_orders = sales_records
+  const salesCount = summary?.total_orders || 0;
+  return empty.length >= 4 && salesCount > 0;
+}
+
+async function buildMasterTables() {
+  const btn = document.getElementById('btn-build');
+  const st = document.getElementById('build-status');
+  if (!confirm('¿Construir las 10 tablas maestras desde sales_records? (1–3 minutos)')) return;
+  btn.disabled = true;
+  st.textContent = 'Construyendo… no cierres esta pestaña';
+  try {
+    const r = await fetch(API + '/build_model', { method: 'POST' });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || r.statusText);
+    st.textContent = '✓ ' + (data.message || 'Listo');
+    document.getElementById('build-banner').style.display = 'none';
+    await initMasterButtons();
+  } catch (e) {
+    st.textContent = '✗ ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function initMasterButtons() {
+  const tables = await get('/master/tables');
+  if (!tables) return;
+  const show = await needsBuild(tables);
+  document.getElementById('build-banner').style.display = show ? 'block' : 'none';
+  const grid = document.getElementById('master-grid');
+  grid.innerHTML = tables.map(t => `
+    <button class="master-btn${t.id === masterCurrent ? ' active' : ''}" data-id="${t.id}" onclick="selectTable('${t.id}', this)">
+      <div class="name">${t.label}</div>
+      <div class="cnt">${(t.count ?? 0).toLocaleString('es-EC')} registros</div>
+    </button>`).join('');
+  loadRows();
+}
+
+function selectTable(id, btn) {
+  masterCurrent = id;
+  masterPage = 1;
+  document.querySelectorAll('.master-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('active-table-name').textContent =
+    btn?.querySelector('.name')?.textContent || id;
+  loadRows();
+}
+
+function clearFilter() {
+  document.getElementById('master-q').value = '';
+  masterPage = 1;
+  loadRows();
+}
+
+async function loadRows() {
+  const limit = +document.getElementById('master-limit').value;
+  const offset = (masterPage - 1) * limit;
+  const q = document.getElementById('master-q').value.trim();
+  const path = `/master/${masterCurrent}?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`;
+  const data = await get(path);
+  if (!data) return;
+  masterTotal = data.total || 0;
+  document.getElementById('active-table-name').textContent =
+    `${data.label || data.collection} (${masterTotal.toLocaleString('es-EC')} total)`;
+  const rows = data.rows || [];
+  if (!rows.length) {
+    document.getElementById('master-head').innerHTML = '';
+    document.getElementById('master-body').innerHTML = '<tr><td>Sin registros</td></tr>';
+    document.getElementById('master-page-info').textContent = '';
+    return;
+  }
+  const cols = Object.keys(rows[0]);
+  document.getElementById('master-head').innerHTML =
+    '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+  document.getElementById('master-body').innerHTML = rows.map(r =>
+    '<tr>' + cols.map(c => `<td title="${String(r[c] ?? '')}">${r[c] ?? ''}</td>`).join('') + '</tr>'
+  ).join('');
+  const pages = Math.max(1, Math.ceil(masterTotal / limit));
+  document.getElementById('master-page-info').textContent =
+    `Página ${masterPage} / ${pages}`;
+}
+
+function prevPage() {
+  if (masterPage > 1) { masterPage--; loadRows(); }
+}
+function nextPage() {
+  const limit = +document.getElementById('master-limit').value;
+  if (masterPage * limit < masterTotal) { masterPage++; loadRows(); }
+}
+
+initMasterButtons();
+</script>
+</body>
+</html>

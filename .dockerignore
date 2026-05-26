@@ -1,0 +1,12 @@
+.venv
+__pycache__
+*.pyc
+.env
+.git
+.gitignore
+data/raw/*.json
+*.md
+!README.md
+files/db_manager.py
+files/app.py
+pb_data

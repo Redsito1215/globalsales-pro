@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GLOBTRADE S.A. — Sistema de Inteligencia Comercial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #060a0f;
+  --surface:    #0d1520;
+  --surface2:   #111d2e;
+  --border:     #1a2f47;
+  --accent:     #00e5a0;
+  --accent2:    #0af;
+  --accent3:    #f5a623;
+  --danger:     #ff4d6d;
+  --text:       #e8edf5;
+  --muted:      #6b8299;
+  --font:       'Syne', sans-serif;
+  --mono:       'DM Mono', monospace;
+  --radius:     12px;
+  --glow:       0 0 30px rgba(0,229,160,.18);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:0;
+}
+
+/* ── Sidebar ───────────────────────────────────── */
+.sidebar {
+  position: fixed; left:0; top:0; bottom:0; width:240px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 100;
+  transition: transform .3s;
+}
+.logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.logo-mark {
+  font-size: 22px; font-weight: 800; letter-spacing: 3px;
+  color: var(--accent); line-height: 1;
+}
+.logo-sub {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  margin-top: 4px; letter-spacing: 1px; line-height: 1.5;
+}
+nav { flex:1; padding: 16px 12px; overflow-y:auto; }
+.nav-section { font-family:var(--mono); font-size:9px; letter-spacing:2px;
+  color:var(--muted); text-transform:uppercase; padding:12px 8px 6px; }
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  width:100%; padding:9px 12px; border-radius:8px; border:none;
+  background:transparent; color:var(--muted);
+  font-family:var(--font); font-size:13px; font-weight:600;
+  cursor:pointer; text-align:left; transition:all .15s;
+}
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: rgba(0,229,160,.1); color: var(--accent); }
+.nav-item .icon { font-size: 16px; width:20px; text-align:center; }
+
+.sidebar-footer {
+  padding:16px 20px;
+  border-top:1px solid var(--border);
+  font-family:var(--mono); font-size:10px; color:var(--muted);
+}
+#db-status { color:var(--accent); }
+
+/* ── Main ──────────────────────────────────────── */
+.main {
+  margin-left: 240px;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  position: relative; z-index:1;
+}
+.topbar {
+  position:sticky; top:0; z-index:50;
+  background:rgba(6,10,15,.85);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:0 32px; height:56px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+#topbar-title {
+  font-size:14px; font-weight:700; letter-spacing:2px;
+  text-transform:uppercase; color:var(--text);
+}
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.topbar-time { font-family:var(--mono); font-size:11px; color:var(--muted); }
+
+.content { flex:1; padding:28px 32px; }
+
+/* ── Pages ─────────────────────────────────────── */
+.page { display:none; }
+.page.active { display:block; }
+
+/* ── KPI Cards ─────────────────────────────────── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  transition: border-color .2s, transform .2s;
+  cursor:default;
+}
+.card:hover { border-color: rgba(0,229,160,.3); transform:translateY(-2px); }
+.card-accent { border-color: rgba(0,229,160,.3); box-shadow:var(--glow); }
+.card-label {
+  font-family:var(--mono); font-size:9px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--muted); margin-bottom:10px;
+}
+.card-value { font-size:28px; font-weight:800; color:var(--text); line-height:1; }
+.card-accent .card-value { color:var(--accent); }
+.card-sub { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:6px; }
+.card-delta {
+  display:inline-block; margin-top:8px;
+  font-family:var(--mono); font-size:10px;
+  padding:2px 7px; border-radius:4px;
+}
+.delta-up   { background:rgba(0,229,160,.15); color:var(--accent); }
+.delta-down { background:rgba(255,77,109,.15); color:var(--danger); }
+
+/* ── Filter Bar (Dashboard) ────────────────────── */
+.filter-bar {
+  display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px 20px;
+  margin-bottom:20px;
+}
+.filter-bar .fb-label {
+  font-family:var(--mono); font-size:9px; color:var(--accent);
+  letter-spacing:2px; text-transform:uppercase; margin-bottom:12px;
+  width:100%;
+}
+.fg { display:flex; flex-direction:column; gap:5px; }
+.fg label { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+select, input[type=text], input[type=number] {
+  background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  color:var(--text); font-family:var(--mono); font-size:11px;
+  padding:7px 10px; outline:none; transition:border-color .2s;
+  min-width:120px;
+}
+select:focus, input:focus { border-color:var(--accent); }
+option { background:var(--surface); }
+
+/* ── Charts ────────────────────────────────────── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.charts-row.single { grid-template-columns: 1fr; }
+.charts-row.tri    { grid-template-columns: 2fr 1fr 1fr; }
+.chart-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+.chart-title {
+  font-family:var(--mono); font-size:10px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:2px; margin-bottom:16px;
+}
+.chart-wrap { position:relative; height:220px; }
+.chart-wrap.tall { height:300px; }
+
+/* ── Tables ────────────────────────────────────── */
+.table-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); margin-bottom:14px; overflow:hidden;
+}
+.table-header {
+  padding:16px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.table-title { font-size:13px; font-weight:700; }
+.table-scroll { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+thead tr { background:var(--surface2); }
+th {
+  padding:10px 14px; text-align:left;
+  font-family:var(--mono); font-size:9px;
+  color:var(--muted); letter-spacing:2px; text-transform:uppercase;
+  white-space:nowrap; cursor:pointer; user-select:none;
+}
+th:hover { color:var(--text); }
+td { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.04); }
+tr:last-child td { border:none; }
+tr:hover td { background:rgba(255,255,255,.02); }
+
+/* ── Badges ────────────────────────────────────── */
+.badge {
+  display:inline-block; padding:2px 8px; border-radius:4px;
+  font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
+}
+.badge-Online  { background:rgba(0,229,160,.15); color:var(--accent); }
+.badge-Offline { background:rgba(0,170,255,.15);  color:var(--accent2); }
+.badge-C { background:rgba(255,77,109,.2);  color:var(--danger); }
+.badge-H { background:rgba(245,166,35,.2);  color:var(--accent3); }
+.badge-M { background:rgba(0,170,255,.15);  color:var(--accent2); }
+.badge-L { background:rgba(107,130,153,.2); color:var(--muted); }
+
+/* ── Filters (Orders page) ─────────────────────── */
+.filters {
+  display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px 20px; margin-bottom:16px;
+}
+.filter-group { display:flex; flex-direction:column; gap:4px; }
+.filter-group label { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; }
+
+/* ── Buttons ───────────────────────────────────── */
+.btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 16px; border-radius:8px; border:1px solid transparent;
+  font-family:var(--font); font-size:12px; font-weight:600;
+  cursor:pointer; transition:all .15s; white-space:nowrap;
+}
+.btn-primary { background:var(--accent); color:#000; }
+.btn-primary:hover { background:#00ffa8; box-shadow:var(--glow); }
+.btn-primary:disabled { opacity:.4; cursor:not-allowed; }
+.btn-ghost { background:transparent; border-color:var(--border); color:var(--muted); }
+.btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+.btn-danger { background:rgba(255,77,109,.15); border:1px solid rgba(255,77,109,.3); color:var(--danger); }
+
+/* ── Company page ──────────────────────────────── */
+.company-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.info-block {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:24px;
+}
+.info-block h3 { font-size:11px; font-family:var(--mono); color:var(--accent);
+  text-transform:uppercase; letter-spacing:2px; margin-bottom:14px; }
+.info-block p { font-size:13px; color:#b0c4d8; line-height:1.7; }
+.list-items { list-style:none; }
+.list-items li { padding:8px 0; border-bottom:1px solid var(--border);
+  font-size:13px; color:#b0c4d8; display:flex; gap:8px; }
+.list-items li:last-child { border:none; }
+.list-items li::before { content:'→'; color:var(--accent); flex-shrink:0; }
+.problems-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; }
+.problem-card { background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:20px; }
+.problem-card .num { font-family:var(--mono); font-size:32px; font-weight:300;
+  color:var(--border); line-height:1; margin-bottom:10px; }
+.problem-card h4 { font-size:13px; font-weight:700; margin-bottom:6px; color:var(--text); }
+.problem-card p  { font-size:12px; color:var(--muted); line-height:1.6; }
+.problem-card.sys .num { color:rgba(0,170,255,.25); }
+.problem-card.dec .num { color:rgba(245,166,35,.25); }
+
+/* ── Schema page ───────────────────────────────── */
+.schema-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+.schema-card { background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:18px; cursor:pointer; transition:all .2s; }
+.schema-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+.schema-card-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.schema-card-icon { font-size:20px; }
+.schema-card-name { font-size:14px; font-weight:700; }
+.schema-card-tag  { font-family:var(--mono); font-size:9px; color:var(--muted); }
+.field-list { list-style:none; }
+.field-list li { display:flex; justify-content:space-between; align-items:center;
+  padding:5px 0; border-bottom:1px solid rgba(255,255,255,.04); font-size:11px; }
+.field-list li:last-child { border:none; }
+.field-name { font-family:var(--mono); color:var(--text); }
+.field-type { font-family:var(--mono); color:var(--muted); font-size:10px; }
+.field-pk   { font-family:var(--mono); color:var(--accent); font-size:10px; }
+
+/* ── Load page ─────────────────────────────────── */
+.load-box { max-width:560px; margin:0 auto;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:32px; }
+.load-box h2 { margin-bottom:6px; }
+.load-box p  { color:var(--muted); font-size:13px; margin-bottom:24px; }
+.form-row { display:flex; flex-direction:column; gap:6px; margin-bottom:18px; }
+.form-row label { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:1px; }
+.form-row input { width:100%; }
+.log-box { background:#000; border:1px solid var(--border); border-radius:8px;
+  padding:14px; font-family:var(--mono); font-size:11px; color:var(--accent);
+  height:140px; overflow-y:auto; margin-top:18px; white-space:pre-wrap; }
+
+/* ── Summary mini table ────────────────────────── */
+.mini-stat { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.mini-stat:last-child { border:none; }
+.mini-stat-label { color:var(--muted); font-family:var(--mono); font-size:10px; }
+.mini-stat-val   { font-weight:700; }
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* ── Responsive ────────────────────────────────── */
+@media(max-width:900px){
+  .sidebar { transform:translateX(-100%); }
+  .main { margin-left:0; }
+  .charts-row, .charts-row.tri { grid-template-columns:1fr; }
+  .cards-grid { grid-template-columns:1fr 1fr; }
+  .company-grid, .problems-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div id="boot-screen" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#060a0f;color:#00e5a0;font-family:Syne,sans-serif">
+  <div style="font-size:28px;font-weight:800;letter-spacing:4px">GLOBTRADE</div>
+  <p style="margin-top:12px;color:#6b8299;font-size:13px">Cargando dashboard…</p>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">GLOBTRADE</div>
+    <div class="logo-sub">S.A. &nbsp;·&nbsp; Inteligencia Comercial</div>
+  </div>
+  <nav>
+    <div class="nav-section">Principal</div>
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <span class="icon">📊</span> Dashboard
+    </button>
+    <button class="nav-item" onclick="showPage('trends',this)">
+      <span class="icon">📈</span> Tendencias
+    </button>
+
+    <div class="nav-section">Análisis</div>
+    <button class="nav-item" onclick="showPage('regions',this)">
+      <span class="icon">🌍</span> Regiones & Países
+    </button>
+    <button class="nav-item" onclick="showPage('products',this)">
+      <span class="icon">📦</span> Productos
+    </button>
+    <button class="nav-item" onclick="showPage('orders',this)">
+      <span class="icon">🔍</span> Explorar Pedidos
+    </button>
+
+    <div class="nav-section">Datos</div>
+    <button class="nav-item" onclick="window.location.href='/master'">
+      <span class="icon">🗂️</span> Tablas maestras
+    </button>
+
+    <div class="nav-section">Empresa</div>
+    <button class="nav-item" onclick="showPage('company',this)">
+      <span class="icon">🏢</span> GLOBTRADE S.A.
+    </button>
+    <button class="nav-item" onclick="showPage('schema',this)">
+      <span class="icon">🗄</span> Modelo BD
+    </button>
+    <button class="nav-item" onclick="showPage('load',this)">
+      <span class="icon">⬆</span> Cargar Dataset
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    Estado: <span id="db-status">Conectando…</span>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div id="topbar-title">Dashboard</div>
+    <div class="topbar-right">
+      <span class="topbar-time" id="clock"></span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══════════════════════════════════════════
+         PAGE: DASHBOARD (página principal)
+    ══════════════════════════════════════════ -->
+    <div class="page active" id="page-dashboard">
+
+      <!-- ▸ FILTROS PRINCIPALES DEL DASHBOARD -->
+      <div class="filter-bar">
+        <div class="fb-label">🎯 Filtros del Dashboard</div>
+
+        <div class="fg">
+          <label>Región</label>
+          <select id="dash-region" onchange="applyDashFilters()">
+            <option value="">Todas las regiones</option>
+            <option>Sub-Saharan Africa</option>
+            <option>Europe</option>
+            <option>Asia</option>
+            <option>Middle East and North Africa</option>
+            <option>North America</option>
+            <option>Central America and the Caribbean</option>
+            <option>Australia and Oceania</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Tipo de Producto</label>
+          <select id="dash-itemtype" onchange="applyDashFilters()">
+            <option value="">Todos</option>
+            <option>Snacks</option><option>Cosmetics</option><option>Fruits</option>
+            <option>Personal Care</option><option>Household</option><option>Clothes</option>
+            <option>Vegetables</option><option>Office Supplies</option><option>Beverages</option>
+            <option>Meat</option><option>Cereal</option><option>Baby Food</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Canal de Venta</label>
+          <select id="dash-channel" onchange="applyDashFilters()">
+            <option value="">Todos</option>
+            <option>Online</option>
+            <option>Offline</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Prioridad</label>
+          <select id="dash-priority" onchange="applyDashFilters()">
+            <option value="">Todas</option>
+            <option value="C">C — Critical</option>
+            <option value="H">H — High</option>
+            <option value="M">M — Medium</option>
+            <option value="L">L — Low</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Período (meses)</label>
+          <select id="dash-months" onchange="applyDashFilters()">
+            <option value="12">Últimos 12 meses</option>
+            <option value="24" selected>Últimos 24 meses</option>
+            <option value="48">Últimos 48 meses</option>
+            <option value="999">Todo el histórico</option>
+          </select>
+        </div>
+
+        <div class="fg" style="padding-top:18px">
+          <button class="btn btn-ghost" onclick="resetDashFilters()">↺ Limpiar</button>
+        </div>
+      </div>
+
+      <div class="filter-bar" style="margin-top:12px;border-color:rgba(245,166,35,.25);background:rgba(245,166,35,.04)">
+        <div class="fb-label">⚡ Generar ventas (MongoDB)</div>
+        <div class="fg" style="min-width:140px">
+          <label>Cantidad a generar</label>
+          <input type="number" id="gen-count" value="100000" min="1000" step="1000" style="width:100%"/>
+        </div>
+        <div class="fg" style="padding-top:18px">
+          <button class="btn btn-primary" id="btn-gen" onclick="generateSalesRecords()">
+            ➕ Generar más registros en sales_records
+          </button>
+        </div>
+        <div class="fg" style="padding-top:18px;flex:1">
+          <span id="gen-status" style="font-family:var(--mono);font-size:11px;color:var(--muted)">
+            Usa regiones, países, productos, canales, prioridades y clientes.
+          </span>
+        </div>
+      </div>
+
+      <!-- ▸ KPI CARDS -->
+      <div class="cards-grid" id="kpi-cards">
+        <div class="card"><div class="card-label">Cargando…</div></div>
+      </div>
+
+      <!-- ▸ GRÁFICOS FILA 1 -->
+      <div class="charts-row">
+        <div class="chart-box">
+          <div class="chart-title">Ingresos por Región</div>
+          <div class="chart-wrap"><canvas id="chart-regions"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Canal de Venta — distribución</div>
+          <div class="chart-wrap"><canvas id="chart-channels"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ▸ GRÁFICOS FILA 2 -->
+      <div class="charts-row">
+        <div class="chart-box">
+          <div class="chart-title">Tendencia Mensual — Ingresos & Utilidad</div>
+          <div class="chart-wrap"><canvas id="chart-trend-dash"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Top 10 Países por Ingreso</div>
+          <div class="chart-wrap"><canvas id="chart-countries"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ▸ GRÁFICOS FILA 3 -->
+      <div class="charts-row">
+        <div class="chart-box">
+          <div class="chart-title">Prioridad de Pedidos — Tiempo promedio entrega (días)</div>
+          <div class="chart-wrap"><canvas id="chart-priorities"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Ingresos por Tipo de Producto</div>
+          <div class="chart-wrap"><canvas id="chart-products-dash"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ▸ TABLA DE REGISTROS -->
+      <div class="table-box" style="margin-top:8px">
+        <div class="table-header">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div class="table-title">📋 Sales Records</div>
+            <span id="dash-records-count" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="dash-page-size" onchange="dashTable.setPageSize(+this.value)" style="font-size:11px;padding:5px 8px;width:auto">
+              <option value="25">25 filas</option>
+              <option value="50" selected>50 filas</option>
+              <option value="100">100 filas</option>
+              <option value="200">200 filas</option>
+            </select>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="dashTable.prev()">‹ Ant</button>
+            <span id="dash-page-info" style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap"></span>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="dashTable.next()">Sig ›</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th>Order ID</th>
+              <th>Región</th>
+              <th>País</th>
+              <th>Producto</th>
+              <th>Canal</th>
+              <th>Prior.</th>
+              <th>Fecha Pedido</th>
+              <th>Fecha Envío</th>
+              <th>Unidades</th>
+              <th>P. Unit</th>
+              <th>C. Unit</th>
+              <th>Ingresos</th>
+              <th>Costo Total</th>
+              <th>Utilidad</th>
+            </tr></thead>
+            <tbody id="body-dash-records"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         PAGE: TRENDS
+    ══════════════════════════════════════════ -->
+    <div class="page" id="page-trends">
+      <div class="charts-row single">
+        <div class="chart-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div class="chart-title" style="margin:0">Tendencia Mensual — Ingresos & Utilidad</div>
+            <select id="trend-months" onchange="loadTrends()" style="width:auto;font-size:12px;padding:5px 10px">
+              <option value="12">Últimos 12 meses</option>
+              <option value="24" selected>Últimos 24 meses</option>
+              <option value="48">Últimos 48 meses</option>
+            </select>
+          </div>
+          <div class="chart-wrap tall"><canvas id="chart-trend"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-box">
+          <div class="chart-title">Ingresos por Tipo de Producto</div>
+          <div class="chart-wrap"><canvas id="chart-products-bar"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Unidades Vendidas por Categoría</div>
+          <div class="chart-wrap"><canvas id="chart-products-pie"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         PAGE: REGIONS
+    ══════════════════════════════════════════ -->
+    <div class="page" id="page-regions">
+      <div class="table-box">
+        <div class="table-header">
+          <div class="table-title">Desempeño por Región</div>
+        </div>
+        <div class="table-scroll">
+          <table id="tbl-regions"><thead><tr>
+            <th>Región</th><th>Ingresos (USD)</th><th>Utilidad (USD)</th><th>Pedidos</th><th>Margen</th>
+          </tr></thead><tbody id="body-regions"></tbody></table>
+        </div>
+      </div>
+      <div class="table-box">
+        <div class="table-header">
+          <div class="table-title">Top 20 Países</div>
+          <button class="btn btn-ghost" onclick="loadCountries(20)">Ver más</button>
+        </div>
+        <div class="table-scroll">
+          <table id="tbl-countries"><thead><tr>
+            <th>#</th><th>País</th><th>Ingresos (USD)</th><th>Pedidos</th>
+          </tr></thead><tbody id="body-countries"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         PAGE: PRODUCTS
+    ══════════════════════════════════════════ -->
+    <div class="page" id="page-products">
+      <div class="table-box">
+        <div class="table-header"><div class="table-title">Análisis por Tipo de Producto</div></div>
+        <div class="table-scroll">
+          <table><thead><tr>
+            <th>Producto</th><th>Unidades Vendidas</th><th>Ingresos (USD)</th><th>Utilidad (USD)</th><th>Margen</th>
+          </tr></thead><tbody id="body-products"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         PAGE: ORDERS
+    ══════════════════════════════════════════ -->
+    <div class="page" id="page-orders">
+      <div class="filters">
+        <div class="filter-group">
+          <label>País</label>
+          <input id="f-country" type="text" placeholder="ej. Mexico" style="width:150px" />
+        </div>
+        <div class="filter-group">
+          <label>Tipo de Producto</label>
+          <select id="f-itemtype">
+            <option value="">Todos</option>
+            <option>Snacks</option><option>Cosmetics</option><option>Fruits</option>
+            <option>Personal Care</option><option>Household</option><option>Clothes</option>
+            <option>Vegetables</option><option>Office Supplies</option><option>Beverages</option>
+            <option>Meat</option><option>Cereal</option><option>Baby Food</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Canal</label>
+          <select id="f-channel">
+            <option value="">Todos</option>
+            <option>Online</option><option>Offline</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Prioridad</label>
+          <select id="f-priority">
+            <option value="">Todas</option>
+            <option value="C">C — Critical</option>
+            <option value="H">H — High</option>
+            <option value="M">M — Medium</option>
+            <option value="L">L — Low</option>
+          </select>
+        </div>
+        <div class="filter-group" style="justify-content:flex-end;padding-top:18px">
+          <button class="btn btn-primary" onclick="ordersTable.search()">🔍 Buscar</button>
+        </div>
+      </div>
+      <div class="table-box">
+        <div class="table-header">
+          <div class="table-title">📋 Pedidos</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span id="orders-count" style="font-family:var(--mono);font-size:11px;color:var(--muted)"></span>
+            <select id="orders-page-size" onchange="ordersTable.setPageSize(+this.value)" style="font-size:11px;padding:5px 8px;width:auto">
+              <option value="50">50 filas</option>
+              <option value="100">100 filas</option>
+              <option value="200">200 filas</option>
+            </select>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="ordersTable.prev()">‹ Ant</button>
+            <span id="orders-page-info" style="font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap"></span>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="ordersTable.next()">Sig ›</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table><thead><tr>
+            <th>Order ID</th><th>País</th><th>Región</th><th>Producto</th><th>Canal</th>
+            <th>Prioridad</th><th>Fecha Pedido</th><th>Fecha Envío</th>
+            <th>Unidades</th><th>Ingreso</th><th>Utilidad</th>
+          </tr></thead><tbody id="body-orders"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         PAGE: COMPANY
+    ══════════════════════════════════════════ -->
+    <div class="page" id="page-company">
+
+      <!-- ENCABEZADO EMPRESA -->
+      <div style="margin-bottom:28px">
+        <h1 style="font-size:36px;font-weight:800;letter-spacing:-1px;margin-bottom:6px">
+          GLOBTRADE <span style="color:var(--accent)">S.A.</span>
+        </h1>
+        <p style="color:var(--muted);font-size:13px;font-family:var(--mono);letter-spacing:1px">
+          EMPRESA DE DISTRIBUCIÓN Y COMERCIO INTERNACIONAL ESTRATÉGICO · FUNDADA 2010 · 185+ PAÍSES
+        </p>
+      </div>
+
+      <!-- MISIÓN Y VISIÓN -->
+      <div class="company-grid" style="margin-bottom:20px">
+        <div class="info-block">
+          <h3>🎯 Misión</h3>
+          <p>Conectar productores y consumidores a escala global, optimizando cadenas de suministro multirregionales mediante tecnología de datos, análisis predictivo e inteligencia comercial, para garantizar entregas eficientes, rentables y sostenibles en los cinco continentes.</p>
+        </div>
+        <div class="info-block">
+          <h3>🔭 Visión</h3>
+          <p>Ser la empresa líder mundial en distribución comercial internacional para 2030, reconocida por su infraestructura tecnológica de vanguardia, su red logística en 200+ países y su capacidad de generar valor sostenible para clientes, proveedores y accionistas.</p>
+        </div>
+      </div>
+
+      <!-- OBJETIVOS: 3 COLUMNAS -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:28px">
+        <div class="info-block">
+          <h3>🏛 Objetivos Estratégicos</h3>
+          <ul class="list-items">
+            <li>Expandir presencia a 200+ países para 2027</li>
+            <li>Alcanzar USD 2,000M en ingresos anuales</li>
+            <li>Lograr margen de utilidad neta ≥ 30%</li>
+            <li>Implementar BI en tiempo real en toda la cadena</li>
+            <li>Reducir tiempo de entrega crítica a &lt; 24h globalmente</li>
+            <li>Diversificar a 20 categorías de producto para 2028</li>
+          </ul>
+        </div>
+        <div class="info-block">
+          <h3>⚙ Objetivos Tácticos</h3>
+          <ul class="list-items">
+            <li>Digitalizar el 100% de los pedidos en 18 meses</li>
+            <li>Reducir costos logísticos en 15% anual</li>
+            <li>Implementar CRM y ERP integrados en 2 años</li>
+            <li>Capacitar al 100% del personal en herramientas data</li>
+            <li>Establecer alianzas con 50 nuevos proveedores</li>
+            <li>Lanzar canal online en 30 nuevos países por año</li>
+          </ul>
+        </div>
+        <div class="info-block">
+          <h3>🔧 Objetivos Operacionales</h3>
+          <ul class="list-items">
+            <li>Procesar 100% de pedidos en &lt; 2h hábiles</li>
+            <li>Mantener tasa de error de envío &lt; 0.5%</li>
+            <li>Actualizar stock en tiempo real cada 15 min</li>
+            <li>Generar reportes KPI diarios automáticos</li>
+            <li>Resolver incidencias logísticas en &lt; 4h</li>
+            <li>Auditar registros de ventas semanalmente</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 10 PROBLEMAS SISTEMAS & SOFTWARE -->
+      <h2 style="font-size:18px;font-weight:800;margin-bottom:6px">
+        🔴 Problemas — <span style="color:var(--accent2)">Sistemas &amp; Software</span>
+      </h2>
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:16px;letter-spacing:1px">
+        ÁMBITO TECNOLÓGICO · 10 PROBLEMAS IDENTIFICADOS
+      </p>
+      <div class="problems-grid" style="margin-bottom:36px">
+        <div class="problem-card sys">
+          <div class="num">01</div>
+          <h4>Falta de integración de sistemas</h4>
+          <p>ERP, WMS y CRM operan en silos sin API unificada, generando duplicidad de datos y errores manuales en cada sincronización.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">02</div>
+          <h4>Calidad inconsistente del dataset</h4>
+          <p>El CSV fuente contiene fechas en formato no estándar, valores nulos en columnas clave y registros duplicados que distorsionan reportes.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">03</div>
+          <h4>Ausencia de pipeline ETL automatizado</h4>
+          <p>La carga de datos se realiza manualmente cada vez; no existe un proceso ETL programado que actualice la BD de forma continua y confiable.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">04</div>
+          <h4>Escalabilidad de la base de datos</h4>
+          <p>PostgreSQL sin particionamiento ni índices compuestos optimizados responde lentamente con volúmenes superiores a 500K registros.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">05</div>
+          <h4>Seguridad y control de acceso</h4>
+          <p>No existe sistema de roles y permisos granular; todos los usuarios ven datos sensibles de precios, costos y utilidades sin restricción.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">06</div>
+          <h4>Sin capa de caché en reportes</h4>
+          <p>Cada consulta recalcula los KPIs desde cero en PostgreSQL, sobrecargando el servidor en horas pico y degradando la experiencia de usuario.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">07</div>
+          <h4>Ausencia de monitoreo y alertas</h4>
+          <p>No existe sistema de observabilidad (logs, métricas, trazas) que detecte fallos del servidor Flask o caídas de la conexión a la BD en tiempo real.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">08</div>
+          <h4>Sin estrategia de backup y recuperación</h4>
+          <p>La base de datos carece de política de respaldos automáticos (full + incremental); una falla de disco implicaría pérdida total de los 100K registros.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">09</div>
+          <h4>Deuda técnica en el frontend</h4>
+          <p>La interfaz web mezcla lógica de negocio, presentación y llamadas a API en un solo archivo HTML sin modularización ni pruebas automatizadas.</p>
+        </div>
+        <div class="problem-card sys">
+          <div class="num">10</div>
+          <h4>Falta de API versionada y documentada</h4>
+          <p>Los endpoints REST no tienen versionado (/v1/), documentación OpenAPI ni manejo consistente de errores, dificultando integraciones futuras.</p>
+        </div>
+      </div>
+
+      <!-- 10 PROBLEMAS TOMA DE DECISIONES -->
+      <h2 style="font-size:18px;font-weight:800;margin-bottom:6px">
+        🟡 Problemas — <span style="color:var(--accent3)">Toma de Decisiones</span>
+      </h2>
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:16px;letter-spacing:1px">
+        ÁMBITO GERENCIAL Y ESTRATÉGICO · 10 PROBLEMAS IDENTIFICADOS
+      </p>
+      <div class="problems-grid" style="margin-bottom:20px">
+        <div class="problem-card dec">
+          <div class="num">01</div>
+          <h4>¿Qué región priorizar en expansión?</h4>
+          <p>No existe un modelo cuantitativo que rankee oportunidades de inversión por rentabilidad proyectada, riesgo político y potencial de mercado.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">02</div>
+          <h4>¿Qué productos descontinuar?</h4>
+          <p>Sin análisis de margen vs. volumen vs. tendencia temporal no se puede identificar qué categorías son lastre financiero para el portafolio.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">03</div>
+          <h4>¿Online u Offline según país?</h4>
+          <p>No existe análisis segmentado que muestre cuál canal genera mejor margen neto por país, región y tipo de producto simultáneamente.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">04</div>
+          <h4>¿Cómo optimizar precios?</h4>
+          <p>Los precios son estáticos en todo el mundo; no se aprovechan datos históricos de demanda, competencia o estacionalidad para pricing dinámico.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">05</div>
+          <h4>¿Cuándo y cuánto stockear?</h4>
+          <p>Sin modelo predictivo de demanda por categoría y región, el área de compras sobreabastece productos de baja rotación y desabastece los de alta.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">06</div>
+          <h4>¿Qué prioridades de pedido son rentables?</h4>
+          <p>No se ha calculado si el costo operativo de prioridad Critical supera el ingreso diferencial; se acepta sin análisis de rentabilidad por SLA.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">07</div>
+          <h4>¿A qué clientes retener y cuáles dejar ir?</h4>
+          <p>Sin segmentación RFM (Recencia, Frecuencia, Monto) no se puede focalizar esfuerzos de retención en los clientes de mayor valor estratégico.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">08</div>
+          <h4>¿Cómo asignar presupuesto de logística?</h4>
+          <p>El presupuesto se distribuye por país sin considerar el ratio costo-beneficio real; países con alto costo y bajo ingreso absorben recursos sin justificación.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">09</div>
+          <h4>¿Cuándo escalar infraestructura tecnológica?</h4>
+          <p>No hay criterios definidos (volumen de transacciones, latencia, usuarios concurrentes) para decidir cuándo migrar a cloud o escalar servidores.</p>
+        </div>
+        <div class="problem-card dec">
+          <div class="num">10</div>
+          <h4>¿Cómo medir el éxito del negocio?</h4>
+          <p>Los KPIs actuales (ingresos, utilidad, pedidos) son insuficientes; no hay OKRs definidos por área, ni alertas automáticas cuando un indicador se desvía.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         PAGE: SCHEMA
+    ══════════════════════════════════════════ -->
+    <div class="page" id="page-schema">
+      <div style="margin-bottom:24px">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:6px">Modelo Relacional — 11 Tablas</h2>
+        <p style="color:var(--muted);font-size:13px">1 tabla contenedora del dataset + 10 tablas del modelo de empresa GLOBTRADE S.A.</p>
+      </div>
+      <div class="schema-grid" id="schema-grid"></div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         PAGE: LOAD DATASET
+    ══════════════════════════════════════════ -->
+    <div class="page" id="page-load">
+      <div class="load-box">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:6px">⬆ Cargar Dataset</h2>
+        <p>Carga el CSV en MongoDB y reconstruye las tablas del modelo de GLOBTRADE S.A.</p>
+        <div class="form-row">
+          <label>Ruta del archivo CSV</label>
+          <input id="csv-path" value="sales.csv" placeholder="Ruta absoluta o relativa al CSV" />
+        </div>
+        <button class="btn btn-primary" onclick="loadDataset()" id="btn-load">
+          ⬆ Cargar Dataset Completo
+        </button>
+        <div class="log-box" id="load-log">Listo para cargar. Haz clic en el botón para iniciar.\n</div>
+        <div style="margin-top:18px;padding:14px;background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.15);border-radius:8px">
+          <p style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.8">
+            ℹ️ &nbsp;Esta operación:<br>
+            1. Trunca y recarga <strong>sales_records</strong> con el CSV<br>
+            2. Construye las 10 tablas del modelo empresarial<br>
+            3. Actualiza vistas y KPIs mensuales<br>
+            Tiempo estimado: 15–40 seg para 100,000 registros.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main><!-- /main -->
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────
+const API = (window.location.origin || 'http://127.0.0.1:5000') + '/api';
+
+function hideBootScreen() {
+  const el = document.getElementById('boot-screen');
+  if (el) el.style.display = 'none';
+}
+let chartsMap = {};
+
+// ── Reloj ───────────────────────────────────────────────────────────
+function updateClock(){
+  document.getElementById('clock').textContent =
+    new Date().toLocaleString('es-EC',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateClock,1000); updateClock();
+
+// ── HTTP helpers ────────────────────────────────────────────────────
+async function get(path) {
+  try {
+    const r = await fetch(API + path);
+    if (!r.ok) throw new Error(r.statusText);
+    document.getElementById('db-status').textContent = '🟢 Conectado';
+    return await r.json();
+  } catch(e) {
+    document.getElementById('db-status').textContent = '🔴 Sin conexión';
+    return null;
+  }
+}
+
+// ── Navigation ──────────────────────────────────────────────────────
+const titles = {
+  dashboard:'Dashboard',   trends:'Tendencias',
+  regions:'Regiones & Países', products:'Productos',
+  orders:'Explorar Pedidos',   company:'GLOBTRADE S.A.',
+  schema:'Modelo de Base de Datos', load:'Cargar Dataset'
+};
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  document.getElementById('topbar-title').textContent = titles[id]||id;
+  loadPage(id);
+}
+function loadPage(id) {
+  if(id==='dashboard') loadDashboard();
+  else if(id==='trends')   loadTrends();
+  else if(id==='regions')  loadRegions();
+  else if(id==='products') loadProducts();
+  else if(id==='orders')   loadOrders();
+  else if(id==='schema')   renderSchema();
+}
+
+// ── Formatters ──────────────────────────────────────────────────────
+const fmtUSD = v => v==null?'—':'$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
+const fmtNum = v => v==null?'—':Number(v).toLocaleString('en-US');
+const fmtPct = v => v==null?'—':Number(v).toFixed(1)+'%';
+
+// ── Chart helpers ────────────────────────────────────────────────────
+const COLORS=['#00e5a0','#00aaff','#f5a623','#ff4d6d','#a78bfa','#34d399','#fb923c','#60a5fa','#f472b6','#4ade80'];
+function destroyChart(id){ if(chartsMap[id]){chartsMap[id].destroy();delete chartsMap[id];} }
+
+function drawBar(id, labels, data, label='', color='#00e5a0') {
+  destroyChart(id);
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if(!ctx) return;
+  chartsMap[id] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{label, data, backgroundColor:color+'88', borderColor:color, borderWidth:1, borderRadius:6}]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#6b8299',font:{size:10}}, grid:{color:'#1a2f47'}},
+                y:{ticks:{color:'#6b8299',font:{size:10}}, grid:{color:'#1a2f47'}}}}
+  });
+}
+function drawBarH(id, labels, data) {
+  destroyChart(id);
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if(!ctx) return;
+  chartsMap[id] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{data, backgroundColor: COLORS.map(c=>c+'88'), borderColor:COLORS, borderWidth:1, borderRadius:4}]},
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#6b8299',font:{size:9}}, grid:{color:'#1a2f47'}},
+                y:{ticks:{color:'#e8edf5',font:{size:10}}, grid:{display:false}}}}
+  });
+}
+function drawDoughnut(id, labels, data) {
+  destroyChart(id);
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if(!ctx) return;
+  chartsMap[id] = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{data, backgroundColor:COLORS.map(c=>c+'cc'), borderColor:'#060a0f', borderWidth:2}]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'right', labels:{color:'#e8edf5',font:{size:11},padding:12}}}}
+  });
+}
+function drawLine(id, labels, rev, profit) {
+  destroyChart(id);
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if(!ctx) return;
+  chartsMap[id] = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'Ingresos', data:rev, borderColor:'#00e5a0', backgroundColor:'rgba(0,229,160,.08)',
+       fill:true, tension:.4, pointRadius:3, pointBackgroundColor:'#00e5a0'},
+      {label:'Utilidad',  data:profit, borderColor:'#00aaff', backgroundColor:'rgba(0,170,255,.06)',
+       fill:true, tension:.4, pointRadius:3, pointBackgroundColor:'#00aaff'}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#e8edf5',font:{size:11}}}},
+      scales:{ x:{ticks:{color:'#6b8299',font:{size:10},maxTicksLimit:12}, grid:{color:'#1a2f47'}},
+                y:{ticks:{color:'#6b8299',font:{size:10}}, grid:{color:'#1a2f47'}}}}
+  });
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────
+// Construye query params según los filtros del dashboard
+function getDashParams() {
+  const region   = document.getElementById('dash-region')?.value   || '';
+  const itemtype = document.getElementById('dash-itemtype')?.value || '';
+  const channel  = document.getElementById('dash-channel')?.value  || '';
+  const priority = document.getElementById('dash-priority')?.value || '';
+  const months   = document.getElementById('dash-months')?.value   || '24';
+  // Los filtros se aplican vía la página de orders para los datos tabulares.
+  // Para KPIs usamos los endpoints globales (sin filtros en backend aún).
+  return { region, itemtype, channel, priority, months };
+}
+
+function resetDashFilters() {
+  ['dash-region','dash-itemtype','dash-channel','dash-priority'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  document.getElementById('dash-months').value = '24';
+  loadDashboard();
+}
+
+function applyDashFilters() { loadDashboard(); }
+
+async function loadDashboard() {
+  hideBootScreen();
+  const { months } = getDashParams();
+  const s = await get('/summary');
+  if(!s) {
+    document.getElementById('kpi-cards').innerHTML =
+      '<div class="card"><div class="card-label">Sin datos</div><div class="card-value" style="font-size:14px">MongoDB no responde. ¿Está corriendo el servicio y app.py?</div></div>';
+    return;
+  }
+
+  const margin = s.total_revenue ? ((s.total_profit/s.total_revenue)*100).toFixed(1) : '—';
+  document.getElementById('kpi-cards').innerHTML = `
+    <div class="card card-accent">
+      <div class="card-label">Ingresos Totales</div>
+      <div class="card-value">${fmtUSD(s.total_revenue)}</div>
+      <div class="card-sub">USD acumulados</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Utilidad Total</div>
+      <div class="card-value">${fmtUSD(s.total_profit)}</div>
+      <div class="card-sub">Margen: ${margin}%</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Pedidos</div>
+      <div class="card-value">${fmtNum(s.total_orders)}</div>
+      <div class="card-sub">Registros en BD</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cobertura</div>
+      <div class="card-value">${s.countries}</div>
+      <div class="card-sub">${s.item_types} tipos de producto</div>
+    </div>`;
+
+  // Parámetros para la tabla (respeta filtros de canal, producto y prioridad)
+  const { itemtype, channel, priority } = getDashParams();
+
+  const [regs, chs, prios, tops, trend, prods] = await Promise.all([
+    get('/regions'),
+    get('/channels'),
+    get('/priorities'),
+    get('/countries?top=10'),
+    get('/trend?months='+months),
+    get('/products'),
+  ]);
+
+  if(regs)  drawBar('chart-regions',
+    regs.map(r=>r.region.split(' ')[0]), regs.map(r=>r.revenue), 'Ingresos');
+  if(chs)   drawDoughnut('chart-channels',
+    chs.map(r=>r.sales_channel), chs.map(r=>r.revenue));
+  if(prios) drawBar('chart-priorities',
+    prios.map(r=>r.order_priority), prios.map(r=>r.avg_days), 'Días promedio', '#f5a623');
+  if(tops)  drawBarH('chart-countries',
+    tops.map(r=>r.country), tops.map(r=>r.revenue));
+  if(trend) drawLine('chart-trend-dash',
+    trend.map(r=>r.month), trend.map(r=>r.revenue), trend.map(r=>r.profit));
+  if(prods) drawBar('chart-products-dash',
+    prods.map(r=>r.item_type), prods.map(r=>r.revenue), 'Ingresos', '#00aaff');
+
+  // Tabla con paginación server-side (muestra los 100k registros completos)
+  const tableFilters = {};
+  if(itemtype) tableFilters.item_type = itemtype;
+  if(channel)  tableFilters.channel   = channel;
+  if(priority) tableFilters.priority  = priority;
+  dashTable.load(tableFilters);
+}
+
+// ── Trends ───────────────────────────────────────────────────────────
+async function loadTrends() {
+  const n = document.getElementById('trend-months')?.value || 24;
+  const [trend, prods] = await Promise.all([get('/trend?months='+n), get('/products')]);
+  if(trend) drawLine('chart-trend',
+    trend.map(r=>r.month), trend.map(r=>r.revenue), trend.map(r=>r.profit));
+  if(prods) {
+    drawBar('chart-products-bar',
+      prods.map(r=>r.item_type), prods.map(r=>r.revenue), 'Ingresos', '#00aaf5');
+    drawDoughnut('chart-products-pie',
+      prods.map(r=>r.item_type), prods.map(r=>r.units));
+  }
+}
+
+// ── Regions ──────────────────────────────────────────────────────────
+async function loadRegions() {
+  const regs = await get('/regions');
+  if(regs) {
+    document.getElementById('body-regions').innerHTML = regs.map(r=>{
+      const m = r.revenue>0 ? ((r.profit/r.revenue)*100).toFixed(1) : '—';
+      return `<tr>
+        <td>${r.region}</td>
+        <td>${fmtUSD(r.revenue)}</td>
+        <td>${fmtUSD(r.profit)}</td>
+        <td>${fmtNum(r.orders)}</td>
+        <td>${m}%</td>
+      </tr>`;
+    }).join('');
+  }
+  loadCountries(20);
+}
+async function loadCountries(n=10) {
+  const tops = await get('/countries?top='+n);
+  if(tops) {
+    document.getElementById('body-countries').innerHTML = tops.map((r,i)=>`<tr>
+      <td style="color:var(--muted);font-family:var(--mono)">${i+1}</td>
+      <td>${r.country}</td>
+      <td>${fmtUSD(r.revenue)}</td>
+      <td>${fmtNum(r.orders)}</td>
+    </tr>`).join('');
+  }
+}
+
+// ── Products ──────────────────────────────────────────────────────────
+async function loadProducts() {
+  const data = await get('/products');
+  if(data) {
+    document.getElementById('body-products').innerHTML = data.map(r=>{
+      const m = r.revenue>0 ? ((r.profit/r.revenue)*100).toFixed(1) : '—';
+      return `<tr>
+        <td>${r.item_type}</td>
+        <td>${fmtNum(r.units)}</td>
+        <td>${fmtUSD(r.revenue)}</td>
+        <td>${fmtUSD(r.profit)}</td>
+        <td>${m}%</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ── Orders (server-side pagination) ─────────────────────────────────
+class OrdersTable {
+  constructor() {
+    this.total    = 0;
+    this.page     = 1;
+    this.pageSize = 50;
+    this._filters = {};
+    this._loading = false;
+  }
+
+  // Called when page loads or "Buscar" is clicked
+  async search() {
+    this._filters = {
+      country:   document.getElementById('f-country')?.value  || '',
+      item_type: document.getElementById('f-itemtype')?.value || '',
+      channel:   document.getElementById('f-channel')?.value  || '',
+      priority:  document.getElementById('f-priority')?.value || '',
+    };
+    // Remove empty filters
+    Object.keys(this._filters).forEach(k => {
+      if(!this._filters[k]) delete this._filters[k];
+    });
+    this.page = 1;
+    await this._fetchCount();
+    await this._fetchPage();
+  }
+
+  async setPageSize(n) { this.pageSize = n; this.page = 1; await this._fetchPage(); }
+  async prev() { if(this.page > 1) { this.page--; await this._fetchPage(); } }
+  async next() { if(this.page < this._totalPages()) { this.page++; await this._fetchPage(); } }
+
+  _totalPages() { return Math.max(1, Math.ceil(this.total / this.pageSize)); }
+
+  async _fetchCount() {
+    const p = new URLSearchParams(this._filters);
+    const res = await get('/orders/count?' + p);
+    this.total = res ? res.total : 0;
+    document.getElementById('orders-count').textContent =
+      `${this.total.toLocaleString()} registros`;
+  }
+
+  async _fetchPage() {
+    if(this._loading) return;
+    this._loading = true;
+    const offset = (this.page - 1) * this.pageSize;
+    const p = new URLSearchParams({ ...this._filters, limit: this.pageSize, offset });
+    const rows = await get('/orders?' + p);
+    this._loading = false;
+    document.getElementById('orders-page-info').textContent =
+      `Pág ${this.page} / ${this._totalPages()}`;
+    document.getElementById('body-orders').innerHTML = (rows || []).map(r => `<tr>
+      <td style="font-family:var(--mono);color:var(--muted);font-size:10px">${r.order_id}</td>
+      <td>${r.country}</td>
+      <td style="color:var(--muted);font-size:11px">${r.region||'—'}</td>
+      <td>${r.item_type}</td>
+      <td><span class="badge badge-${r.sales_channel}">${r.sales_channel}</span></td>
+      <td><span class="badge badge-${r.order_priority}">${r.order_priority}</span></td>
+      <td style="font-family:var(--mono);font-size:11px">${r.order_date}</td>
+      <td style="font-family:var(--mono);font-size:11px">${r.ship_date}</td>
+      <td style="font-family:var(--mono);text-align:right">${fmtNum(r.units_sold)}</td>
+      <td style="font-family:var(--mono);text-align:right">${fmtUSD(r.total_revenue)}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--accent)">${fmtUSD(r.total_profit)}</td>
+    </tr>`).join('');
+  }
+}
+
+const ordersTable = new OrdersTable();
+
+// Called by navigation (loadPage)
+async function loadOrders() { await ordersTable.search(); }
+
+// ── Dataset Load ──────────────────────────────────────────────────────
+async function loadDataset() {
+  const log = document.getElementById('load-log');
+  const btn = document.getElementById('btn-load');
+  btn.disabled = true; btn.textContent = '⏳ Cargando…';
+  log.textContent = '[' + new Date().toLocaleTimeString() + '] Iniciando carga...\n';
+  try {
+    const r = await fetch(API+'/load_dataset', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({csv_path: document.getElementById('csv-path').value})
+    });
+    const d = await r.json();
+    log.textContent += '[' + new Date().toLocaleTimeString() + '] '
+      + (d.status==='ok'?'✅ ':'❌ ') + d.message + '\n';
+  } catch(e) {
+    log.textContent += '❌ Error: '+e.message+'\n';
+  }
+  btn.disabled = false; btn.textContent = '⬆ Cargar Dataset Completo';
+}
+
+// ── Schema ────────────────────────────────────────────────────────────
+function renderSchema() {
+  const tables = [
+    { icon:'📊', name:'sales_records', tag:'TABLA BASE (Dataset)', fields:[
+      ['region','TEXT'],['country','TEXT'],['item_type','TEXT'],['sales_channel','TEXT'],
+      ['order_priority','CHAR(1)'],['order_date','DATE'],['order_id','BIGINT','PK'],
+      ['ship_date','DATE'],['units_sold','INTEGER'],['unit_price','NUMERIC'],
+      ['unit_cost','NUMERIC'],['total_revenue','NUMERIC'],['total_cost','NUMERIC'],['total_profit','NUMERIC']
+    ]},
+    { icon:'🌐', name:'regions', tag:'Zonas Comerciales', fields:[
+      ['region_id','SERIAL','PK'],['name','TEXT'],['description','TEXT']
+    ]},
+    { icon:'🗺', name:'countries', tag:'Países', fields:[
+      ['country_id','SERIAL','PK'],['name','TEXT'],['region_id','INTEGER → regions']
+    ]},
+    { icon:'🏷', name:'product_categories', tag:'Categorías', fields:[
+      ['category_id','SERIAL','PK'],['name','TEXT'],['description','TEXT']
+    ]},
+    { icon:'📦', name:'products', tag:'Productos', fields:[
+      ['product_id','SERIAL','PK'],['name','TEXT'],['category_id','INTEGER → categories'],
+      ['unit_price','NUMERIC'],['unit_cost','NUMERIC'],['margin_pct','NUMERIC (calc.)']
+    ]},
+    { icon:'🔀', name:'sales_channels', tag:'Canales de Venta', fields:[
+      ['channel_id','SERIAL','PK'],['name','TEXT'],['description','TEXT']
+    ]},
+    { icon:'🚦', name:'order_priorities', tag:'Prioridades', fields:[
+      ['priority_id','SERIAL','PK'],['code','CHAR(1)'],['name','TEXT'],
+      ['sla_days','INTEGER'],['description','TEXT']
+    ]},
+    { icon:'👤', name:'clients', tag:'Clientes', fields:[
+      ['client_id','SERIAL','PK'],['name','TEXT'],['country_id','INTEGER → countries'],
+      ['channel_id','INTEGER → channels'],['email','TEXT'],['phone','TEXT'],['created_at','DATE']
+    ]},
+    { icon:'🛒', name:'orders', tag:'Pedidos', fields:[
+      ['order_id','BIGINT','PK'],['client_id','INTEGER → clients'],
+      ['country_id','INTEGER → countries'],['channel_id','INTEGER → channels'],
+      ['priority_id','INTEGER → priorities'],['order_date','DATE'],['ship_date','DATE'],
+      ['delivery_days','INTEGER (calc.)'],['total_revenue','NUMERIC'],
+      ['total_cost','NUMERIC'],['total_profit','NUMERIC'],['status','TEXT']
+    ]},
+    { icon:'📋', name:'order_lines', tag:'Líneas de Pedido', fields:[
+      ['line_id','SERIAL','PK'],['order_id','BIGINT → orders'],
+      ['category_id','INTEGER → categories'],['units_sold','INTEGER'],
+      ['unit_price','NUMERIC'],['unit_cost','NUMERIC'],
+      ['line_revenue','NUMERIC (calc.)'],['line_cost','NUMERIC (calc.)']
+    ]},
+    { icon:'📈', name:'monthly_kpis', tag:'KPIs Mensuales (BI)', fields:[
+      ['kpi_id','SERIAL','PK'],['year','INTEGER'],['month','INTEGER'],
+      ['region','TEXT'],['item_type','TEXT'],['total_orders','INTEGER'],
+      ['total_units','BIGINT'],['total_revenue','NUMERIC'],['total_cost','NUMERIC'],
+      ['total_profit','NUMERIC'],['avg_margin_pct','NUMERIC']
+    ]}
+  ];
+  document.getElementById('schema-grid').innerHTML = tables.map(t=>`
+    <div class="schema-card">
+      <div class="schema-card-head">
+        <span class="schema-card-icon">${t.icon}</span>
+        <div>
+          <div class="schema-card-name">${t.name}</div>
+          <div class="schema-card-tag">${t.tag}</div>
+        </div>
+      </div>
+      <ul class="field-list">
+        ${t.fields.map(f=>`<li>
+          <span class="field-name">${f[0]}</span>
+          <span class="${f[2]?'field-pk':'field-type'}">${f[2]||f[1]}</span>
+        </li>`).join('')}
+      </ul>
+    </div>`).join('');
+}
+
+// ── Tabla de Sales Records en Dashboard (server-side pagination) ──────
+class DashTable {
+  constructor() {
+    this.total     = 0;
+    this.page      = 1;
+    this.pageSize  = 50;
+    this._filters  = {};
+    this._loading  = false;
+  }
+
+  async load(filters = {}) {
+    this._filters = filters;
+    this.page = 1;
+    await this._fetchCount();
+    await this._fetchPage();
+  }
+
+  async setPageSize(n) { this.pageSize = n; this.page = 1; await this._fetchPage(); }
+  async prev() { if(this.page > 1) { this.page--; await this._fetchPage(); } }
+  async next() { if(this.page < this._totalPages()) { this.page++; await this._fetchPage(); } }
+
+  _totalPages() { return Math.max(1, Math.ceil(this.total / this.pageSize)); }
+
+  async _fetchCount() {
+    const p = new URLSearchParams(this._filters);
+    const res = await get('/orders/count?' + p);
+    this.total = res ? res.total : 0;
+  }
+
+  async _fetchPage() {
+    if(this._loading) return;
+    this._loading = true;
+    const offset = (this.page - 1) * this.pageSize;
+    const p = new URLSearchParams({
+      ...this._filters,
+      limit: this.pageSize,
+      offset: offset
+    });
+    const rows = await get('/orders?' + p);
+    this._loading = false;
+    this._render(rows || []);
+  }
+
+  _render(slice) {
+    document.getElementById('dash-records-count').textContent =
+      `${this.total.toLocaleString()} registros`;
+    document.getElementById('dash-page-info').textContent =
+      `Pág ${this.page} / ${this._totalPages()}`;
+
+    const profitColor = v => Number(v) >= 0 ? 'var(--accent)' : 'var(--danger)';
+
+    document.getElementById('body-dash-records').innerHTML = slice.map(r => `
+      <tr>
+        <td style="font-family:var(--mono);color:var(--muted);font-size:10px">${r.order_id}</td>
+        <td style="font-size:11px;color:var(--muted)">${r.region}</td>
+        <td>${r.country}</td>
+        <td>${r.item_type}</td>
+        <td><span class="badge badge-${r.sales_channel}">${r.sales_channel}</span></td>
+        <td><span class="badge badge-${r.order_priority}">${r.order_priority}</span></td>
+        <td style="font-family:var(--mono);font-size:11px">${r.order_date}</td>
+        <td style="font-family:var(--mono);font-size:11px">${r.ship_date}</td>
+        <td style="font-family:var(--mono);text-align:right">${fmtNum(r.units_sold)}</td>
+        <td style="font-family:var(--mono);text-align:right">${fmtUSD(r.unit_price)}</td>
+        <td style="font-family:var(--mono);text-align:right;color:var(--muted)">${fmtUSD(r.unit_cost)}</td>
+        <td style="font-family:var(--mono);text-align:right">${fmtUSD(r.total_revenue)}</td>
+        <td style="font-family:var(--mono);text-align:right;color:var(--muted)">${fmtUSD(r.total_cost)}</td>
+        <td style="font-family:var(--mono);text-align:right;color:${profitColor(r.total_profit)}">${fmtUSD(r.total_profit)}</td>
+      </tr>`).join('');
+  }
+}
+
+const dashTable = new DashTable();
+
+async function generateSalesRecords() {
+  const count = parseInt(document.getElementById('gen-count').value, 10) || 100000;
+  if (!confirm(`¿Generar ${count.toLocaleString('es-EC')} ventas nuevas en sales_records usando las tablas maestras?`)) return;
+  const btn = document.getElementById('btn-gen');
+  const status = document.getElementById('gen-status');
+  btn.disabled = true;
+  status.textContent = 'Generando desde tablas maestras… puede tardar 1–3 minutos';
+  try {
+    const r = await fetch(API + '/sales_records/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || r.statusText);
+    status.textContent = `✓ Generados: ${data.inserted?.toLocaleString('es-EC')} · Total sales_records: ${data.total_after?.toLocaleString('es-EC')}`;
+    loadDashboard();
+  } catch (e) {
+    status.textContent = '✗ Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  hideBootScreen();
+  loadDashboard().catch(err => {
+    hideBootScreen();
+    console.error(err);
+    const k = document.getElementById('kpi-cards');
+    if (k) k.innerHTML = `<div class="card"><div class="card-label">Error</div><div class="card-value" style="font-size:13px">${err.message}</div></div>`;
+  });
+});
+</script>
+</body>
+</html>
