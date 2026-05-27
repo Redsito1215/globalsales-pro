@@ -52,14 +52,23 @@ uvicorn api.main:app --reload
 python frontend\app.py
 ```
 
-## Docker Desktop
+## Docker Desktop (solo desde esta carpeta)
 
-Ver [README-DOCKER.md](README-DOCKER.md):
+**No uses `C:\globtrade`.** Esa carpeta era una copia antigua; todo corre aquí en `C:\vicuna`:
 
 ```powershell
+cd C:\vicuna
 docker compose up -d --build
 docker compose --profile etl-mongo run --rm etl-mongo
 ```
+
+Si Docker Desktop aún apunta a `C:\globtrade`, ejecuta una vez:
+
+```powershell
+.\scripts\docker-unificar.ps1
+```
+
+Ver detalles en [README-DOCKER.md](README-DOCKER.md).
 
 ## Kiro
 
@@ -70,6 +79,4 @@ Abre en Kiro la spec que corresponda:
 
 Ejecuta el dashboard desde `frontend/app.py` (no desde la carpeta antigua `files/`).
 
-## Carpeta `eliminar/`
 
-Todo lo que ya no sirve está en **`eliminar/`** (copia vieja `files/`, PocketBase, docs, etc.). Cuando no lo necesites, borra esa carpeta entera para liberar espacio.

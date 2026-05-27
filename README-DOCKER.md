@@ -1,5 +1,9 @@
 # Docker — GLOBTRADE S.A.
 
+> **Una sola carpeta de código:** `C:\vicuna`. No copies el proyecto a `C:\globtrade`.
+> Si tienes esa carpeta duplicada, apágala con `docker compose down` allí y usa solo vicuna.
+> Script de ayuda: `.\scripts\docker-unificar.ps1`
+
 ## Requisitos
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y **en ejecución**

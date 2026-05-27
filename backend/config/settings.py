@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     api_port: int = 8000
     web_port: int = 5000
 
+    flask_secret_key: str = "globtrade-dev-change-in-production"
+    session_days: int = 7
+
     def model_post_init(self, __context) -> None:
         def _clean(s: str) -> str:
             return s.strip().strip("\ufeff").strip("\r").strip("\n")
@@ -31,6 +34,7 @@ class Settings(BaseSettings):
         self.pocketbase_admin_email = _clean(self.pocketbase_admin_email)
         self.pocketbase_admin_password = _clean(self.pocketbase_admin_password)
         self.pocketbase_url = self.pocketbase_url.rstrip("/")
+        self.flask_secret_key = _clean(self.flask_secret_key)
 
 
 settings = Settings()

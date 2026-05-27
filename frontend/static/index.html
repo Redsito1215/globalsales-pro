@@ -107,6 +107,29 @@ nav { flex:1; padding: 16px 12px; overflow-y:auto; }
 }
 .topbar-right { display:flex; align-items:center; gap:12px; }
 .topbar-time { font-family:var(--mono); font-size:11px; color:var(--muted); }
+.auth-guest, .auth-user { display:flex; align-items:center; gap:8px; }
+.auth-user-name { font-size:12px; font-weight:700; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.auth-user-role { font-family:var(--mono); font-size:9px; color:var(--accent); letter-spacing:1px; text-transform:uppercase; }
+.btn-auth { padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); border:1px solid var(--border); background:transparent; color:var(--text); }
+.btn-auth:hover { border-color:var(--accent); color:var(--accent); }
+.btn-auth-primary { background:var(--accent); color:#060a0f; border-color:var(--accent); }
+.btn-auth-primary:hover { filter:brightness(1.08); color:#060a0f; }
+.auth-modal { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.72); align-items:center; justify-content:center; padding:20px; }
+.auth-modal.open { display:flex; }
+.auth-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; width:100%; max-width:400px; padding:28px 26px; box-shadow:var(--glow); }
+.auth-card h3 { font-size:18px; font-weight:800; margin-bottom:4px; }
+.auth-card .auth-sub { font-family:var(--mono); font-size:10px; color:var(--muted); margin-bottom:20px; }
+.auth-field { margin-bottom:14px; }
+.auth-field label { display:block; font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+.auth-field input { width:100%; }
+.auth-err { font-family:var(--mono); font-size:10px; color:var(--danger); margin-top:4px; display:none; }
+.auth-form-msg { font-family:var(--mono); font-size:11px; margin-bottom:12px; display:none; }
+.auth-actions { display:flex; gap:10px; margin-top:18px; }
+.auth-actions .btn { flex:1; }
+.auth-switch { margin-top:14px; font-size:12px; color:var(--muted); text-align:center; }
+.auth-switch a { color:var(--accent); cursor:pointer; text-decoration:none; font-weight:700; }
+.auth-close { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; }
+.auth-card-wrap { position:relative; }
 
 .content { flex:1; padding:28px 32px; }
 
@@ -383,6 +406,17 @@ tr:hover td { background:rgba(255,255,255,.02); }
   <div class="topbar">
     <div id="topbar-title">Dashboard</div>
     <div class="topbar-right">
+      <div id="auth-guest" class="auth-guest">
+        <button type="button" class="btn-auth" id="btn-open-login">Iniciar sesión</button>
+        <button type="button" class="btn-auth btn-auth-primary" id="btn-open-register">Crear cuenta</button>
+      </div>
+      <div id="auth-user" class="auth-user" style="display:none">
+        <div>
+          <div class="auth-user-name" id="auth-user-name">—</div>
+          <div class="auth-user-role" id="auth-user-role">—</div>
+        </div>
+        <button type="button" class="btn-auth" id="btn-logout">Cerrar sesión</button>
+      </div>
       <span class="topbar-time" id="clock"></span>
     </div>
   </div>
@@ -455,24 +489,6 @@ tr:hover td { background:rgba(255,255,255,.02); }
 
         <div class="fg" style="padding-top:18px">
           <button class="btn btn-ghost" onclick="resetDashFilters()">↺ Limpiar</button>
-        </div>
-      </div>
-
-      <div class="filter-bar" style="margin-top:12px;border-color:rgba(245,166,35,.25);background:rgba(245,166,35,.04)">
-        <div class="fb-label">⚡ Generar ventas (MongoDB)</div>
-        <div class="fg" style="min-width:140px">
-          <label>Cantidad a generar</label>
-          <input type="number" id="gen-count" value="100000" min="1000" step="1000" style="width:100%"/>
-        </div>
-        <div class="fg" style="padding-top:18px">
-          <button class="btn btn-primary" id="btn-gen" onclick="generateSalesRecords()">
-            ➕ Generar más registros en sales_records
-          </button>
-        </div>
-        <div class="fg" style="padding-top:18px;flex:1">
-          <span id="gen-status" style="font-family:var(--mono);font-size:11px;color:var(--muted)">
-            Usa regiones, países, productos, canales, prioridades y clientes.
-          </span>
         </div>
       </div>
 
@@ -928,9 +944,74 @@ tr:hover td { background:rgba(255,255,255,.02); }
   </div><!-- /content -->
 </main><!-- /main -->
 
+<!-- Autenticación -->
+<div class="auth-modal" id="modal-login" role="dialog" aria-labelledby="login-title">
+  <div class="auth-card-wrap">
+    <div class="auth-card">
+      <button type="button" class="auth-close" data-auth-close aria-label="Cerrar">×</button>
+      <h3 id="login-title">Iniciar sesión</h3>
+      <p class="auth-sub">Accede para exportar, cargar datos y administrar el sistema.</p>
+      <div class="auth-form-msg" id="login-form-msg"></div>
+      <div class="auth-field">
+        <label for="login-email">Correo electrónico</label>
+        <input type="email" id="login-email" autocomplete="email" placeholder="tu@correo.com" />
+        <div class="auth-err" id="login-err-email"></div>
+      </div>
+      <div class="auth-field">
+        <label for="login-password">Contraseña</label>
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••" />
+        <div class="auth-err" id="login-err-password"></div>
+      </div>
+      <div class="auth-actions">
+        <button type="button" class="btn btn-ghost" data-auth-close>Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-login-submit">Entrar</button>
+      </div>
+      <p class="auth-switch">¿No tienes cuenta? <a href="#" id="link-to-register">Crear cuenta</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="auth-modal" id="modal-register" role="dialog" aria-labelledby="register-title">
+  <div class="auth-card-wrap">
+    <div class="auth-card">
+      <button type="button" class="auth-close" data-auth-close aria-label="Cerrar">×</button>
+      <h3 id="register-title">Crear cuenta</h3>
+      <p class="auth-sub">El primer usuario registrado será administrador del sistema.</p>
+      <div class="auth-form-msg" id="register-form-msg"></div>
+      <div class="auth-field">
+        <label for="reg-name">Nombre completo</label>
+        <input type="text" id="reg-name" autocomplete="name" placeholder="Tu nombre" />
+        <div class="auth-err" id="reg-err-name"></div>
+      </div>
+      <div class="auth-field">
+        <label for="reg-email">Correo electrónico</label>
+        <input type="email" id="reg-email" autocomplete="email" placeholder="tu@correo.com" />
+        <div class="auth-err" id="reg-err-email"></div>
+      </div>
+      <div class="auth-field">
+        <label for="reg-password">Contraseña</label>
+        <input type="password" id="reg-password" autocomplete="new-password" placeholder="Mín. 8 caracteres, letra y número" />
+        <div class="auth-err" id="reg-err-password"></div>
+      </div>
+      <div class="auth-field">
+        <label for="reg-password2">Confirmar contraseña</label>
+        <input type="password" id="reg-password2" autocomplete="new-password" placeholder="Repite la contraseña" />
+        <div class="auth-err" id="reg-err-password_confirm"></div>
+      </div>
+      <div class="auth-actions">
+        <button type="button" class="btn btn-ghost" data-auth-close>Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-register-submit">Registrarme</button>
+      </div>
+      <p class="auth-switch">¿Ya tienes cuenta? <a href="#" id="link-to-login">Iniciar sesión</a></p>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/auth.js"></script>
 <script>
 // ── Config ──────────────────────────────────────────────────────────
-const API = (window.location.origin || 'http://127.0.0.1:5000') + '/api';
+window.GLOBTRADE_API = (window.location.origin || 'http://127.0.0.1:5000') + '/api';
+const API = window.GLOBTRADE_API;
 
 function hideBootScreen() {
   const el = document.getElementById('boot-screen');
@@ -948,7 +1029,7 @@ setInterval(updateClock,1000); updateClock();
 // ── HTTP helpers ────────────────────────────────────────────────────
 async function get(path) {
   try {
-    const r = await fetch(API + path);
+    const r = await fetch(API + path, { credentials: 'same-origin' });
     if (!r.ok) throw new Error(r.statusText);
     document.getElementById('db-status').textContent = '🟢 Conectado';
     return await r.json();
@@ -1269,18 +1350,20 @@ async function loadOrders() { await ordersTable.search(); }
 
 // ── Dataset Load ──────────────────────────────────────────────────────
 async function loadDataset() {
+  if (!window.GlobtradeAuth?.requireAuth({ admin: true, message: 'Inicia sesión como administrador para cargar el dataset.' })) return;
   const log = document.getElementById('load-log');
   const btn = document.getElementById('btn-load');
   btn.disabled = true; btn.textContent = '⏳ Cargando…';
   log.textContent = '[' + new Date().toLocaleTimeString() + '] Iniciando carga...\n';
   try {
-    const r = await fetch(API+'/load_dataset', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({csv_path: document.getElementById('csv-path').value})
+    const res = await window.GlobtradeAuth.fetchWithAuth('/load_dataset', {
+      method: 'POST',
+      body: JSON.stringify({ csv_path: document.getElementById('csv-path').value }),
+      auth: { admin: true },
     });
-    const d = await r.json();
+    const d = res.data || {};
     log.textContent += '[' + new Date().toLocaleTimeString() + '] '
-      + (d.status==='ok'?'✅ ':'❌ ') + d.message + '\n';
+      + (res.ok && d.status === 'ok' ? '✅ ' : '❌ ') + (d.message || 'Error') + '\n';
   } catch(e) {
     log.textContent += '❌ Error: '+e.message+'\n';
   }
@@ -1432,32 +1515,34 @@ class DashTable {
 const dashTable = new DashTable();
 
 async function generateSalesRecords() {
-  const count = parseInt(document.getElementById('gen-count').value, 10) || 100000;
+  if (!window.GlobtradeAuth?.requireAuth({ admin: true, message: 'Inicia sesión como administrador para generar ventas.' })) return;
+  const count = parseInt(document.getElementById('gen-count')?.value, 10) || 100000;
   if (!confirm(`¿Generar ${count.toLocaleString('es-EC')} ventas nuevas en sales_records usando las tablas maestras?`)) return;
   const btn = document.getElementById('btn-gen');
   const status = document.getElementById('gen-status');
-  btn.disabled = true;
-  status.textContent = 'Generando desde tablas maestras… puede tardar 1–3 minutos';
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Generando desde tablas maestras… puede tardar 1–3 minutos';
   try {
-    const r = await fetch(API + '/sales_records/generate', {
+    const res = await window.GlobtradeAuth.fetchWithAuth('/sales_records/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count })
+      body: JSON.stringify({ count }),
+      auth: { admin: true },
     });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.message || r.statusText);
-    status.textContent = `✓ Generados: ${data.inserted?.toLocaleString('es-EC')} · Total sales_records: ${data.total_after?.toLocaleString('es-EC')}`;
+    const data = res.data || {};
+    if (!res.ok) throw new Error(data.message || 'Error');
+    if (status) status.textContent = `✓ Generados: ${data.inserted?.toLocaleString('es-EC')} · Total: ${data.total_after?.toLocaleString('es-EC')}`;
     loadDashboard();
   } catch (e) {
-    status.textContent = '✗ Error: ' + e.message;
+    if (status) status.textContent = '✗ Error: ' + e.message;
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   hideBootScreen();
+  if (window.GlobtradeAuth) await window.GlobtradeAuth.refreshSession();
   loadDashboard().catch(err => {
     hideBootScreen();
     console.error(err);

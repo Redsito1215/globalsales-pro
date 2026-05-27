@@ -53,9 +53,14 @@ services:
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: globtrade_dw
       WEB_PORT: "5000"
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-globtrade-docker-change-me}
     volumes:
       - ./data:/app/data
       - ./frontend/static:/app/frontend/static:ro
+      - ./frontend/app.py:/app/frontend/app.py:ro
+      - ./frontend/mongo_manager.py:/app/frontend/mongo_manager.py:ro
+      - ./backend/auth:/app/backend/auth:ro
+      - ./backend/config:/app/backend/config:ro
     depends_on:
       mongo:
         condition: service_healthy
