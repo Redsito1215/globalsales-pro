@@ -1,0 +1,9 @@
+.venv/
+.cursor/
+__pycache__/
+*.pyc
+.env
+data/parquet/*.parquet
+data/raw/*
+!data/raw/.gitkeep
+!data/.gitkeep

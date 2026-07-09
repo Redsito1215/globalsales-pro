@@ -1,0 +1,307 @@
+/* ═══════════════════════════════════════════════════════════════
+   TEMA — fuente única (claro / oscuro). Cargar al final.
+   ═══════════════════════════════════════════════════════════════ */
+
+html[data-theme="light"],
+html.theme-light {
+  color-scheme: light;
+  --bg: #f6f6f7;
+  --surface: #ffffff;
+  --surface2: #f1f2f4;
+  --border: #e1e3e5;
+  --text: #202223;
+  --muted: #6d7175;
+  --accent: #008060;
+  --accent-hover: #004c3f;
+  --accent2: #5c6ac4;
+  --accent3: #b98900;
+  --danger: #d82c0d;
+  --topbar-bg: #ffffff;
+  --topbar-text: #202223;
+  --topbar-border: #e1e3e5;
+  --topbar-control-bg: #f1f2f4;
+  --topbar-control-border: #c9cccf;
+  --topbar-control-text: #202223;
+  --input-bg: #ffffff;
+  --input-border: #c9cccf;
+  --chart-grid: #e5e7eb;
+  --chart-text: #6b7280;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --panel-highlight-bg: rgba(0, 128, 96, 0.06);
+  --panel-highlight-border: rgba(0, 128, 96, 0.18);
+  --shop-sidebar-bg: #ffffff;
+  --shop-sidebar-text: #202223;
+  --shop-sidebar-muted: #6d7175;
+  --shop-sidebar-border: #e1e3e5;
+  --shop-sidebar-hover: #f1f2f4;
+  --shop-sidebar-active-bg: rgba(0, 128, 96, 0.12);
+  --shop-sidebar-active-border: rgba(0, 128, 96, 0.35);
+  --shop-green-light: #e3f1df;
+  --shop-green-dark: #004c3f;
+}
+
+html[data-theme="dark"],
+html.theme-dark {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --surface2: #252a33;
+  --border: #3d4553;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --accent: #00a47c;
+  --accent-hover: #008060;
+  --accent2: #60a5fa;
+  --accent3: #fbbf24;
+  --danger: #f87171;
+  --topbar-bg: #1a1d24;
+  --topbar-text: #f3f4f6;
+  --topbar-border: #3d4553;
+  --topbar-control-bg: #252a33;
+  --topbar-control-border: #4b5563;
+  --topbar-control-text: #f3f4f6;
+  --input-bg: #252a33;
+  --input-border: #4b5563;
+  --chart-grid: #3d4553;
+  --chart-text: #9ca3af;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --panel-highlight-bg: rgba(0, 164, 124, 0.12);
+  --panel-highlight-border: rgba(0, 164, 124, 0.28);
+  --shop-sidebar-bg: #121418;
+  --shop-sidebar-text: #e3e3e3;
+  --shop-sidebar-muted: #9ca3af;
+  --shop-sidebar-border: rgba(255, 255, 255, 0.08);
+  --shop-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --shop-sidebar-active-bg: rgba(0, 128, 96, 0.28);
+  --shop-sidebar-active-border: rgba(0, 164, 124, 0.35);
+  --shop-green-light: rgba(0, 164, 124, 0.18);
+  --shop-green-dark: #6ee7b7;
+}
+
+/* Superficies principales */
+body {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.main,
+.content,
+.page-shell {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* Sidebar — cambia con el tema */
+.sidebar {
+  background: var(--shop-sidebar-bg) !important;
+  border-right: 1px solid var(--shop-sidebar-border) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.sidebar .logo {
+  border-bottom-color: var(--shop-sidebar-border) !important;
+}
+
+.sidebar .logo-mark {
+  color: var(--shop-sidebar-text) !important;
+}
+
+.sidebar .logo-sub,
+.sidebar .nav-section,
+.sidebar-footer {
+  color: var(--shop-sidebar-muted) !important;
+}
+
+.sidebar .nav-item {
+  color: var(--shop-sidebar-text) !important;
+}
+
+.sidebar .nav-item:hover {
+  background: var(--shop-sidebar-hover) !important;
+  color: var(--shop-sidebar-text) !important;
+}
+
+.sidebar .nav-item.active {
+  background: var(--shop-sidebar-active-bg) !important;
+  border-color: var(--shop-sidebar-active-border) !important;
+  color: var(--shop-sidebar-text) !important;
+}
+
+html[data-theme="light"] .sidebar .nav-item.active .nav-icon,
+html.theme-light .sidebar .nav-item.active .nav-icon {
+  color: var(--accent);
+}
+
+html[data-theme="dark"] .sidebar .nav-item.active .nav-icon,
+html.theme-dark .sidebar .nav-item.active .nav-icon {
+  color: #6ee7b7;
+}
+
+html[data-theme="light"] .sidebar-user-card,
+html.theme-light .sidebar-user-card {
+  background: var(--surface2);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .sidebar-user-name,
+html.theme-light .sidebar-user-name {
+  color: var(--text);
+}
+
+html[data-theme="dark"] .sidebar-user-card,
+html.theme-dark .sidebar-user-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dark"] .sidebar-user-name,
+html.theme-dark .sidebar-user-name {
+  color: #fff;
+}
+
+html[data-theme="light"] .sidebar-btn--outline,
+html.theme-light .sidebar-btn--outline {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme="light"] .sidebar-btn--logout,
+html.theme-light .sidebar-btn--logout {
+  background: var(--surface2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Topbar */
+.topbar {
+  background: var(--topbar-bg) !important;
+  border-bottom: 1px solid var(--topbar-border) !important;
+  color: var(--topbar-text) !important;
+}
+
+.topbar #topbar-title,
+.topbar-time,
+.auth-user-label {
+  color: var(--topbar-text) !important;
+}
+
+.auth-user-label {
+  color: var(--muted) !important;
+}
+
+.topbar-time {
+  color: var(--muted) !important;
+}
+
+/* Cards y paneles */
+.filters,
+.page-panel,
+.chart-box,
+.table-box,
+.dash-panel,
+.stat-card,
+.load-box,
+.modal-card,
+.shop-collections,
+.shop-cart,
+.shop-product-card,
+.card,
+.info-block,
+.problem-card,
+.schema-card {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.dash-filters select,
+.dash-filters input,
+.filters input,
+.filters select {
+  background-color: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--text) !important;
+}
+
+#page-tienda,
+.shop-catalog-wrap {
+  background-color: var(--bg) !important;
+}
+
+.shop-cart-foot,
+.shop-product-media,
+thead tr,
+.log-box,
+.page-tabs {
+  background-color: var(--surface2) !important;
+}
+
+.shop-search {
+  background-color: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--text) !important;
+}
+
+.page-badge,
+.dash-badge {
+  color: var(--shop-green-dark);
+  background: var(--shop-green-light);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+
+.stat-card--accent {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface)) !important;
+}
+
+.page-tabs .btn.active,
+.page-tabs .ventas-tab-btn.active {
+  background: var(--surface) !important;
+  color: var(--accent) !important;
+}
+
+#boot-screen {
+  background: var(--bg) !important;
+  color: var(--accent) !important;
+}
+
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme="dark"] .modal-backdrop,
+html.theme-dark .modal-backdrop {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.load-hint {
+  background: var(--panel-highlight-bg);
+  border: 1px solid var(--panel-highlight-border);
+}
+
+.sidebar-auth-hint {
+  display: none;
+}
+
+select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+}
+
+tr:hover td {
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface2));
+}
+
+#db-status {
+  color: var(--accent) !important;
+}

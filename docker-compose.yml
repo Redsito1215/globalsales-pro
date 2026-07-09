@@ -1,0 +1,95 @@
+# GLOBTRADE S.A. — C:\proyect6softwa
+# Un solo stack: mongo + web + api
+# Web http://localhost:5001  |  API http://localhost:8001  |  Mongo :27017
+# Uso: docker compose up -d --build
+
+name: globtrade-saas
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: globtrade-saas-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: globtrade-saas-api
+    restart: unless-stopped
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"
+    environment:
+      PYTHONPATH: /app/backend:/app
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: globtrade_dw
+      API_PORT: "8000"
+      CSV_SOURCE: /app/data/sales.csv
+    volumes:
+      - ./data:/app/data
+      - ./backend/auth:/app/backend/auth:ro
+      - ./backend/config:/app/backend/config:ro
+      - ./backend/etl:/app/backend/etl:ro
+      - ./backend/shared:/app/backend/shared:ro
+      - ./paquetes:/app/paquetes:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  web:
+    build: .
+    container_name: globtrade-saas-web
+    restart: unless-stopped
+    command: >
+      sh -c "find /app/paquetes -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null;
+      python frontend/app.py"
+    ports:
+      - "5001:5000"
+    environment:
+      PYTHONPATH: /app/backend:/app
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: globtrade_dw
+      WEB_PORT: "5000"
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-globtrade-docker-change-me}
+    volumes:
+      - ./data:/app/data
+      - ./frontend/app.py:/app/frontend/app.py:ro
+      - ./frontend/static:/app/frontend/static
+      - ./paquetes:/app/paquetes:ro
+      - ./backend/auth:/app/backend/auth:ro
+      - ./backend/config:/app/backend/config:ro
+      - ./backend/shared:/app/backend/shared:ro
+      - ./backend/etl:/app/backend/etl:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  etl-mongo:
+    build: .
+    profiles: ["etl-mongo"]
+    container_name: globtrade-saas-etl
+    command: python -m etl.run_pipeline_mongo
+    environment:
+      PYTHONPATH: /app/backend
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: globtrade_dw
+      CSV_SOURCE: /app/data/sales.csv
+      POCKETBASE_COLLECTION: sales_records
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
+    external: true
+    name: globtrade_mongo_data

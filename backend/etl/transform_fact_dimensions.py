@@ -1,0 +1,304 @@
+"""Paso 4 — Dimensiones, hechos y espejos SQL (sin duplicar products / product_categories)."""
+from __future__ import annotations
+
+import os
+import sys
+from datetime import datetime
+
+import pandas as pd
+from pymongo import MongoClient
+
+from shared.collections_q1 import drop_duplicate_catalog_collections
+
+CATEGORY_DESC = {
+    "Baby Food": "Alimentos para bebés",
+    "Beverages": "Bebidas y líquidos",
+    "Cereal": "Cereales y granos",
+    "Clothes": "Prendas de vestir y moda",
+    "Cosmetics": "Productos de belleza y cuidado facial",
+    "Fruits": "Frutas frescas e importadas",
+    "Household": "Artículos del hogar",
+    "Meat": "Carnes y derivados",
+    "Office Supplies": "Insumos de oficina",
+    "Personal Care": "Higiene y cuidado personal",
+    "Snacks": "Productos de botana y snacks envasados",
+    "Vegetables": "Verduras y hortalizas",
+}
+
+
+def _mirror(db, src: str, dst: str) -> None:
+    docs = list(db[src].find({}, {"_id": 0}))
+    db[dst].delete_many({})
+    if docs:
+        db[dst].insert_many(docs)
+    print(f"  {dst}: {len(docs)}")
+
+
+def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
+    uri = mongo_uri or os.getenv("MONGO_URI")
+    name = mongo_db or os.getenv("MONGO_DB")
+    if not uri or not name:
+        try:
+            from config.settings import settings as _s
+
+            uri = uri or _s.mongo_uri
+            name = name or _s.mongo_db
+        except ImportError:
+            uri = uri or "mongodb://localhost:27017"
+            name = name or "globtrade_dw"
+
+    client = MongoClient(uri)
+    db = client[name]
+    rows = list(db["sales_records"].find({}, {"_id": 0}))
+    if not rows:
+        print("sales_records vacío.", file=sys.stderr)
+        sys.exit(1)
+
+    df = pd.DataFrame(rows)
+    df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
+    df["ship_date"] = pd.to_datetime(df["ship_date"], errors="coerce")
+
+    from paquetes.tablero import catalogo_modelo as cat_model
+    from paquetes.tablero import catalogo_nombres as nom
+
+    # ── Regiones y países ─────────────────────────────────────────────
+    db["dim_region"].delete_many({})
+    rmap: dict[str, int] = {}
+    regions = []
+    for i, rname in enumerate(sorted(df["region"].dropna().unique()), start=1):
+        regions.append({"region_id": i, "name": rname, "description": f"Zona comercial: {rname}"})
+        rmap[rname] = i
+    db["dim_region"].insert_many(regions)
+
+    db["dim_pais"].delete_many({})
+    cmap: dict[str, int] = {}
+    paises = []
+    for i, row in enumerate(
+        df[["country", "region"]].drop_duplicates().sort_values("country").itertuples(index=False),
+        start=1,
+    ):
+        paises.append({"country_id": i, "name": row.country, "region_id": rmap[row.region]})
+        cmap[row.country] = i
+    db["dim_pais"].insert_many(paises)
+
+    # ── Categorías y productos (catálogo oficial 120 SKUs) ───────────
+    catmap = {nom.CATEGORY_BY_ID[cid]: cid for cid in nom.CATEGORY_BY_ID}
+    db["dim_categoria"].delete_many({})
+    categorias = []
+    for cid in sorted(nom.CATEGORY_BY_ID.keys()):
+        cname = nom.CATEGORY_BY_ID[cid]
+        categorias.append(
+            {
+                "category_id": cid,
+                "name": cname,
+                "description": CATEGORY_DESC.get(cname, "Categoría general"),
+            }
+        )
+    db["dim_categoria"].insert_many(categorias)
+
+    old_images = {
+        int(r["product_id"]): r.get("image_url")
+        for r in db["dim_producto"].find({"image_url": {"$ne": None}}, {"product_id": 1, "image_url": 1})
+    }
+    productos = []
+    for cid in sorted(nom.CATEGORY_BY_ID.keys()):
+        cname = nom.CATEGORY_BY_ID[cid]
+        sub = df[df["item_type"] == cname]
+        if sub.empty:
+            continue
+        stats = {
+            "revenue": float(sub["total_revenue"].sum()),
+            "units": int(sub["units_sold"].sum()),
+            "orders": len(sub),
+            "unit_price": float(sub["unit_price"].iloc[0]),
+            "unit_cost": float(sub["unit_cost"].mean()),
+        }
+        for p in cat_model.build_products_for_category(cid, cname, stats):
+            pid = int(p["product_id"])
+            productos.append(
+                {
+                    "product_id": pid,
+                    "name": p["name"],
+                    "category_id": int(p["category_id"]),
+                    "line": int(p["line"]),
+                    "unit_price": p["unit_price"],
+                    "unit_cost": p["unit_cost"],
+                    "margin_pct": p["margin_pct"],
+                    "units": p["units"],
+                    "orders": p["orders"],
+                    "revenue": p["revenue"],
+                    "image_url": old_images.get(pid),
+                }
+            )
+    db["dim_producto"].delete_many({})
+    if productos:
+        db["dim_producto"].insert_many(productos)
+
+    # ── Canal y prioridad ───────────────────────────────────────────
+    db["dim_canal"].delete_many({})
+    chmap = {"Online": 1, "Offline": 2}
+    db["dim_canal"].insert_many(
+        [
+            {"channel_id": 1, "name": "Online", "description": "Ventas digitales"},
+            {"channel_id": 2, "name": "Offline", "description": "Ventas físicas"},
+        ]
+    )
+
+    db["dim_prioridad"].delete_many({})
+    pmap = {"C": 1, "H": 2, "M": 3, "L": 4}
+    db["dim_prioridad"].insert_many(
+        [
+            {"priority_id": 1, "code": "C", "name": "Critical", "sla_days": 1, "description": "24h"},
+            {"priority_id": 2, "code": "H", "name": "High", "sla_days": 3, "description": "3 días"},
+            {"priority_id": 3, "code": "M", "name": "Medium", "sla_days": 7, "description": "7 días"},
+            {"priority_id": 4, "code": "L", "name": "Low", "sla_days": 15, "description": "15 días"},
+        ]
+    )
+
+    # ── Clientes y tiempo ─────────────────────────────────────────────
+    db["dim_cliente"].delete_many({})
+    client_lookup: dict[tuple, int] = {}
+    clientes = []
+    for i, row in enumerate(df[["country", "sales_channel"]].drop_duplicates().itertuples(index=False), start=1):
+        client_lookup[(row.country, row.sales_channel)] = i
+        clientes.append(
+            {
+                "client_id": i,
+                "name": f"Cliente-{i:05d}",
+                "country_id": cmap[row.country],
+                "channel_id": chmap.get(row.sales_channel, 1),
+                "email": None,
+                "phone": None,
+                "created_at": datetime.now().date().isoformat(),
+            }
+        )
+    db["dim_cliente"].insert_many(clientes)
+
+    db["dim_tiempo"].delete_many({})
+    tiempos = []
+    tmap: dict[str, int] = {}
+    for i, fecha in enumerate(sorted(df["order_date"].dropna().dt.date.unique()), start=1):
+        tiempos.append(
+            {
+                "tiempo_id": i,
+                "fecha_id": fecha.isoformat(),
+                "anio": fecha.year,
+                "mes": fecha.month,
+                "trimestre": (fecha.month - 1) // 3 + 1,
+            }
+        )
+        tmap[fecha.isoformat()] = i
+    db["dim_tiempo"].insert_many(tiempos)
+
+    # ── Hechos y pedidos ──────────────────────────────────────────────
+    db["fact_ventas"].delete_many({})
+    hechos = []
+    order_lines = []
+    orders_map: dict[str, dict] = {}
+    for i, row in enumerate(df.itertuples(), start=1):
+        fecha = row.order_date.date().isoformat() if pd.notna(row.order_date) else None
+        u, up, uc = int(row.units_sold), float(row.unit_price), float(row.unit_cost)
+        oid = str(row.order_id)
+        hechos.append(
+            {
+                "venta_id": i,
+                "order_id": oid,
+                "tiempo_id": tmap.get(fecha),
+                "fecha_id": fecha,
+                "region_id": rmap.get(row.region),
+                "country_id": cmap.get(row.country),
+                "category_id": catmap.get(row.item_type),
+                "channel_id": chmap.get(row.sales_channel),
+                "priority_id": pmap.get(row.order_priority),
+                "client_id": client_lookup.get((row.country, row.sales_channel)),
+                "units_sold": u,
+                "unit_price": up,
+                "unit_cost": uc,
+                "total_revenue": float(row.total_revenue),
+                "total_cost": float(row.total_cost),
+                "total_profit": float(row.total_profit),
+                "line_revenue": round(u * up, 2),
+                "line_cost": round(u * uc, 2),
+                "line_profit": round(u * (up - uc), 2),
+            }
+        )
+        order_lines.append(
+            {
+                "line_id": i,
+                "order_id": int(oid) if oid.isdigit() else oid,
+                "category_id": catmap.get(row.item_type),
+                "units_sold": u,
+                "unit_price": up,
+                "unit_cost": uc,
+                "line_revenue": round(u * up, 2),
+                "line_cost": round(u * uc, 2),
+                "line_profit": round(u * (up - uc), 2),
+            }
+        )
+        if oid not in orders_map:
+            od = row.order_date.date() if pd.notna(row.order_date) else None
+            sd = row.ship_date.date() if pd.notna(row.ship_date) else None
+            orders_map[oid] = {
+                "order_id": int(oid) if oid.isdigit() else oid,
+                "client_id": client_lookup.get((row.country, row.sales_channel)),
+                "country_id": cmap.get(row.country),
+                "channel_id": chmap.get(row.sales_channel),
+                "priority_id": pmap.get(row.order_priority),
+                "order_date": od.isoformat() if od else None,
+                "ship_date": sd.isoformat() if sd else None,
+                "delivery_days": (sd - od).days if od and sd else None,
+                "total_revenue": float(row.total_revenue),
+                "total_cost": float(row.total_cost),
+                "total_profit": float(row.total_profit),
+                "status": "Delivered",
+            }
+    db["fact_ventas"].insert_many(hechos)
+
+    db["monthly_kpis"].delete_many({})
+    df["year"] = df["order_date"].dt.year
+    df["month"] = df["order_date"].dt.month
+    kpis = []
+    for kid, (keys, g) in enumerate(df.groupby(["year", "month", "region", "item_type"], dropna=False), start=1):
+        rev, prof = g["total_revenue"].sum(), g["total_profit"].sum()
+        kpis.append(
+            {
+                "kpi_id": kid,
+                "year": int(keys[0]) if pd.notna(keys[0]) else None,
+                "month": int(keys[1]) if pd.notna(keys[1]) else None,
+                "region": keys[2],
+                "item_type": keys[3],
+                "total_orders": len(g),
+                "total_units": int(g["units_sold"].sum()),
+                "total_revenue": round(float(rev), 2),
+                "total_cost": round(float(g["total_cost"].sum()), 2),
+                "total_profit": round(float(prof), 2),
+                "avg_margin_pct": round(float((prof / rev * 100) if rev else 0), 2),
+            }
+        )
+    if kpis:
+        db["monthly_kpis"].insert_many(kpis)
+
+    db["order_lines"].delete_many({})
+    db["order_lines"].insert_many(order_lines)
+    db["orders"].delete_many({})
+    db["orders"].insert_many(list(orders_map.values()))
+
+    print("Espejos SQL (sin products ni product_categories):")
+    _mirror(db, "dim_region", "regions")
+    _mirror(db, "dim_pais", "countries")
+    _mirror(db, "dim_canal", "sales_channels")
+    _mirror(db, "dim_prioridad", "order_priorities")
+    _mirror(db, "dim_cliente", "clients")
+
+    print("Eliminando duplicados de catálogo…")
+    for dropped in drop_duplicate_catalog_collections(db):
+        print(f"  eliminada: {dropped}")
+
+    print(f"  sales_records: {db['sales_records'].count_documents({})}")
+    print(f"  dim_producto: {db['dim_producto'].count_documents({})}")
+    print(f"  fact_ventas: {db['fact_ventas'].count_documents({})}")
+    client.close()
+
+
+if __name__ == "__main__":
+    main()

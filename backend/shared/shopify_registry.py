@@ -1,0 +1,165 @@
+"""Modelo comercial inspirado en Shopify — colecciones MongoDB."""
+from __future__ import annotations
+
+from typing import Any
+
+# Capas: catálogo → clientes → carrito/checkout → pedidos → inventario → marketing
+SHOPIFY_TABLES: dict[str, dict[str, Any]] = {
+    "shop_settings": {
+        "pk": "shop_id",
+        "label": "Configuración tienda",
+        "layer": "config",
+        "editable": True,
+        "fields": ["shop_id", "name", "currency", "country_default", "checkout_note"],
+    },
+    "vendors": {
+        "pk": "vendor_id",
+        "label": "Proveedores",
+        "layer": "catalog",
+        "editable": True,
+        "fields": ["vendor_id", "name", "email", "country", "active"],
+    },
+    "collections": {
+        "pk": "collection_id",
+        "label": "Colecciones (categorías tienda)",
+        "layer": "catalog",
+        "editable": True,
+        "fields": ["collection_id", "title", "handle", "description", "published"],
+    },
+    "products": {
+        "pk": "product_id",
+        "label": "Productos tienda",
+        "layer": "catalog",
+        "editable": True,
+        "fields": ["product_id", "title", "vendor_id", "status", "product_type", "tags"],
+    },
+    "product_variants": {
+        "pk": "variant_id",
+        "label": "Variantes de producto",
+        "layer": "catalog",
+        "editable": True,
+        "fields": ["variant_id", "product_id", "sku", "price", "compare_at_price", "cost", "inventory_quantity"],
+    },
+    "collection_products": {
+        "pk": "id",
+        "label": "Productos por colección",
+        "layer": "catalog",
+        "editable": False,
+        "fields": ["id", "collection_id", "product_id", "position"],
+    },
+    "product_media": {
+        "pk": "media_id",
+        "label": "Medios / imágenes",
+        "layer": "catalog",
+        "editable": True,
+        "fields": ["media_id", "product_id", "src", "alt", "position"],
+    },
+    "customers": {
+        "pk": "customer_id",
+        "label": "Clientes",
+        "layer": "customers",
+        "editable": True,
+        "fields": ["customer_id", "email", "first_name", "last_name", "phone", "orders_count", "total_spent"],
+    },
+    "customer_addresses": {
+        "pk": "address_id",
+        "label": "Direcciones cliente",
+        "layer": "customers",
+        "editable": True,
+        "fields": ["address_id", "customer_id", "country", "city", "address1", "zip", "default"],
+    },
+    "carts": {
+        "pk": "cart_id",
+        "label": "Carritos activos",
+        "layer": "checkout",
+        "editable": False,
+        "fields": ["cart_id", "customer_email", "token", "created_at", "updated_at"],
+    },
+    "cart_items": {
+        "pk": "item_id",
+        "label": "Ítems de carrito",
+        "layer": "checkout",
+        "editable": False,
+        "fields": ["item_id", "cart_id", "variant_id", "quantity", "line_price"],
+    },
+    "checkouts": {
+        "pk": "checkout_id",
+        "label": "Checkouts / solicitudes",
+        "layer": "checkout",
+        "editable": False,
+        "fields": ["checkout_id", "email", "status", "total_price", "created_at"],
+    },
+    "checkout_line_items": {
+        "pk": "line_id",
+        "label": "Líneas de checkout",
+        "layer": "checkout",
+        "editable": False,
+        "fields": ["line_id", "checkout_id", "variant_id", "quantity", "price"],
+    },
+    "shop_orders": {
+        "pk": "order_id",
+        "label": "Pedidos tienda",
+        "layer": "orders",
+        "editable": False,
+        "fields": ["order_id", "order_number", "customer_id", "financial_status", "fulfillment_status", "total_price"],
+    },
+    "shop_order_lines": {
+        "pk": "line_id",
+        "label": "Líneas pedido tienda",
+        "layer": "orders",
+        "editable": False,
+        "fields": ["line_id", "order_id", "variant_id", "quantity", "price", "title"],
+    },
+    "fulfillments": {
+        "pk": "fulfillment_id",
+        "label": "Despachos",
+        "layer": "orders",
+        "editable": True,
+        "fields": ["fulfillment_id", "order_id", "status", "tracking_number", "shipped_at"],
+    },
+    "inventory_items": {
+        "pk": "inventory_item_id",
+        "label": "Ítems inventario",
+        "layer": "inventory",
+        "editable": True,
+        "fields": ["inventory_item_id", "variant_id", "sku", "tracked"],
+    },
+    "inventory_levels": {
+        "pk": "level_id",
+        "label": "Niveles inventario",
+        "layer": "inventory",
+        "editable": True,
+        "fields": ["level_id", "inventory_item_id", "location", "available", "committed"],
+    },
+    "discount_codes": {
+        "pk": "discount_id",
+        "label": "Códigos descuento",
+        "layer": "marketing",
+        "editable": True,
+        "fields": ["discount_id", "code", "value_type", "value", "usage_limit", "active"],
+    },
+    "order_events": {
+        "pk": "event_id",
+        "label": "Eventos de pedido",
+        "layer": "orders",
+        "editable": False,
+        "fields": ["event_id", "order_id", "kind", "message", "created_at"],
+    },
+    "transactions": {
+        "pk": "transaction_id",
+        "label": "Transacciones pago",
+        "layer": "orders",
+        "editable": False,
+        "fields": ["transaction_id", "order_id", "kind", "amount", "status", "created_at"],
+    },
+}
+
+SHOPIFY_LAYERS = [
+    ("config", "Configuración"),
+    ("catalog", "Catálogo"),
+    ("customers", "Clientes"),
+    ("checkout", "Checkout"),
+    ("orders", "Pedidos"),
+    ("inventory", "Inventario"),
+    ("marketing", "Marketing"),
+]
