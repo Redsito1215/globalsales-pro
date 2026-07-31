@@ -72,6 +72,7 @@ def catalog_products():
 
 
 @tablero_bp.post("/catalog/sync")
+@admin_required
 def catalog_sync():
     """Regenera dim_categoria + dim_producto (120 SKUs, 10 por categoría)."""
     try:
@@ -106,13 +107,15 @@ def countries():
 
 @tablero_bp.get("/orders")
 def orders():
+    f = _filters_from_request()
     return jsonify(
         queries.search_orders(
             country=request.args.get("country"),
-            item_type=request.args.get("item_type"),
-            channel=request.args.get("channel"),
-            priority=request.args.get("priority"),
-            region=request.args.get("region"),
+            item_type=f.get("item_type"),
+            channel=f.get("channel"),
+            priority=f.get("priority"),
+            region=f.get("region"),
+            months=f.get("months"),
             limit=int(request.args.get("limit", 50)),
             offset=int(request.args.get("offset", 0)),
         )
@@ -121,14 +124,16 @@ def orders():
 
 @tablero_bp.get("/orders/count")
 def orders_count():
+    f = _filters_from_request()
     return jsonify(
         {
             "total": queries.count_orders(
                 country=request.args.get("country"),
-                item_type=request.args.get("item_type"),
-                channel=request.args.get("channel"),
-                priority=request.args.get("priority"),
-                region=request.args.get("region"),
+                item_type=f.get("item_type"),
+                channel=f.get("channel"),
+                priority=f.get("priority"),
+                region=f.get("region"),
+                months=f.get("months"),
             )
         }
     )
@@ -145,6 +150,7 @@ def generate():
         return jsonify({"status": "error", "message": "count inválido"}), 400
     try:
         result = generar_ventas.generate_sales(count, year=year)
+        queries.clear_query_cache()
         return jsonify({"status": "ok", **result})
     except ValueError as e:
         return jsonify({"status": "error", "message": str(e)}), 400

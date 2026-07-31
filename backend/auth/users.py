@@ -89,6 +89,18 @@ def list_users(*, limit: int = 100, offset: int = 0) -> dict[str, Any]:
     return {"total": total, "limit": limit, "offset": offset, "users": rows}
 
 
+def list_emails_by_roles(roles: list[str]) -> list[str]:
+    role_set = {r for r in roles if r}
+    if not role_set:
+        return []
+    emails: list[str] = []
+    for doc in _col().find({"active": True, "role": {"$in": list(role_set)}}, {"email": 1}):
+        email = (doc.get("email") or "").strip().lower()
+        if email:
+            emails.append(email)
+    return emails
+
+
 def update_user_role(user_id: str, role: str) -> dict[str, Any]:
     roles_service.ensure_roles_seed()
     role_doc = roles_service.get_role(role)

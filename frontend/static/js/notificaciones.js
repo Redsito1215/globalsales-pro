@@ -1,9 +1,30 @@
 /* Centro de notificaciones */
+function notifTypeFrom(n) {
+  const cat = String(n.category || '').toLowerCase();
+  const subject = String(n.subject || '').toLowerCase();
+  if (cat === 'compras' || subject.includes('oc #') || subject.includes('compra')) return 'compras';
+  if (cat === 'soporte' || subject.includes('soporte') || subject.includes('mensaje')) return 'soporte';
+  if (cat === 'solicitud' || subject.includes('solicitud') || n.request_id) return 'solicitud';
+  return 'sistema';
+}
+
+function notifTypeMeta(type) {
+  const map = {
+    solicitud: { label: 'Solicitud', short: 'SOL' },
+    soporte: { label: 'Soporte', short: 'SUP' },
+    compras: { label: 'Compras', short: 'OC' },
+    sistema: { label: 'Sistema', short: 'SYS' },
+  };
+  return map[type] || map.sistema;
+}
+
 async function refreshNotificationBadge() {
   const badge = document.getElementById('notif-badge');
+  const navBadge = document.getElementById('notif-nav-badge');
   const btn = document.getElementById('btn-notifications');
   if (!window._authUser) {
     if (btn) btn.hidden = true;
+    if (navBadge) navBadge.hidden = true;
     return;
   }
   if (btn) btn.hidden = false;
@@ -12,10 +33,12 @@ async function refreshNotificationBadge() {
     const data = await r.json();
     if (!r.ok) return;
     const n = data.unread || 0;
-    if (badge) {
-      badge.textContent = n > 99 ? '99+' : String(n);
-      badge.hidden = n <= 0;
-    }
+    const text = n > 99 ? '99+' : String(n);
+    [badge, navBadge].forEach(el => {
+      if (!el) return;
+      el.textContent = text;
+      el.hidden = n <= 0;
+    });
   } catch { /* ignore */ }
 }
 
@@ -40,16 +63,45 @@ async function loadNotificacionesPage() {
     list.innerHTML = '<p class="catalog-empty">No tienes notificaciones.</p>';
     return;
   }
-  list.innerHTML = rows.map(n => `
-    <article class="notif-card ${n.read ? 'notif-card--read' : ''}" data-id="${n.notification_id}">
-      <div class="notif-card-head">
-        <strong>${n.subject}</strong>
-        <span class="notif-date">${(n.created_at || '').slice(0, 16).replace('T', ' ')}</span>
+  list.innerHTML = rows.map(n => {
+    const type = notifTypeFrom(n);
+    const metaT = notifTypeMeta(type);
+    const unread = !n.read;
+    return `
+    <article class="notif-card notif-card--${type} ${n.read ? 'notif-card--read' : ''}" data-id="${n.notification_id}">
+      <div class="notif-icon" aria-hidden="true">${metaT.short}</div>
+      <div class="notif-card-main">
+        <div class="notif-tags">
+          <span class="notif-tag">${metaT.label}</span>
+          ${unread ? '<span class="notif-tag">Sin leer</span>' : ''}
+        </div>
+        <div class="notif-card-head">
+          <strong>${n.subject || 'Aviso'}</strong>
+          <span class="notif-date">${(n.created_at || '').slice(0, 16).replace('T', ' ')}</span>
+        </div>
+        <p class="notif-body">${(n.body || '').replace(/\n/g, '<br>')}</p>
+        <div class="notif-actions">${notifActionsHtml(n, type)}</div>
       </div>
-      <p class="notif-body">${(n.body || '').replace(/\n/g, '<br>')}</p>
-      ${n.request_id ? `<button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px;margin-top:6px" onclick="openSolicitudDetail(${n.request_id})">Ver solicitud #${n.request_id}</button>` : ''}
-    </article>`).join('');
+    </article>`;
+  }).join('');
   refreshNotificationBadge();
+}
+
+function notifActionsHtml(n, type) {
+  const parts = [];
+  if (n.request_id) {
+    parts.push(`<button type="button" class="btn btn-primary btn-sm" onclick="openSolicitudDetail(${n.request_id})">Ver solicitud #${n.request_id}</button>`);
+  }
+  const poId = n.meta && n.meta.po_id != null ? Number(n.meta.po_id) : null;
+  if ((type === 'compras' || poId) && typeof openComprasPo === 'function') {
+    parts.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="openComprasPo(${poId || 'null'})">Ir a Compras${poId ? ' · OC #' + poId : ''}</button>`);
+  } else if (type === 'compras' && typeof showPage === 'function') {
+    parts.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="showPage('compras')">Ir a Compras</button>`);
+  }
+  if (type === 'soporte' && typeof showPage === 'function') {
+    parts.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="showPage('soporte')">Abrir soporte</button>`);
+  }
+  return parts.join(' ');
 }
 
 async function markAllNotificationsRead() {
@@ -64,5 +116,10 @@ document.addEventListener('click', async e => {
   const id = card.getAttribute('data-id');
   await fetch(`${API}/auth/notifications/${id}/read`, { method: 'PATCH', credentials: 'same-origin' });
   card.classList.add('notif-card--read');
+  const tag = card.querySelector('.notif-tag');
+  // remove "Sin leer" tag if present as second tag
+  card.querySelectorAll('.notif-tag').forEach(t => {
+    if (t.textContent === 'Sin leer') t.remove();
+  });
   refreshNotificationBadge();
 });

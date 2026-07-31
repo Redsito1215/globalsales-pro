@@ -56,13 +56,15 @@ def analysis_channels():
 @permission_required("analysis.export")
 def analysis_export():
     f = _filters()
+    limit = min(int(request.args.get("limit", 5000)), 50000)
     rows = queries.search_orders(
         country=request.args.get("country"),
         item_type=f.get("item_type"),
         channel=f.get("channel"),
         priority=f.get("priority"),
         region=f.get("region"),
-        limit=min(int(request.args.get("limit", 5000)), 50000),
+        months=f.get("months"),
+        limit=limit,
         offset=0,
     )
     buf = io.StringIO()
@@ -72,8 +74,11 @@ def analysis_export():
         writer.writerows(rows)
     else:
         buf.write("sin_datos\n")
-    return Response(
-        buf.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=globtrade_export.csv"},
-    )
+    truncated = len(rows) >= limit
+    headers = {
+        "Content-Disposition": "attachment; filename=globtrade_export.csv",
+        "X-Export-Rows": str(len(rows)),
+        "X-Export-Limit": str(limit),
+        "X-Export-Truncated": "1" if truncated else "0",
+    }
+    return Response(buf.getvalue(), mimetype="text/csv", headers=headers)

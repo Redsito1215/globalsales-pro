@@ -1,15 +1,26 @@
 """Rutas Flask — paquete Q3 Ventas."""
 from __future__ import annotations
 
-import re
-
 from flask import Blueprint, jsonify, request, session
 
+from auth import roles_service
 from auth.decorators import admin_required, login_required, permission_required
 from paquetes.tablero import queries
 from paquetes.ventas import services
 
 ventas_bp = Blueprint("ventas", __name__, url_prefix="/api")
+
+
+def _can_read_solicitudes(role: str | None) -> bool:
+    return (
+        role == "administrador"
+        or roles_service.has_permission(role, "ventas.manage")
+        or roles_service.has_permission(role, "orders.read")
+    )
+
+
+def _can_manage_solicitudes(role: str | None) -> bool:
+    return role == "administrador" or roles_service.has_permission(role, "ventas.manage")
 
 
 @ventas_bp.get("/sales/orders")
@@ -30,6 +41,8 @@ def sales_orders_list():
 
 
 @ventas_bp.get("/sales/orders/<order_id>")
+@login_required
+@permission_required("orders.read")
 def sales_orders_detail(order_id: str):
     order = services.get_order(order_id)
     if not order:
@@ -81,19 +94,25 @@ def tienda_productos():
 
 
 @ventas_bp.post("/solicitudes")
+@login_required
+@permission_required("shop.checkout")
 def crear_solicitud():
-    body = request.get_json(silent=True) or {}
-    try:
-        req = services.create_request(body)
-        return jsonify({"status": "ok", "message": "Solicitud registrada.", "request": req}), 201
-    except ValueError as e:
-        return _ventas_error(e)
+    """Deprecated: el alta con stock va por vitrina (`POST /api/shop/checkout`)."""
+    return jsonify(
+        {
+            "status": "error",
+            "message": "Usa la Vitrina B2B (checkout) para crear pedidos con control de stock.",
+            "code": "use_checkout",
+        }
+    ), 400
 
 
 @ventas_bp.get("/solicitudes")
 @login_required
-@permission_required("ventas.manage")
 def listar_solicitudes():
+    role = session.get("role")
+    if not _can_read_solicitudes(role):
+        return jsonify({"status": "error", "message": "No tienes permiso para esta acción.", "code": "forbidden"}), 403
     status = (request.args.get("status") or "").strip() or None
     active_only = request.args.get("active_only", "").lower() in ("1", "true", "yes")
     if status == "activas":
@@ -102,10 +121,20 @@ def listar_solicitudes():
     data = services.list_requests(
         status=status,
         active_only=active_only,
+        q=(request.args.get("q") or "").strip() or None,
         limit=min(int(request.args.get("limit", 50)), 200),
         offset=max(int(request.args.get("offset", 0)), 0),
     )
+    data["can_manage"] = _can_manage_solicitudes(role)
     return jsonify({"status": "ok", **data})
+
+
+@ventas_bp.get("/solicitudes/pendientes/count")
+@login_required
+def count_pendientes():
+    if not _can_read_solicitudes(session.get("role")):
+        return jsonify({"status": "error", "message": "No tienes permiso para esta acción.", "code": "forbidden"}), 403
+    return jsonify({"status": "ok", "pending": services.count_pending_requests()})
 
 
 @ventas_bp.get("/solicitudes/mias")
@@ -130,8 +159,11 @@ def obtener_solicitud(request_id: int):
         return jsonify({"status": "error", "message": "Solicitud no encontrada."}), 404
     email = (session.get("email") or "").strip().lower()
     role = session.get("role")
-    if role not in ("administrador", "vendedor") and (req.get("client_email") or "").lower() != email:
-        return jsonify({"status": "error", "message": "No autorizado."}), 403
+    if role not in ("administrador", "vendedor") and not roles_service.has_permission(
+        role, "ventas.manage"
+    ) and not roles_service.has_permission(role, "orders.read"):
+        if (req.get("client_email") or "").lower() != email:
+            return jsonify({"status": "error", "message": "No autorizado."}), 403
     return jsonify({"status": "ok", "request": req})
 
 
@@ -157,6 +189,48 @@ def cambiar_estado(request_id: int):
         return _ventas_error(e)
 
 
+@ventas_bp.patch("/solicitudes/<int:request_id>/pago")
+@permission_required("ventas.manage")
+def cambiar_pago(request_id: int):
+    """Staff: solo crédito comercial. El estado «pagado» lo marca el cliente con /pagar."""
+    body = request.get_json(silent=True) or {}
+    payment_status = (body.get("payment_status") or "").strip()
+    if payment_status == "pagado":
+        return jsonify(
+            {
+                "status": "error",
+                "message": "Solo el cliente puede marcar el pedido como pagado (Mis pedidos → Pagar).",
+                "code": "client_must_pay",
+            }
+        ), 409
+    try:
+        req = services.update_payment(
+            request_id,
+            payment_status,
+            reviewer_email=session.get("email"),
+            payment_method=body.get("payment_method"),
+        )
+        return jsonify({"status": "ok", "request": req})
+    except ValueError as e:
+        return _ventas_error(e)
+
+
+@ventas_bp.post("/solicitudes/<int:request_id>/pagar")
+@login_required
+def cliente_pagar(request_id: int):
+    """Pago del cliente dueño de la solicitud (simulado)."""
+    body = request.get_json(silent=True) or {}
+    try:
+        req = services.client_pay(
+            request_id,
+            client_email=session.get("email") or "",
+            method=(body.get("method") or body.get("payment_method") or "transferencia"),
+        )
+        return jsonify({"status": "ok", "message": "Pago registrado.", "request": req})
+    except ValueError as e:
+        return _ventas_error(e)
+
+
 @ventas_bp.post("/solicitudes/<int:request_id>/convertir")
 @permission_required("ventas.manage")
 def convertir_solicitud(request_id: int):
@@ -166,7 +240,41 @@ def convertir_solicitud(request_id: int):
             admin_email=session.get("email"),
             actor_role=session.get("role"),
         )
-        return jsonify({"status": "ok", "message": "Solicitud convertida en venta.", **result})
+        hint = result.get("message_analytics") or ""
+        return jsonify(
+            {
+                "status": "ok",
+                "message": (
+                    "Solicitud convertida en venta (capa landing). " + hint
+                    if result.get("analytics_stale")
+                    else "Solicitud convertida en venta."
+                ),
+                **result,
+            }
+        )
+    except ValueError as e:
+        return _ventas_error(e)
+
+
+@ventas_bp.post("/solicitudes/<int:request_id>/devolver")
+@permission_required("ventas.manage")
+def devolver_solicitud(request_id: int):
+    body = request.get_json(silent=True) or {}
+    try:
+        req = services.return_delivered_request(
+            request_id,
+            reviewer_email=session.get("email"),
+            reason=body.get("reason"),
+            condition=body.get("condition"),
+            inspections=body.get("inspections") or body.get("lines"),
+        )
+        restock_u = int(req.get("return_restock_units") or 0)
+        damaged_u = int(req.get("return_damaged_units") or 0)
+        msg = (
+            f"Devolución registrada. Reingresan a stock: {restock_u} ud(s). "
+            f"Dañadas (no reingresan): {damaged_u} ud(s)."
+        )
+        return jsonify({"status": "ok", "message": msg, "request": req})
     except ValueError as e:
         return _ventas_error(e)
 
@@ -182,12 +290,51 @@ def _ventas_error(exc: ValueError):
         "invalid_product": ("Producto no encontrado en catálogo.", 404),
         "not_found": ("Solicitud no encontrada.", 404),
         "invalid_status": ("Estado no válido.", 400),
+        "invalid_payment": ("Estado de pago no válido.", 400),
+        "cannot_pay_closed": ("No se puede registrar pago en una solicitud cerrada.", 409),
+        "already_paid": ("Esta solicitud ya está pagada.", 409),
+        "client_must_pay": ("Solo el cliente puede marcar el pedido como pagado.", 409),
+        "payment_required": ("Espera el pago del cliente o registra crédito antes de enviar.", 409),
+        "payment_required_before_convert": (
+            "No se puede convertir: el cliente debe pagar primero (o registra crédito).",
+            409,
+        ),
         "already_converted": ("La solicitud ya fue convertida.", 409),
         "already_rejected": ("La solicitud ya fue rechazada.", 409),
+        "already_delivered": ("La solicitud ya fue entregada.", 409),
+        "already_returned": ("La solicitud ya fue devuelta.", 409),
+        "must_be_delivered": ("Solo se pueden devolver pedidos entregados.", 409),
+        "return_condition_required": (
+            "Indica la condición del producto: apto, dañado o mixto.",
+            400,
+        ),
+        "return_inspection_required": (
+            "En devolución mixta debes inspeccionar cada línea (apto vs dañado).",
+            400,
+        ),
+        "return_inspection_incomplete": (
+            "Falta inspeccionar todas las líneas del pedido.",
+            400,
+        ),
+        "return_qty_mismatch": (
+            "Apto + dañado debe coincidir con la cantidad de cada línea.",
+            400,
+        ),
+        "invalid_return_line": ("Línea de inspección no válida.", 400),
+        "duplicate_return_line": ("Hay líneas de inspección duplicadas.", 400),
+        "invalid_return_qty": ("Cantidades de inspección inválidas.", 400),
         "cannot_reject_approved": ("No se puede rechazar una solicitud aprobada.", 409),
         "approval_required": ("Debes aprobar la solicitud antes de convertirla.", 409),
+        "must_convert_first": ("Primero convierte la solicitud en venta.", 409),
+        "must_ship_first": ("Marca el pedido como enviado antes de entregarlo.", 409),
+        "invalid_transition": ("Transición de estado no permitida.", 409),
+        "use_dedicated_endpoint": (
+            "Usa el endpoint dedicado (convertir, devolver o cancelar).",
+            409,
+        ),
+        "use_checkout": ("Usa la Vitrina B2B para crear el pedido.", 400),
         "cancelled": ("No se puede convertir una solicitud cancelada.", 409),
-        "forbidden": ("No puedes cancelar esta solicitud.", 403),
+        "forbidden": ("No autorizado para esta solicitud.", 403),
         "cannot_cancel": ("Esta solicitud ya no se puede cancelar.", 409),
         "cannot_cancel_approved": ("No puedes cancelar una solicitud ya aprobada.", 409),
         "already_cancelled": ("La solicitud ya fue cancelada.", 409),

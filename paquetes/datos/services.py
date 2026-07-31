@@ -221,11 +221,19 @@ def run_build_model() -> dict[str, Any]:
 
     build_main(mongo_uri=settings.mongo_uri, mongo_db=settings.mongo_db)
     log_audit("build_model", entity="etl", details={"mongo_db": settings.mongo_db})
+    try:
+        from paquetes.tablero.queries import clear_query_cache
+
+        clear_query_cache()
+    except Exception:
+        pass
     db = get_db()
     return {
         "sales_records": db["sales_records"].count_documents({}),
         "fact_ventas": db["fact_ventas"].count_documents({}),
         "dim_producto": db["dim_producto"].count_documents({}),
+        "data_layer": "estrategico",
+        "strategic_ready": db["fact_ventas"].count_documents({}, limit=1) > 0,
     }
 
 
@@ -252,6 +260,12 @@ def run_load_dataset(csv_path: str | None = None) -> dict[str, Any]:
             raise RuntimeError(proc.stderr or proc.stdout or f"Fallo en {step}")
 
     log_audit("load_dataset", entity="etl", details={"csv": str(csv)})
+    try:
+        from paquetes.tablero.queries import clear_query_cache
+
+        clear_query_cache()
+    except Exception:
+        pass
     db = get_db()
     return {
         "message": "Dataset cargado y modelo reconstruido.",

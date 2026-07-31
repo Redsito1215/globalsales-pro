@@ -9,4 +9,9 @@ def get_db():
 
 
 def sales_collection():
+    """Landing / staging (CSV, generate, post-convertir).
+
+    Capas operativo/estratégico: importar desde ``shared.data_layers``
+    (no reexportar aquí para evitar import circular).
+    """
     return get_db()["sales_records"]

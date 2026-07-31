@@ -3,6 +3,10 @@
 > **Kiro:** implementar en orden. Marcar `[x]` al terminar.  
 > Referencia: `requirements.md` · `design.md` · `paquetes.md`
 
+**Cierre demo (2026-07-29):** checklist Spec Kit en `specs/001-globtrade-plataforma/tasks.md` marcado completo.  
+Gaps no bloqueantes: pago/correo simulados; UI legacy `/sem1` opcional; rúbrica oral.  
+Fuente de verdad de tareas: Spec Kit (`specs/.../tasks.md`), no este archivo Kiro histórico.
+
 ---
 
 ## Fase 0 — Bootstrap (recrear proyecto vacío)

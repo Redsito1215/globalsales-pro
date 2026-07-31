@@ -1,9 +1,9 @@
 """Colecciones MongoDB — duplicados vs modelo dimensional."""
 from __future__ import annotations
 
-# Copias redundantes del catálogo (la fuente es dim_categoria / dim_producto)
+# Solo espejos legacy de categorías. `products` es catálogo OPERATIVO (vitrina);
+# no dropear en build_model — se sincroniza con Maestros → Sync catálogo.
 DUPLICATE_CATALOG_COLLECTIONS: tuple[str, ...] = (
-    "products",
     "product_categories",
 )
 

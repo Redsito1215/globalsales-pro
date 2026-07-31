@@ -50,15 +50,28 @@ def ensure_shop_catalog() -> None:
         _sync_from_masters_unlocked()
 
 
-def sync_from_masters() -> dict[str, int]:
-    """Sincroniza dim_* → tablas comerciales Shopify."""
+def sync_from_masters(*, reset_stock: bool = False) -> dict[str, int]:
+    """Sincroniza dim_* → tablas comerciales Shopify.
+
+    Por defecto conserva el stock actual de variantes existentes (no wipe ciego).
+    Usa reset_stock=True solo cuando se quiere regenerar inventario desde maestros.
+    """
     with _sync_lock:
-        return _sync_from_masters_unlocked()
+        return _sync_from_masters_unlocked(reset_stock=reset_stock)
 
 
-def _sync_from_masters_unlocked() -> dict[str, int]:
+def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     db = get_db()
     counts: dict[str, int] = {}
+
+    # Conservar stock previo por product_id antes de regenerar catálogo
+    previous_stock: dict[int, int] = {}
+    if not reset_stock:
+        for v in db["product_variants"].find({}, {"product_id": 1, "inventory_quantity": 1}):
+            try:
+                previous_stock[int(v["product_id"])] = int(v.get("inventory_quantity") or 0)
+            except (TypeError, ValueError, KeyError):
+                continue
 
     db["shop_settings"].delete_many({})
     db["shop_settings"].insert_one(
@@ -72,10 +85,28 @@ def _sync_from_masters_unlocked() -> dict[str, int]:
     )
     counts["shop_settings"] = 1
 
-    db["vendors"].delete_many({})
-    vendors = [{"vendor_id": 1, "name": "GLOBTRADE Supply", "email": "supply@globtrade.com", "country": "Global", "active": True}]
-    db["vendors"].insert_many(vendors)
-    counts["vendors"] = 1
+    # Conservar proveedores custom; solo asegurar el proveedor por defecto
+    if db["vendors"].count_documents({}) == 0:
+        db["vendors"].insert_one(
+            {
+                "vendor_id": 1,
+                "name": "GLOBTRADE Supply",
+                "email": "supply@globtrade.com",
+                "country": "Global",
+                "active": True,
+            }
+        )
+    elif not db["vendors"].find_one({"vendor_id": 1}):
+        db["vendors"].insert_one(
+            {
+                "vendor_id": 1,
+                "name": "GLOBTRADE Supply",
+                "email": "supply@globtrade.com",
+                "country": "Global",
+                "active": True,
+            }
+        )
+    counts["vendors"] = db["vendors"].count_documents({})
 
     db["collections"].delete_many({})
     db["collection_products"].delete_many({})
@@ -127,7 +158,8 @@ def _sync_from_masters_unlocked() -> dict[str, int]:
         )
         price = float(p.get("unit_price") or 0)
         cost = float(p.get("unit_cost") or 0)
-        qty = int(p.get("units") or 100)
+        default_qty = int(p.get("units") or 100)
+        qty = previous_stock.get(pid, default_qty) if not reset_stock else default_qty
         variants.append(
             {
                 "variant_id": vid,
@@ -161,6 +193,7 @@ def _sync_from_masters_unlocked() -> dict[str, int]:
     counts["product_variants"] = len(variants)
     counts["product_media"] = len(media)
     counts["inventory_items"] = len(inv_items)
+    counts["stock_preserved"] = 0 if reset_stock else len(previous_stock)
 
     db["customers"].delete_many({})
     db["customer_addresses"].delete_many({})
@@ -298,7 +331,15 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
         price = float(variant.get("price") or 0)
         subtotal += price * qty
         line_docs.append({"line_id": lid, "checkout_id": checkout_id, "variant_id": variant["variant_id"], "quantity": qty, "price": price})
-        pr_lines.append({"product_id": variant["product_id"], "quantity": qty})
+        pr_lines.append(
+            {
+                "product_id": int(variant["product_id"]),
+                "quantity": qty,
+                "unit_price": price,
+                "variant_id": int(variant["variant_id"]),
+                "unit_cost": float(variant.get("cost") or 0),
+            }
+        )
         lid += 1
 
     discount_code = (data.get("discount_code") or "").strip().upper()
@@ -324,9 +365,13 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
     if line_docs:
         db["checkout_line_items"].insert_many(line_docs)
 
+    stock_lines: list[dict[str, Any]] = []
     for item in lines_in:
         vid = int(item.get("variant_id") or item.get("product_id") or 0)
         qty = int(item.get("quantity") or 1)
+        variant = db["product_variants"].find_one({"variant_id": vid}) or db["product_variants"].find_one({"product_id": vid})
+        if variant:
+            stock_lines.append({"variant_id": int(variant["variant_id"]), "quantity": qty})
         _deduct_stock(db, vid, qty)
 
     if discount_code:
@@ -347,6 +392,7 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
             "discount_amount": discount_amount,
             "subtotal": subtotal,
             "total": total,
+            "stock_lines": stock_lines,
         }
     )
     db["checkouts"].update_one({"checkout_id": checkout_id}, {"$set": {"status": "submitted", "request_id": req.get("request_id")}})
@@ -387,6 +433,77 @@ def _deduct_stock(db, variant_id: int, qty: int) -> None:
             {"inventory_item_id": inv["inventory_item_id"]},
             {"$inc": {"available": -qty, "committed": qty}},
         )
+
+
+def restock(db, variant_id: int, qty: int) -> None:
+    """Devuelve unidades al inventario (rechazo / cancelación)."""
+    if qty < 1:
+        return
+    variant = db["product_variants"].find_one({"variant_id": int(variant_id)})
+    if not variant:
+        variant = db["product_variants"].find_one({"product_id": int(variant_id)})
+    if not variant:
+        return
+    vid = int(variant["variant_id"])
+    db["product_variants"].update_one(
+        {"variant_id": vid},
+        {"$inc": {"inventory_quantity": int(qty)}},
+    )
+    inv = db["inventory_items"].find_one({"variant_id": vid})
+    if inv:
+        db["inventory_levels"].update_one(
+            {"inventory_item_id": inv["inventory_item_id"]},
+            {"$inc": {"available": int(qty), "committed": -int(qty)}},
+        )
+
+
+def restock_lines(stock_lines: list[dict[str, Any]] | None) -> None:
+    db = get_db()
+    for line in stock_lines or []:
+        restock(db, int(line.get("variant_id") or 0), int(line.get("quantity") or 0))
+
+
+def finalize_committed(stock_lines: list[dict[str, Any]] | None) -> None:
+    """Al convertir/vender: libera committed (available ya se bajó en checkout)."""
+    db = get_db()
+    for line in stock_lines or []:
+        qty = int(line.get("quantity") or 0)
+        if qty < 1:
+            continue
+        vid = int(line.get("variant_id") or 0)
+        variant = db["product_variants"].find_one({"variant_id": vid})
+        if not variant:
+            continue
+        inv = db["inventory_items"].find_one({"variant_id": int(variant["variant_id"])})
+        if not inv:
+            continue
+        level = db["inventory_levels"].find_one({"inventory_item_id": inv["inventory_item_id"]})
+        committed = int((level or {}).get("committed") or 0)
+        dec = min(qty, committed)
+        if dec > 0:
+            db["inventory_levels"].update_one(
+                {"inventory_item_id": inv["inventory_item_id"]},
+                {"$inc": {"committed": -dec}},
+            )
+
+
+def adjust_variant_stock(variant_id: int, available: int) -> dict[str, Any]:
+    """Ajuste manual de stock (admin) sin regenerar catálogo."""
+    db = get_db()
+    variant = db["product_variants"].find_one({"variant_id": int(variant_id)})
+    if not variant:
+        raise ValueError("invalid_variant")
+    qty = max(int(available), 0)
+    vid = int(variant["variant_id"])
+    db["product_variants"].update_one({"variant_id": vid}, {"$set": {"inventory_quantity": qty}})
+    inv = db["inventory_items"].find_one({"variant_id": vid})
+    if inv:
+        db["inventory_levels"].update_one(
+            {"inventory_item_id": inv["inventory_item_id"]},
+            {"$set": {"available": qty, "committed": 0}},
+        )
+    log_audit("adjust_stock", entity="product_variants", entity_id=vid, details={"available": qty})
+    return {"variant_id": vid, "inventory_quantity": qty}
 
 
 def validate_coupon(code: str, subtotal: float) -> dict[str, Any]:

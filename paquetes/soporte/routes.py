@@ -3,11 +3,25 @@ from __future__ import annotations
 
 from flask import Blueprint, Response, jsonify, request, session
 
-from auth.decorators import admin_required, login_required
+from auth.decorators import login_required, permission_required
+from auth import roles_service
 from paquetes.soporte import services
 from paquetes.ventas import services as ventas
 
 soporte_bp = Blueprint("soporte", __name__, url_prefix="/api/soporte")
+
+
+def _is_staff() -> bool:
+    role = session.get("role")
+    return role == "administrador" or roles_service.has_permission(role, "soporte.inbox")
+
+
+@soporte_bp.get("/hilos")
+@login_required
+@permission_required("soporte.inbox")
+def listar_hilos():
+    data = services.list_threads(limit=min(int(request.args.get("limit", 50)), 200))
+    return jsonify({"status": "ok", **data})
 
 
 @soporte_bp.get("/mensajes")
@@ -15,9 +29,10 @@ soporte_bp = Blueprint("soporte", __name__, url_prefix="/api/soporte")
 def listar_mensajes():
     email = (session.get("email") or "").strip()
     thread = (request.args.get("thread") or email).strip().lower()
-    role = session.get("role")
-    if role != "administrador" and thread != email.lower():
+    if not _is_staff() and thread != email.lower():
         return jsonify({"status": "error", "message": "No puedes ver este hilo."}), 403
+    if _is_staff() and not thread:
+        return jsonify({"status": "error", "message": "Indica el hilo del cliente."}), 400
     data = services.list_thread(thread)
     return jsonify({"status": "ok", **data})
 
@@ -28,9 +43,8 @@ def enviar_mensaje():
     body = request.get_json(silent=True) or {}
     text = (body.get("text") or "").strip()
     thread = (body.get("thread_email") or session.get("email") or "").strip().lower()
-    role = session.get("role")
-    staff = role in ("administrador", "vendedor") and body.get("as_staff")
-    if staff and role != "administrador" and not body.get("thread_email"):
+    staff = _is_staff() and bool(body.get("as_staff"))
+    if staff and not body.get("thread_email"):
         return jsonify({"status": "error", "message": "Indique el hilo del cliente."}), 400
     if not staff:
         thread = (session.get("email") or "").strip().lower()

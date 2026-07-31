@@ -15,7 +15,9 @@ async function loadRolesAdminPage() {
 async function loadRolesList() {
   const body = document.getElementById('roles-admin-roles-body');
   if (!body) return;
-  body.innerHTML = '<tr><td colspan="4">Cargando…</td></tr>';
+  body.innerHTML = typeof opsEmptyRow === 'function'
+    ? opsEmptyRow(4, { title: 'Cargando roles…', hint: 'Un momento.' })
+    : '<tr><td colspan="4">Cargando…</td></tr>';
   const r = await fetch(API + '/auth/roles', { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {

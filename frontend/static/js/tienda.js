@@ -1,4 +1,4 @@
-/* Storefront Shopify — colecciones, variantes, carrito, checkout */
+/* Storefront B2B — colecciones, variantes, carrito, checkout */
 let tiendaState = {
   collections: [],
   products: [],
@@ -136,7 +136,14 @@ function filterShopProducts() {
     : tiendaState.products.slice();
   if (!grid) return;
   if (!tiendaState.filtered.length) {
-    grid.innerHTML = '<div class="shop-cart-empty" style="grid-column:1/-1">No hay productos. Ejecuta <strong>Sync Shopify</strong> en Q4 Maestros (admin).</div>';
+    grid.innerHTML = typeof opsEmpty === 'function'
+      ? `<div style="grid-column:1/-1">${opsEmpty({
+          title: 'Catálogo vacío',
+          hint: 'Un administrador debe sincronizar el catálogo en Maestros para publicar productos.',
+          ctaLabel: 'Ir a Maestros',
+          ctaOnclick: "showPage('datos')",
+        })}</div>`
+      : '<div class="shop-cart-empty" style="grid-column:1/-1">Catálogo vacío. Sincroniza en Maestros.</div>';
     return;
   }
   grid.innerHTML = tiendaState.filtered.map(p => {
@@ -148,7 +155,7 @@ function filterShopProducts() {
     return `
     <article class="shop-product-card">
       <div class="shop-product-media">
-        ${img ? `<img src="${img}" alt="${p.image?.alt || p.title || ''}">` : '<div class="shop-product-media--empty">📦</div>'}
+        ${img ? `<img src="${img}" alt="${p.image?.alt || p.title || ''}">` : '<div class="shop-product-media--empty" aria-hidden="true"></div>'}
         ${compare ? '<span class="shop-product-badge">Oferta</span>' : ''}
       </div>
       <div class="shop-product-body">
@@ -235,7 +242,7 @@ function renderTiendaCart() {
   if (btn) btn.disabled = !tiendaState.cart.length;
   if (!el) return;
   if (!tiendaState.cart.length) {
-    el.innerHTML = '<div class="shop-cart-empty">Tu carrito está vacío</div>';
+    el.innerHTML = '<div class="shop-cart-empty"><strong>Carrito vacío</strong>Elige productos del catálogo o una colección completa.</div>';
     return;
   }
   el.innerHTML = tiendaState.cart.map(c => `
@@ -256,16 +263,45 @@ function tiendaRemoveFromCart(variantId) {
   renderTiendaCart();
 }
 
+function isAssistedPurchase() {
+  return !!(window._authUser && (
+    window._authUser.role === 'administrador'
+    || (typeof hasPermission === 'function' && hasPermission('ventas.manage'))
+  ));
+}
+
 function openSolicitudModal() {
   if (!tiendaState.cart.length) { alert('Agrega productos al carrito.'); return; }
+  if (!window._authUser) {
+    alert('Inicia sesión para solicitar la compra. Así verás el pedido en Mis pedidos.');
+    if (typeof openLoginModal === 'function') openLoginModal();
+    return;
+  }
+  if (!hasPermission('shop.checkout')) {
+    alert('Tu rol no permite solicitar compras en la vitrina.');
+    return;
+  }
   loadTiendaMasterSelects();
   updateCheckoutSummary();
   const user = window._authUser;
-  if (user) {
-    const n = document.getElementById('sol-client-name');
-    const e = document.getElementById('sol-client-email');
-    if (n && !n.value) n.value = user.name || '';
-    if (e && !e.value) e.value = user.email || '';
+  const assisted = isAssistedPurchase();
+  const n = document.getElementById('sol-client-name');
+  const e = document.getElementById('sol-client-email');
+  const channelWrap = document.getElementById('sol-channel-wrap');
+  const lead = document.getElementById('sol-modal-lead');
+  if (n) {
+    n.value = user.name || '';
+    n.readOnly = !assisted;
+  }
+  if (e) {
+    e.value = user.email || '';
+    e.readOnly = !assisted;
+  }
+  if (channelWrap) channelWrap.hidden = !assisted;
+  if (lead) {
+    lead.textContent = assisted
+      ? 'Pedido asistido: indica el cliente fijo y el canal. Se creará una solicitud comercial a su nombre.'
+      : 'Confirma tus datos. Se creará una solicitud comercial para revisar y confirmar la venta.';
   }
   document.getElementById('solicitud-modal').hidden = false;
 }
@@ -305,31 +341,45 @@ async function applyCheckoutCoupon() {
 }
 
 async function submitSolicitud() {
-  const name = document.getElementById('sol-client-name').value.trim();
-  const email = document.getElementById('sol-client-email').value.trim();
+  if (!window._authUser) {
+    alert('Inicia sesión para completar la compra.');
+    return;
+  }
+  const assisted = isAssistedPurchase();
+  const name = (document.getElementById('sol-client-name').value || window._authUser.name || '').trim();
+  const email = (document.getElementById('sol-client-email').value || window._authUser.email || '').trim();
+  if (!name || !email) { alert('Nombre y correo del cliente son obligatorios.'); return; }
   const phone = document.getElementById('sol-client-phone').value.trim();
   const country_id = parseInt(document.getElementById('sol-country-id').value, 10);
-  const channel_id = parseInt(document.getElementById('sol-channel-id').value, 10) || 1;
+  const channelSel = document.getElementById('sol-channel-id');
+  const channel_id = assisted
+    ? (parseInt(channelSel?.value, 10) || 1)
+    : 1; // Online por defecto para el cliente
   const notes = document.getElementById('sol-notes').value.trim();
   const body = {
     name, email, phone, country_id, channel_id, notes,
+    client_name: name,
+    client_email: email,
     discount_code: tiendaState.discountCode || '',
     lines: tiendaState.cart.map(c => ({ variant_id: c.variant_id, quantity: c.quantity })),
   };
   const r = await fetch(API + '/shop/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Error en checkout'); return; }
-  alert(`Checkout #${data.checkout_id} · Solicitud #${data.request?.request_id || '—'} · Total ${shopMoney(data.total_price)}`);
+  if (!r.ok) { alert(data.message || 'Error al solicitar la compra'); return; }
   tiendaState.cart = [];
   tiendaState.discountAmount = 0;
   tiendaState.discountCode = '';
   renderTiendaCart();
   closeSolicitudModal();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
+  if (typeof refreshVentasBadge === 'function') refreshVentasBadge();
+  const misBtn = document.querySelector('[data-page=mis-pedidos]');
+  if (misBtn) showPage('mis-pedidos', misBtn);
 }
 
 async function loadTiendaMasterSelects() {
@@ -347,9 +397,14 @@ async function loadTiendaMasterSelects() {
       if (prev) countrySel.value = prev;
     }
     const chSel = document.getElementById('sol-channel-id');
-    if (chSel && chSel.options.length <= 1) {
-      chSel.innerHTML = (canales.rows || []).map(c =>
-        `<option value="${c.channel_id}">${c.name}</option>`).join('');
+    if (chSel && (chSel.options.length <= 1 || isAssistedPurchase())) {
+      const rows = canales.rows || [];
+      if (rows.length) {
+        chSel.innerHTML = rows.map(c =>
+          `<option value="${c.channel_id}">${c.name}</option>`).join('');
+        const online = rows.find(c => String(c.name || '').toLowerCase() === 'online');
+        if (online) chSel.value = String(online.channel_id);
+      }
     }
   } catch (e) { /* ignore */ }
 }

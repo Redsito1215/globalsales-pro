@@ -39,7 +39,7 @@ def ensure_roles_seed() -> None:
         {"slug": "cliente"},
         {
             "$set": {
-                "pages": ["tienda", "mis-pedidos", "soporte", "notificaciones"],
+                "pages": ["tienda", "company", "mis-pedidos", "soporte", "notificaciones"],
                 "permissions": ["shop.view", "shop.checkout"],
             }
         },
@@ -54,11 +54,63 @@ def ensure_roles_seed() -> None:
                 "assignable": True,
             },
             "$set": {
-                "pages": ["tienda", "ventas", "mis-pedidos", "soporte", "notificaciones"],
-                "permissions": ["shop.view", "shop.checkout", "ventas.manage"],
+                "pages": [
+                    "tienda",
+                    "company",
+                    "ventas",
+                    "compras",
+                    "reportes",
+                    "reportes-compuestos",
+                    "orders",
+                    "decisiones",
+                    "mis-pedidos",
+                    "soporte",
+                    "notificaciones",
+                ],
+                "permissions": [
+                    "shop.view",
+                    "shop.checkout",
+                    "ventas.manage",
+                    "compras.manage",
+                    "reportes.view",
+                    "orders.read",
+                    "soporte.inbox",
+                    "decisiones.view",
+                ],
             },
         },
         upsert=True,
+    )
+    col.update_one(
+        {"slug": "analista"},
+        {
+            "$set": {
+                "pages": [
+                    "dashboard",
+                    "catalogo",
+                    "company",
+                    "trends",
+                    "regions",
+                    "products",
+                    "export",
+                    "decisiones",
+                    "reportes-compuestos",
+                    "tienda",
+                    "orders",
+                    "ventas",
+                    "reportes",
+                    "soporte",
+                    "notificaciones",
+                ],
+                "permissions": [
+                    "shop.view",
+                    "orders.read",
+                    "analysis.export",
+                    "decisiones.view",
+                    "reportes.view",
+                ],
+            }
+        },
     )
 
 

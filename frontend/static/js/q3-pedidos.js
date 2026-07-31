@@ -1,21 +1,32 @@
-/* Q3 — CRUD pedidos (admin) */
+/* Q3 — CRUD pedidos históricos (admin) */
+function toast(msg, type) {
+  if (typeof opsToast === 'function') opsToast(msg, type || 'info');
+  else alert(msg);
+}
+
 async function loadPedidosAdmin() {
   const body = document.getElementById('pedidos-admin-body');
   if (!body) return;
   if (!window._authUser) {
-    body.innerHTML = '<tr><td colspan="6">Inicia sesión para administrar pedidos.</td></tr>';
+    body.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(6, { title: 'Sesión requerida', hint: 'Inicia sesión para administrar pedidos históricos.' })
+      : '<tr><td colspan="6">Inicia sesión para administrar pedidos.</td></tr>';
     return;
   }
   body.innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
   const r = await fetch(API + '/sales/orders?limit=30', { credentials: 'same-origin' });
   if (!r.ok) {
     const data = await r.json().catch(() => ({}));
-    body.innerHTML = `<tr><td colspan="6">${data.message || 'Error al cargar pedidos'}</td></tr>`;
+    body.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(6, { title: 'Error', hint: data.message || 'Error al cargar pedidos' })
+      : `<tr><td colspan="6">${data.message || 'Error al cargar pedidos'}</td></tr>`;
     return;
   }
   const rows = await r.json();
   if (!Array.isArray(rows) || !rows.length) {
-    body.innerHTML = '<tr><td colspan="6">Sin pedidos</td></tr>';
+    body.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(6, { title: 'Sin pedidos históricos', hint: 'Los pedidos convertidos desde solicitudes aparecen aquí.' })
+      : '<tr><td colspan="6">Sin pedidos</td></tr>';
     return;
   }
   const admin = window._authUser?.role === 'administrador';
@@ -26,12 +37,14 @@ async function loadPedidosAdmin() {
       <td>${row.item_type}</td>
       <td>${row.units_sold}</td>
       <td>${fmtUSD(row.total_revenue)}</td>
-      <td>${admin ? `<button type="button" class="btn btn-ghost" style="font-size:10px;padding:4px 6px" onclick="deletePedido('${row.order_id}')">Eliminar</button>` : '—'}</td>
+      <td>${admin
+        ? `<button type="button" class="btn btn-ghost btn-ops" onclick="deletePedido('${row.order_id}')">Eliminar</button>`
+        : '—'}</td>
     </tr>`).join('');
 }
 
 async function createPedidoAdmin() {
-  if (window._authUser?.role !== 'administrador') { alert('Solo administradores.'); return; }
+  if (window._authUser?.role !== 'administrador') { toast('Solo administradores.', 'warn'); return; }
   const body = {
     region: document.getElementById('np-region').value.trim(),
     country: document.getElementById('np-country').value.trim(),
@@ -49,8 +62,8 @@ async function createPedidoAdmin() {
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Error'); return; }
-  alert('Pedido creado: ' + data.order.order_id);
+  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  toast('Pedido creado: ' + data.order.order_id, 'ok');
   await loadPedidosAdmin();
 }
 
@@ -60,17 +73,24 @@ async function deletePedido(orderId) {
     method: 'DELETE', credentials: 'same-origin',
   });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Error'); return; }
+  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  toast('Pedido eliminado', 'ok');
   await loadPedidosAdmin();
 }
 
 function showVentasTab(tab) {
+  if (tab === 'pedidos' && !hasPermission('orders.read')) {
+    toast('No tienes permiso para explorar pedidos históricos.', 'warn');
+    tab = 'solicitudes';
+  }
   document.querySelectorAll('.ventas-tab-panel').forEach(p => p.hidden = true);
   document.querySelectorAll('.ventas-tab-btn').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('ventas-panel-' + tab);
   const btn = document.querySelector('.ventas-tab-btn[data-tab="' + tab + '"]');
   if (panel) panel.hidden = false;
   if (btn) btn.classList.add('active');
+  const createBox = document.getElementById('pedidos-create-box');
+  if (createBox) createBox.hidden = window._authUser?.role !== 'administrador';
   if (tab === 'solicitudes') loadSolicitudes();
-  if (tab === 'pedidos') { loadPedidosAdmin(); loadSolicitudes(); }
+  if (tab === 'pedidos') loadPedidosAdmin();
 }

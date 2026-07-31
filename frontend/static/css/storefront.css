@@ -1,4 +1,4 @@
-/* GLOBTRADE — storefront premium (referencia Shopify) */
+/* GLOBTRADE — storefront premium B2B */
 :root {
   --shop-green: #008060;
   --shop-green-dark: #004c3f;
@@ -16,7 +16,7 @@
   --shop-landing-bg: linear-gradient(165deg, #041513 0%, #004c3f 42%, #008060 100%);
 }
 
-/* Logo mark verde tipo Shopify */
+/* Logo mark verde de marca */
 .logo-icon {
   display: inline-flex;
   width: 1.35rem;
@@ -59,8 +59,76 @@
 }
 .sidebar-nav {
   flex: 1;
-  padding: 0.5rem 0.65rem 0.75rem;
+  padding: 0.45rem 0.55rem 0.75rem;
   overflow-y: auto;
+}
+.sidebar .logo--rail {
+  padding: 0.75rem 0.75rem 0.65rem;
+}
+.sidebar .sidebar-burger {
+  background: color-mix(in srgb, var(--shop-sidebar-muted) 14%, transparent);
+  border-color: color-mix(in srgb, var(--shop-sidebar-muted) 28%, transparent);
+  color: var(--shop-sidebar-text);
+}
+.sidebar .nav-block {
+  border-bottom-color: color-mix(in srgb, var(--shop-sidebar-muted) 22%, transparent);
+}
+.sidebar .nav-section-label,
+.sidebar .nav-section-label--toggle {
+  color: var(--shop-sidebar-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sidebar .nav-folder-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.35rem 0.55rem 0.25rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--shop-sidebar-muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+.sidebar .nav-folder-toggle:hover {
+  color: var(--shop-sidebar-text);
+  background: var(--shop-sidebar-hover);
+}
+.sidebar .nav-folder-body {
+  margin-left: 0.55rem;
+  padding-left: 0.55rem;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 40%, var(--shop-sidebar-muted));
+}
+.sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.08rem;
+  color: var(--shop-sidebar-text);
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 0.84rem;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sidebar .nav-folder-toggle:hover,
+.sidebar .nav-item:hover {
+  background: var(--shop-sidebar-hover);
+}
+.sidebar .nav-item.active {
+  background: var(--shop-sidebar-active-bg);
+  border-color: transparent;
+  color: var(--shop-sidebar-text);
+  font-weight: 600;
 }
 .sidebar .nav-section {
   color: var(--shop-sidebar-muted);
@@ -72,24 +140,6 @@
 }
 .sidebar .nav-section:first-child {
   padding-top: 0.35rem;
-}
-.sidebar .nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  width: 100%;
-  padding: 0.5rem 0.65rem;
-  margin-bottom: 0.15rem;
-  color: var(--shop-sidebar-text);
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 0.8125rem;
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .nav-icon {
   width: 1.15rem;
@@ -123,10 +173,14 @@
   border-color: var(--shop-sidebar-active-border);
   color: var(--shop-sidebar-text);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .sidebar .nav-item.active .nav-icon {
   opacity: 1;
   color: var(--accent);
+}
+.nav-label {
+  font-family: var(--font-ui, inherit);
 }
 .sidebar-footer {
   border-top: 1px solid var(--shop-sidebar-border);
@@ -262,14 +316,27 @@
   position: relative;
   background: var(--shop-landing-bg);
   color: #fff;
-  min-height: 340px;
-  padding: 3rem 2rem 2rem;
+  min-height: 380px;
+  padding: 3.25rem 2rem 2.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   text-align: center;
+}
+.shop-landing::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -40% 20%;
+  height: 70%;
+  background: radial-gradient(ellipse at center, rgba(0, 160, 120, 0.35), transparent 65%);
+  pointer-events: none;
+  animation: shopGlow 8s ease-in-out infinite alternate;
+}
+@keyframes shopGlow {
+  from { opacity: 0.55; transform: translateY(0); }
+  to { opacity: 1; transform: translateY(-12px); }
 }
 .shop-landing-visual {
   position: absolute;
@@ -362,8 +429,9 @@
   margin-bottom: 1.25rem;
 }
 .shop-landing-title {
+  font-family: var(--font-ui, inherit);
   font-size: clamp(2.25rem, 6vw, 3.75rem);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.04em;
   margin: 0;
@@ -390,19 +458,19 @@
   margin-top: 2rem;
 }
 .shop-btn {
+  font-family: var(--font-ui, inherit);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0.85rem 1.5rem;
-  border-radius: 999px;
-  font-family: inherit;
+  border-radius: 10px;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   border: 2px solid transparent;
-  transition: transform 0.15s, background 0.15s;
+  transition: transform 0.2s var(--ease-out, ease), background 0.2s, box-shadow 0.2s;
 }
-.shop-btn:hover { transform: scale(1.02); }
+.shop-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
 .shop-btn--white {
   background: #fff;
   color: #000;
@@ -441,7 +509,29 @@
   border-top: 1px solid var(--border);
 }
 .shop-catalog-head {
-  display: none;
+  display: block;
+  margin-bottom: 1.25rem;
+}
+.shop-catalog-head .page-title {
+  font-size: clamp(1.25rem, 2.2vw, 1.55rem);
+}
+.shop-product-title {
+  font-family: var(--font-ui, inherit);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.shop-cart-empty {
+  text-align: center;
+  padding: 1.5rem 0.75rem;
+  color: var(--shop-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.shop-cart-empty strong {
+  display: block;
+  color: var(--shop-text);
+  font-family: var(--font-ui, inherit);
+  margin-bottom: 0.35rem;
 }
 .shop-layout {
   display: grid;
@@ -589,15 +679,17 @@
 .shop-product-card {
   background: var(--shop-surface);
   border: 1px solid var(--shop-border);
-  border-radius: var(--shop-radius);
+  border-radius: var(--radius-lg, 14px);
   overflow: hidden;
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: box-shadow 0.25s var(--ease-out, ease), transform 0.25s var(--ease-out, ease), border-color 0.2s;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-sm, none);
 }
 .shop-product-card:hover {
-  box-shadow: 0 8px 24px rgba(0,0,0,.1);
-  transform: translateY(-3px);
+  box-shadow: var(--shadow, 0 8px 24px rgba(0,0,0,.1));
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--shop-border));
 }
 .shop-product-media {
   aspect-ratio: 1;
@@ -618,8 +710,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.5rem;
-  color: var(--shop-muted);
+  min-height: 140px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--shop-green, var(--accent)) 12%, var(--surface)), var(--surface2, #f3f4f6));
+  color: transparent;
+}
+.shop-product-media--empty::after {
+  content: "";
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  border: 2px solid color-mix(in srgb, var(--shop-green, var(--accent)) 45%, transparent);
+  opacity: 0.7;
 }
 .shop-product-badge {
   position: absolute;
@@ -687,11 +789,12 @@
 .shop-cart {
   background: var(--shop-surface);
   border: 1px solid var(--shop-border);
-  border-radius: var(--shop-radius);
+  border-radius: var(--radius-lg, 14px);
   position: sticky;
   top: calc(56px + 1rem);
   overflow: hidden;
-  box-shadow: var(--shop-shadow);
+  box-shadow: var(--shadow, var(--shop-shadow));
+  border-top: 3px solid var(--accent);
 }
 .shop-cart-head {
   padding: 1rem 1.25rem;
@@ -701,8 +804,10 @@
   align-items: center;
 }
 .shop-cart-head h3 {
+  font-family: var(--font-ui, inherit);
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 .shop-cart-count {

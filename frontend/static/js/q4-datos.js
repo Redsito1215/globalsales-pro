@@ -47,7 +47,7 @@ async function loadMasterTablesList() {
     const opt = (t) => `<option value="${t.name}">${t.label} · ${t.name} (${t.count})</option>`;
     sel.innerHTML = '<option value="">— Elegir tabla —</option>' +
       (masters.length ? `<optgroup label="Maestros DW">${masters.map(opt).join('')}</optgroup>` : '') +
-      (shop.length ? `<optgroup label="Comercio Shopify">${shop.map(opt).join('')}</optgroup>` : '');
+      (shop.length ? `<optgroup label="Comercio / tienda">${shop.map(opt).join('')}</optgroup>` : '');
     if (datosState.table) sel.value = datosState.table;
   } catch (e) {
     sel.innerHTML = '<option>Error al cargar</option>';
@@ -87,10 +87,12 @@ async function loadMasterRows() {
   body.innerHTML = datosState.rows.map(row => {
     const pk = masterPk(row) ?? row[keys[0]];
     const img = row.image_url || row.src ? `<br><img src="${row.image_url || row.src}" alt="" style="max-height:40px;margin-top:4px">` : '';
-    const actions = datosState.editable
+    const actions = datosState.editable && canWriteMasters()
       ? `<button type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="openMasterEdit('${pk}')">Editar</button>
-        <button type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="deleteMasterRow('${pk}')" ${!isAdmin() ? 'disabled' : ''}>Eliminar</button>`
-      : '<span style="font-size:11px;color:var(--muted)">Sync Shopify</span>';
+        <button type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="deleteMasterRow('${pk}')">Eliminar</button>`
+      : (datosState.editable
+        ? '<span style="font-size:11px;color:var(--muted)">Sin permiso de escritura</span>'
+        : '<span style="font-size:11px;color:var(--muted)">Sync catálogo</span>');
     return `<tr>${keys.map(k => `<td>${formatCell(row[k])}${k === 'name' || k === 'title' ? img : ''}</td>`).join('')}
       <td style="white-space:nowrap">${actions}</td></tr>`;
   }).join('');
@@ -102,13 +104,21 @@ function formatCell(v) {
   return String(v);
 }
 
-function isAdmin() {
-  return window._authUser && window._authUser.role === 'administrador';
+function canWriteMasters() {
+  return typeof hasPermission === 'function' && hasPermission('masters.write');
+}
+
+function canRunElt() {
+  return typeof hasPermission === 'function' && hasPermission('elt.run');
+}
+
+function canReadAudit() {
+  return typeof hasPermission === 'function' && hasPermission('audit.read');
 }
 
 function openMasterCreate() {
-  if (!isAdmin()) { alert('Solo administradores.'); return; }
-  if (datosState.editable === false) { alert('Tabla comercial: usa Sync Shopify o edita maestros dim_*.'); return; }
+  if (!canWriteMasters()) { alert('No tienes permiso para editar maestros.'); return; }
+  if (datosState.editable === false) { alert('Tabla comercial: usa Sync catálogo o edita maestros dim_*.'); return; }
   document.getElementById('master-form-title').textContent = 'Nuevo registro';
   document.getElementById('master-form-pk').value = '';
   document.getElementById('master-form-fields').innerHTML = buildMasterFormFields({});
@@ -117,7 +127,7 @@ function openMasterCreate() {
 }
 
 function openMasterEdit(pk) {
-  if (!isAdmin()) { alert('Solo administradores.'); return; }
+  if (!canWriteMasters()) { alert('No tienes permiso para editar maestros.'); return; }
   const found = datosState.rows.find(r => String(masterPk(r)) === String(pk));
   if (!found) return;
   document.getElementById('master-form-title').textContent = 'Editar registro';
@@ -201,7 +211,7 @@ async function uploadProductImage(productId, file) {
 }
 
 async function deleteMasterRow(pk) {
-  if (!isAdmin() || !confirm('¿Eliminar registro?')) return;
+  if (!canWriteMasters() || !confirm('¿Eliminar registro?')) return;
   const r = await fetch(`${API}/master/${datosState.table}/${pk}`, {
     method: 'DELETE', credentials: 'same-origin',
   });
@@ -212,7 +222,7 @@ async function deleteMasterRow(pk) {
 }
 
 async function runBuildModel() {
-  if (!isAdmin()) { alert('Solo administradores.'); return; }
+  if (!canRunElt()) { alert('No tienes permiso para reconstruir el modelo.'); return; }
   const st = document.getElementById('datos-build-status');
   st.textContent = 'Reconstruyendo modelo…';
   const r = await fetch(API + '/build_model', { method: 'POST', credentials: 'same-origin' });
@@ -242,16 +252,24 @@ async function loadDatosEltPage() {
   }
 }
 
-async function runShopSync() {
-  if (!isAdmin()) { alert('Solo administradores.'); return; }
+async function runShopSync(resetStock = false) {
+  if (!canWriteMasters()) { alert('No tienes permiso para sincronizar el catálogo.'); return; }
+  if (resetStock && !confirm('¿Reiniciar stock desde maestros? Se perderán ajustes de inventario actuales.')) return;
   const st = document.getElementById('datos-build-status');
-  if (st) st.textContent = 'Sincronizando catálogo Shopify desde maestros…';
+  if (st) st.textContent = resetStock
+    ? 'Sincronizando catálogo y reiniciando stock…'
+    : 'Sincronizando catálogo de tienda (conserva stock)…';
   try {
-    const r = await fetch(API + '/shop/sync', { method: 'POST', credentials: 'same-origin' });
+    const r = await fetch(API + '/shop/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ reset_stock: !!resetStock }),
+    });
     const d = await r.json();
     if (!r.ok) {
       if (st) st.textContent = '✗ ' + (d.message || 'Error al sincronizar');
-      alert(d.message || 'Error al sincronizar catálogo Shopify');
+      alert(d.message || 'Error al sincronizar catálogo de tienda');
       return;
     }
     if (st) st.textContent = '✓ ' + (d.message || 'Sincronizado') + (d.counts ? ' · ' + Object.entries(d.counts).slice(0, 4).map(([k, v]) => `${k}: ${v}`).join(', ') : '');
@@ -263,7 +281,7 @@ async function runShopSync() {
 }
 
 async function loadDatasetQ4() {
-  if (!isAdmin()) { alert('Solo administradores.'); return; }
+  if (!canRunElt()) { alert('No tienes permiso para ejecutar la carga ELT.'); return; }
   const log = document.getElementById('load-log');
   const btn = document.getElementById('btn-load');
   if (!log) return;
@@ -290,7 +308,15 @@ async function loadAuditPage() {
   const body = document.getElementById('audit-body');
   if (!body) return;
   if (!window._authUser) {
-    body.innerHTML = '<tr><td colspan="5">Inicia sesión para ver auditoría.</td></tr>';
+    body.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(5, { title: 'Sesión requerida', hint: 'Inicia sesión para consultar el registro de acciones.' })
+      : '<tr><td colspan="5">Inicia sesión para ver auditoría.</td></tr>';
+    return;
+  }
+  if (!canReadAudit()) {
+    body.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(5, { title: 'Sin permiso', hint: 'Tu rol no puede ver auditoría.' })
+      : '<tr><td colspan="5">Tu rol no tiene permiso para ver auditoría.</td></tr>';
     return;
   }
   const r = await fetch(API + '/audit_log?limit=50', { credentials: 'same-origin' });
@@ -301,7 +327,9 @@ async function loadAuditPage() {
   }
   const rows = data.entries || [];
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="5">Sin registros de auditoría.</td></tr>';
+    body.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(5, { title: 'Sin registros', hint: 'Las acciones administrativas aparecerán aquí.' })
+      : '<tr><td colspan="5">Sin registros de auditoría.</td></tr>';
     return;
   }
   body.innerHTML = rows.map(e => `

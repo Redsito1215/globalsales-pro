@@ -19,6 +19,9 @@ from paquetes.tablero import tablero_bp
 from paquetes.ventas import ventas_bp
 from paquetes.shop import shop_bp
 from paquetes.soporte import soporte_bp
+from paquetes.decisiones import decisiones_bp
+from paquetes.compras import compras_bp
+from paquetes.reportes import reportes_bp
 
 static_dir = Path(__file__).parent / "static"
 
@@ -38,6 +41,9 @@ app.register_blueprint(datos_bp)
 app.register_blueprint(ventas_bp)
 app.register_blueprint(shop_bp)
 app.register_blueprint(soporte_bp)
+app.register_blueprint(decisiones_bp)
+app.register_blueprint(compras_bp)
+app.register_blueprint(reportes_bp)
 
 import paquetes.tablero.catalogo as _catalogo_mod
 
@@ -53,11 +59,23 @@ def _init_auth():
         print(f"[auth] índices usuarios/roles: {e}")
 
 
+def _init_ops_indexes():
+    try:
+        from shared.ops_indexes import ensure_ops_indexes
+
+        counts = ensure_ops_indexes()
+        total = sum(counts.values())
+        print(f"[ops] índices operativos asegurados: {total} en {len(counts)} colecciones")
+    except Exception as e:
+        print(f"[ops] índices operativos: {e}")
+
+
 def _init_uploads():
     settings.product_uploads_dir.mkdir(parents=True, exist_ok=True)
 
 
 _init_auth()
+_init_ops_indexes()
 _init_uploads()
 
 

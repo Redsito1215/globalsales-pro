@@ -5,12 +5,49 @@ import re
 from datetime import date, timedelta
 from typing import Any
 
+from auth import roles_service
 from shared.audit import log_audit
 from shared.mongo import get_db, sales_collection
-from shared.notifications import notify_user, status_message
+from shared.notifications import notify_roles, notify_user, status_message
 from shared.roles_registry import ADMIN_ROLE
 
-REQUEST_STATUSES = frozenset({"pendiente", "en_revision", "aprobada", "convertida", "rechazada", "cancelada"})
+REQUEST_STATUSES = frozenset(
+    {
+        "pendiente",
+        "en_revision",
+        "aprobada",
+        "convertida",
+        "enviada",
+        "entregada",
+        "devuelta",
+        "rechazada",
+        "cancelada",
+    }
+)
+ACTIVE_STATUSES = frozenset({"pendiente", "en_revision", "aprobada", "convertida", "enviada"})
+RESTOCK_STATUSES = frozenset({"rechazada", "cancelada"})
+POST_SALE_STATUSES = frozenset({"enviada", "entregada"})
+PAYMENT_STATUSES = frozenset({"pendiente_pago", "pagado", "credito"})
+RETURN_CONDITIONS = frozenset({"apto", "danado", "mixto"})
+
+
+def _allocate_discount(gross_amounts: list[float], discount: float) -> list[float]:
+    """Prorratea descuento por línea; el residuo cae en la última con monto > 0."""
+    n = len(gross_amounts)
+    if n == 0:
+        return []
+    discount = max(0.0, float(discount or 0))
+    total = sum(gross_amounts)
+    if discount <= 0 or total <= 0:
+        return [0.0] * n
+    shares = [round(discount * (g / total), 2) for g in gross_amounts]
+    diff = round(discount - sum(shares), 2)
+    if diff:
+        for i in range(n - 1, -1, -1):
+            if gross_amounts[i] > 0:
+                shares[i] = round(shares[i] + diff, 2)
+                break
+    return shares
 
 
 def _next_request_id(col) -> int:
@@ -23,10 +60,32 @@ def _next_line_id(col) -> int:
     return int(row["line_id"]) + 1 if row and row.get("line_id") else 1
 
 
+def _maybe_restock(req: dict[str, Any]) -> None:
+    if req.get("stock_restored"):
+        return
+    lines = req.get("stock_lines") or []
+    if not lines:
+        return
+    from paquetes.shop.services import restock_lines
+
+    restock_lines(lines)
+    get_db()["purchase_requests"].update_one(
+        {"request_id": int(req["request_id"])},
+        {"$set": {"stock_restored": True}},
+    )
+    log_audit(
+        "restock_request",
+        entity="purchase_requests",
+        entity_id=int(req["request_id"]),
+        details={"lines": len(lines)},
+    )
+
+
 def list_requests(
     *,
     status: str | None = None,
     active_only: bool = False,
+    q: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> dict[str, Any]:
@@ -35,7 +94,17 @@ def list_requests(
     if status:
         query["status"] = status
     elif active_only:
-        query["status"] = {"$nin": ["convertida", "rechazada", "cancelada"]}
+        query["status"] = {"$in": list(ACTIVE_STATUSES)}
+    term = (q or "").strip()
+    if term:
+        rx = {"$regex": re.escape(term), "$options": "i"}
+        query["$or"] = [
+            {"client_name": rx},
+            {"client_email": rx},
+            {"notes": rx},
+        ]
+        if term.isdigit():
+            query["$or"].append({"request_id": int(term)})
     col = db["purchase_requests"]
     total = col.count_documents(query)
     rows = list(col.find(query, {"_id": 0}).sort("request_id", -1).skip(offset).limit(limit))
@@ -46,6 +115,22 @@ def list_requests(
     return {"total": total, "limit": limit, "offset": offset, "requests": rows}
 
 
+def count_pending_requests() -> int:
+    return get_db()["purchase_requests"].count_documents(
+        {"status": {"$in": ["pendiente", "en_revision", "aprobada"]}}
+    )
+
+
+def _client_order_numbers(col, query: dict[str, Any]) -> dict[int, int]:
+    """Número de pedido 1..N por cliente (orden cronológico), independiente del request_id global."""
+    ids = [
+        int(r["request_id"])
+        for r in col.find(query, {"request_id": 1, "_id": 0}).sort("request_id", 1)
+        if r.get("request_id") is not None
+    ]
+    return {rid: i + 1 for i, rid in enumerate(ids)}
+
+
 def list_requests_for_email(email: str, *, limit: int = 50, offset: int = 0) -> dict[str, Any]:
     db = get_db()
     query: dict[str, Any] = {
@@ -53,10 +138,13 @@ def list_requests_for_email(email: str, *, limit: int = 50, offset: int = 0) -> 
     }
     col = db["purchase_requests"]
     total = col.count_documents(query)
+    order_nos = _client_order_numbers(col, query)
     rows = list(col.find(query, {"_id": 0}).sort("request_id", -1).skip(offset).limit(limit))
     for row in rows:
+        rid = int(row["request_id"])
+        row["client_order_no"] = order_nos.get(rid, 0)
         row["lines"] = list(
-            db["purchase_request_lines"].find({"request_id": row["request_id"]}, {"_id": 0})
+            db["purchase_request_lines"].find({"request_id": rid}, {"_id": 0})
         )
     return {"total": total, "limit": limit, "offset": offset, "requests": rows}
 
@@ -75,6 +163,10 @@ def get_request(request_id: int) -> dict[str, Any] | None:
         req["country_name"] = country.get("name")
     if channel:
         req["channel_name"] = channel.get("name")
+    email = (req.get("client_email") or "").strip()
+    if email:
+        q = {"client_email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}}
+        req["client_order_no"] = _client_order_numbers(db["purchase_requests"], q).get(int(request_id), 0)
     return req
 
 
@@ -87,6 +179,23 @@ def _notify_request_status(req: dict[str, Any], status: str) -> None:
         category="pedido",
         request_id=int(req["request_id"]),
         meta={"status": status},
+    )
+
+
+def _notify_staff_new_request(req: dict[str, Any]) -> None:
+    rid = int(req["request_id"])
+    client = req.get("client_name") or req.get("client_email") or "Cliente"
+    notify_roles(
+        roles=("vendedor", "administrador"),
+        subject=f"Nueva solicitud #{rid}",
+        body=(
+            f"{client} envió la solicitud #{rid}.\n"
+            f"Revisa Checkouts / Ventas para gestionarla."
+        ),
+        category="comercial",
+        request_id=rid,
+        meta={"status": "pendiente"},
+        exclude_email=req.get("client_email"),
     )
 
 
@@ -112,6 +221,19 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
     if not channel:
         raise ValueError("invalid_channel")
 
+    stock_lines = []
+    for item in data.get("stock_lines") or []:
+        try:
+            stock_lines.append(
+                {
+                    "variant_id": int(item.get("variant_id") or 0),
+                    "quantity": int(item.get("quantity") or 0),
+                }
+            )
+        except (TypeError, ValueError):
+            continue
+    stock_lines = [x for x in stock_lines if x["variant_id"] > 0 and x["quantity"] > 0]
+
     req_col = db["purchase_requests"]
     line_col = db["purchase_request_lines"]
     rid = _next_request_id(req_col)
@@ -123,6 +245,8 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         "country_id": country_id,
         "channel_id": channel_id,
         "status": "pendiente",
+        "payment_status": "pendiente_pago",
+        "paid_at": None,
         "notes": (data.get("notes") or "").strip() or None,
         "created_at": date.today().isoformat(),
         "reviewed_by": None,
@@ -131,11 +255,18 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         "discount_amount": round(float(data.get("discount_amount") or 0), 2),
         "subtotal": round(float(data.get("subtotal") or 0), 2),
         "total": round(float(data.get("total") or 0), 2),
+        "stock_lines": stock_lines,
+        "stock_restored": False,
+        "stock_committed_closed": False,
+        "tracking_number": None,
+        "shipped_at": None,
+        "delivered_at": None,
     }
     req_col.insert_one(request_doc)
 
     line_docs = []
     lid = _next_line_id(line_col)
+    built_gross: list[float] = []
     for item in lines_in:
         pid = int(item.get("product_id") or 0)
         qty = int(item.get("quantity") or 0)
@@ -144,6 +275,17 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         prod = db["dim_producto"].find_one({"product_id": pid}, {"_id": 0})
         if not prod:
             raise ValueError("invalid_product")
+        # Prioridad: precio de variante/checkout > maestro
+        if item.get("unit_price") is not None and item.get("unit_price") != "":
+            unit_price = float(item["unit_price"])
+        else:
+            unit_price = float(prod.get("unit_price") or 0)
+        if item.get("unit_cost") is not None and item.get("unit_cost") != "":
+            unit_cost = float(item["unit_cost"])
+        else:
+            unit_cost = float(prod.get("unit_cost") or 0)
+        line_gross = round(unit_price * qty, 2)
+        built_gross.append(line_gross)
         line_docs.append(
             {
                 "line_id": lid,
@@ -151,16 +293,39 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
                 "product_id": pid,
                 "product_name": prod.get("name"),
                 "quantity": qty,
-                "unit_price": float(prod.get("unit_price") or 0),
+                "unit_price": unit_price,
+                "unit_cost": unit_cost,
+                "variant_id": int(item["variant_id"]) if item.get("variant_id") else None,
+                "line_gross": line_gross,
+                "discount_alloc": 0.0,
+                "line_net": line_gross,
             }
         )
         lid += 1
+
+    discount_amount = round(float(data.get("discount_amount") or 0), 2)
+    shares = _allocate_discount(built_gross, discount_amount)
+    for i, doc in enumerate(line_docs):
+        share = shares[i] if i < len(shares) else 0.0
+        doc["discount_alloc"] = share
+        doc["line_net"] = round(max(doc["line_gross"] - share, 0.0), 2)
+
+    calc_subtotal = round(sum(built_gross), 2)
+    calc_total = round(max(calc_subtotal - discount_amount, 0.0), 2)
+    if not data.get("subtotal"):
+        request_doc["subtotal"] = calc_subtotal
+        req_col.update_one({"request_id": rid}, {"$set": {"subtotal": calc_subtotal}})
+    if not data.get("total"):
+        request_doc["total"] = calc_total
+        req_col.update_one({"request_id": rid}, {"$set": {"total": calc_total}})
+
     if line_docs:
         line_col.insert_many(line_docs)
 
     log_audit("create_request", entity="purchase_requests", entity_id=rid)
     full = get_request(rid) or request_doc
     _notify_request_status(full, "pendiente")
+    _notify_staff_new_request(full)
     return full
 
 
@@ -172,7 +337,7 @@ def cancel_request_by_client(request_id: int, *, client_email: str) -> dict[str,
     if (req.get("client_email") or "").lower() != (client_email or "").lower():
         raise ValueError("forbidden")
     current = req.get("status")
-    if current in ("convertida", "rechazada", "cancelada"):
+    if current in ("convertida", "enviada", "entregada", "rechazada", "cancelada"):
         raise ValueError("cannot_cancel")
     if current == "aprobada":
         raise ValueError("cannot_cancel_approved")
@@ -180,36 +345,170 @@ def cancel_request_by_client(request_id: int, *, client_email: str) -> dict[str,
         {"request_id": int(request_id)},
         {"$set": {"status": "cancelada", "reviewed_by": client_email}},
     )
+    _maybe_restock(req)
     log_audit("cancel_request", entity="purchase_requests", entity_id=request_id)
     full = get_request(request_id) or {}
     _notify_request_status(full, "cancelada")
     return full
 
 
+# Transiciones permitidas vía PATCH /estado (sin atajos a convertida/devuelta/cancelada)
+_STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
+    "pendiente": frozenset({"en_revision", "aprobada", "rechazada"}),
+    "en_revision": frozenset({"pendiente", "aprobada", "rechazada"}),
+    "aprobada": frozenset(),  # postventa solo vía /convertir, /estado enviada|entregada
+    "convertida": frozenset({"enviada"}),
+    "enviada": frozenset({"entregada"}),
+}
+
+
 def update_status(request_id: int, status: str, *, reviewer_email: str | None = None) -> dict[str, Any]:
     if status not in REQUEST_STATUSES:
         raise ValueError("invalid_status")
+    # Estas salidas tienen endpoints dedicados (convierten venta, restock, etc.)
+    if status in ("convertida", "devuelta", "cancelada"):
+        raise ValueError("use_dedicated_endpoint")
+
     db = get_db()
     req = db["purchase_requests"].find_one({"request_id": int(request_id)})
     if not req:
         raise ValueError("not_found")
     current = req.get("status")
-    if current == "convertida":
-        raise ValueError("already_converted")
+
+    if current == "entregada":
+        raise ValueError("already_delivered")
+    if current == "devuelta":
+        raise ValueError("already_returned")
     if current == "rechazada":
         raise ValueError("already_rejected")
     if current == "cancelada":
         raise ValueError("already_cancelled")
     if status == "rechazada" and current == "aprobada":
         raise ValueError("cannot_reject_approved")
-    db["purchase_requests"].update_one(
-        {"request_id": int(request_id)},
-        {"$set": {"status": status, "reviewed_by": reviewer_email}},
+
+    allowed = _STATUS_TRANSITIONS.get(str(current) if current else "", frozenset())
+    if status not in allowed:
+        if status == "enviada":
+            raise ValueError("must_convert_first")
+        if status == "entregada":
+            raise ValueError("must_ship_first")
+        raise ValueError("invalid_transition")
+
+    # Postventa: convertida → enviada → entregada
+    if status == "enviada":
+        pay = req.get("payment_status") or "pendiente_pago"
+        if pay not in ("pagado", "credito"):
+            raise ValueError("payment_required")
+
+    patch: dict[str, Any] = {"status": status, "reviewed_by": reviewer_email}
+    if status == "enviada":
+        patch["shipped_at"] = date.today().isoformat()
+        if not req.get("tracking_number"):
+            patch["tracking_number"] = f"GT-{int(request_id):06d}"
+    if status == "entregada":
+        patch["delivered_at"] = date.today().isoformat()
+        if not req.get("shipped_at"):
+            patch["shipped_at"] = date.today().isoformat()
+        if not req.get("tracking_number"):
+            patch["tracking_number"] = f"GT-{int(request_id):06d}"
+
+    db["purchase_requests"].update_one({"request_id": int(request_id)}, {"$set": patch})
+    if status in RESTOCK_STATUSES:
+        _maybe_restock(req)
+    log_audit(
+        "update_request_status",
+        entity="purchase_requests",
+        entity_id=request_id,
+        details={"status": status},
     )
-    log_audit("update_request_status", entity="purchase_requests", entity_id=request_id, details={"status": status})
     full = get_request(request_id) or {}
     _notify_request_status(full, status)
     return full
+
+
+def update_payment(
+    request_id: int,
+    payment_status: str,
+    *,
+    reviewer_email: str | None = None,
+    payment_method: str | None = None,
+) -> dict[str, Any]:
+    if payment_status not in PAYMENT_STATUSES:
+        raise ValueError("invalid_payment")
+    db = get_db()
+    req = db["purchase_requests"].find_one({"request_id": int(request_id)})
+    if not req:
+        raise ValueError("not_found")
+    if req.get("status") in ("rechazada", "cancelada"):
+        raise ValueError("cannot_pay_closed")
+    patch: dict[str, Any] = {
+        "payment_status": payment_status,
+        "reviewed_by": reviewer_email,
+    }
+    if payment_status == "pagado":
+        patch["paid_at"] = date.today().isoformat()
+        if payment_method:
+            patch["payment_method"] = str(payment_method)[:40]
+    elif payment_status == "pendiente_pago":
+        patch["paid_at"] = None
+    db["purchase_requests"].update_one({"request_id": int(request_id)}, {"$set": patch})
+    # Sincronizar en sales_records si ya se convirtió
+    oid = req.get("order_id")
+    if oid:
+        sales_collection().update_many(
+            {"order_id": str(oid)},
+            {"$set": {"payment_status": payment_status}},
+        )
+    log_audit(
+        "update_payment",
+        entity="purchase_requests",
+        entity_id=request_id,
+        details={"payment_status": payment_status},
+    )
+    full = get_request(request_id) or {}
+    notify_user(
+        recipient_email=full.get("client_email") or "",
+        subject=f"Solicitud #{request_id} — pago {payment_status.replace('_', ' ')}",
+        body=(
+            f"El estado de pago de tu solicitud #{request_id} es: {payment_status.replace('_', ' ')}.\n"
+            f"Revisa Mis pedidos en GLOBTRADE."
+        ),
+        category="pago",
+        request_id=int(request_id),
+        meta={"payment_status": payment_status},
+    )
+    return full
+
+
+def client_pay(
+    request_id: int,
+    *,
+    client_email: str,
+    method: str = "transferencia",
+) -> dict[str, Any]:
+    """El cliente confirma el pago de su propia solicitud (demo sin pasarela real)."""
+    email = (client_email or "").strip().lower()
+    if not email:
+        raise ValueError("forbidden")
+    db = get_db()
+    req = db["purchase_requests"].find_one({"request_id": int(request_id)})
+    if not req:
+        raise ValueError("not_found")
+    if (req.get("client_email") or "").strip().lower() != email:
+        raise ValueError("forbidden")
+    if req.get("status") in ("rechazada", "cancelada", "devuelta"):
+        raise ValueError("cannot_pay_closed")
+    if (req.get("payment_status") or "pendiente_pago") == "pagado":
+        raise ValueError("already_paid")
+    method_norm = (method or "transferencia").strip().lower()
+    if method_norm not in ("transferencia", "tarjeta"):
+        method_norm = "transferencia"
+    return update_payment(
+        request_id,
+        "pagado",
+        reviewer_email=email,
+        payment_method=method_norm,
+    )
 
 
 def convert_to_sale(
@@ -222,20 +521,46 @@ def convert_to_sale(
     req = get_request(request_id)
     if not req:
         raise ValueError("not_found")
-    if req.get("status") == "convertida":
+    if req.get("status") in ("convertida", "enviada", "entregada"):
         raise ValueError("already_converted")
     if req.get("status") == "rechazada":
         raise ValueError("rejected")
     if req.get("status") == "cancelada":
         raise ValueError("cancelled")
-    if actor_role != ADMIN_ROLE and req.get("status") != "aprobada":
+    can_bypass = actor_role == ADMIN_ROLE or roles_service.has_permission(
+        actor_role, "ventas.convert_bypass"
+    )
+    if not can_bypass and req.get("status") != "aprobada":
         raise ValueError("approval_required")
+
+    # No convertir a venta hasta que el cliente pague o se registre crédito
+    pay = req.get("payment_status") or "pendiente_pago"
+    if pay not in ("pagado", "credito"):
+        raise ValueError("payment_required_before_convert")
 
     country = db["dim_pais"].find_one({"country_id": req["country_id"]}, {"_id": 0})
     region = db["dim_region"].find_one({"region_id": country["region_id"]}, {"_id": 0}) if country else None
     channel = db["dim_canal"].find_one({"channel_id": req["channel_id"]}, {"_id": 0})
     if not country or not region or not channel:
         raise ValueError("invalid_master_refs")
+
+    lines = list(req.get("lines") or [])
+    if not lines:
+        raise ValueError("no_lines")
+
+    # Recalcular prorrateo si líneas viejas no tienen discount_alloc
+    grosses = []
+    for line in lines:
+        qty = int(line.get("quantity") or 0)
+        up = float(line.get("unit_price") or 0)
+        grosses.append(round(qty * up, 2))
+    discount = float(req.get("discount_amount") or 0)
+    shares = _allocate_discount(grosses, discount)
+    for i, line in enumerate(lines):
+        if line.get("discount_alloc") is None:
+            line["discount_alloc"] = shares[i]
+        if line.get("line_net") is None:
+            line["line_net"] = round(max(grosses[i] - float(line.get("discount_alloc") or 0), 0), 2)
 
     col = sales_collection()
     last = col.find_one({}, {"order_id": 1, "_id": 0}, sort=[("order_id", -1)])
@@ -244,25 +569,30 @@ def convert_to_sale(
     except ValueError:
         next_oid = col.count_documents({}) + 1
 
+    order_id = str(next_oid)
     order_date = date.today().isoformat()
     ship_date = (date.today() + timedelta(days=7)).isoformat()
+    payment_status = req.get("payment_status") or "pendiente_pago"
     inserted = 0
-    order_ids: list[str] = []
 
-    for line in req.get("lines") or []:
+    for line in lines:
         prod = db["dim_producto"].find_one({"product_id": line["product_id"]}, {"_id": 0})
         if not prod:
             continue
         cat = db["dim_categoria"].find_one({"category_id": prod["category_id"]}, {"_id": 0})
         item_type = cat["name"] if cat else prod.get("name", "Unknown")
         units = int(line["quantity"])
-        unit_price = float(line.get("unit_price") or prod.get("unit_price") or 0)
-        unit_cost = float(prod.get("unit_cost") or 0)
-        oid = str(next_oid)
-        next_oid += 1
-        order_ids.append(oid)
+        list_price = float(line.get("unit_price") or prod.get("unit_price") or 0)
+        unit_cost = float(line.get("unit_cost") if line.get("unit_cost") is not None else (prod.get("unit_cost") or 0))
+        disc = float(line.get("discount_alloc") or 0)
+        revenue = float(line.get("line_net")) if line.get("line_net") is not None else round(units * list_price - disc, 2)
+        revenue = max(revenue, 0.0)
+        # Precio efectivo neto para coherencia de KPIs (revenue ≈ units * unit_price)
+        net_unit = round(revenue / units, 4) if units else 0.0
+        cost_total = round(units * unit_cost, 2)
         doc = {
-            "order_id": oid,
+            "order_id": order_id,
+            "request_id": int(request_id),
             "region": region["name"],
             "country": country["name"],
             "item_type": item_type,
@@ -271,11 +601,17 @@ def convert_to_sale(
             "order_date": order_date,
             "ship_date": ship_date,
             "units_sold": units,
-            "unit_price": unit_price,
+            "unit_price": net_unit,
+            "list_unit_price": list_price,
+            "discount_alloc": disc,
+            "discount_code": req.get("discount_code"),
             "unit_cost": unit_cost,
-            "total_revenue": round(units * unit_price, 2),
-            "total_cost": round(units * unit_cost, 2),
-            "total_profit": round(units * (unit_price - unit_cost), 2),
+            "total_revenue": round(revenue, 2),
+            "total_cost": cost_total,
+            "total_profit": round(revenue - cost_total, 2),
+            "payment_status": payment_status,
+            "product_id": line.get("product_id"),
+            "product_name": line.get("product_name"),
         }
         col.insert_one(doc)
         inserted += 1
@@ -283,14 +619,20 @@ def convert_to_sale(
     if not inserted:
         raise ValueError("no_lines")
 
-    primary_order_id = order_ids[0]
+    # Cerrar committed de inventario
+    if not req.get("stock_committed_closed"):
+        from paquetes.shop.services import finalize_committed
+
+        finalize_committed(req.get("stock_lines") or [])
+
     db["purchase_requests"].update_one(
         {"request_id": int(request_id)},
         {
             "$set": {
                 "status": "convertida",
-                "order_id": primary_order_id,
+                "order_id": order_id,
                 "reviewed_by": admin_email,
+                "stock_committed_closed": True,
             }
         },
     )
@@ -298,11 +640,245 @@ def convert_to_sale(
         "convert_request",
         entity="purchase_requests",
         entity_id=request_id,
-        details={"order_id": primary_order_id, "lines": inserted},
+        details={"order_id": order_id, "lines": inserted, "discount": discount},
     )
     full = get_request(request_id) or {}
     _notify_request_status(full, "convertida")
-    return {"request_id": request_id, "order_id": primary_order_id, "sales_inserted": inserted}
+
+    analytics_stale = True
+    sync_info: dict[str, Any] = {}
+    try:
+        from shared.analytics_sync import set_strategic_lag, sync_order_to_fact
+
+        sync_info = sync_order_to_fact(order_id)
+        analytics_stale = bool(sync_info.get("analytics_stale", False))
+    except Exception as exc:
+        sync_info = {"error": str(exc)}
+        try:
+            from shared.analytics_sync import set_strategic_lag
+
+            set_strategic_lag(True, detail=f"convert {order_id}: {exc}")
+        except Exception:
+            pass
+
+    return {
+        "request_id": request_id,
+        "order_id": order_id,
+        "sales_inserted": inserted,
+        "discount_amount": discount,
+        "payment_status": payment_status,
+        "analytics_stale": analytics_stale,
+        "analytics_sync": sync_info,
+        "data_layer": "landing" if analytics_stale else "estrategico",
+        "message_analytics": (
+            (
+                "Venta en landing (sales_records). Sync a fact_ventas falló; "
+                "usa Datos → Sincronizar / Construir modelo."
+            )
+            if analytics_stale
+            else "Venta en landing y sincronizada a fact_ventas (Tablero al día)."
+        ),
+    }
+
+
+def _request_stock_lines(req: dict[str, Any]) -> list[dict[str, Any]]:
+    """Líneas de stock asociadas a la solicitud (variant_id + quantity)."""
+    lines = list(req.get("stock_lines") or [])
+    if lines:
+        out = []
+        for line in lines:
+            vid = int(line.get("variant_id") or 0)
+            qty = int(line.get("quantity") or 0)
+            if vid >= 1 and qty >= 1:
+                out.append({"variant_id": vid, "quantity": qty, "product_id": int(line.get("product_id") or 0)})
+        return out
+    db = get_db()
+    out = []
+    for line in db["purchase_request_lines"].find({"request_id": int(req["request_id"])}):
+        qty = int(line.get("quantity") or 0)
+        vid = int(line.get("variant_id") or 0)
+        pid = int(line.get("product_id") or 0)
+        if qty < 1:
+            continue
+        if vid < 1 and pid:
+            variant = db["product_variants"].find_one({"product_id": pid}, {"variant_id": 1})
+            vid = int((variant or {}).get("variant_id") or 0)
+        if vid < 1:
+            continue
+        out.append({"variant_id": vid, "quantity": qty, "product_id": pid})
+    return out
+
+
+def plan_return_stock(
+    stock_lines: list[dict[str, Any]],
+    *,
+    condition: str,
+    inspections: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """
+    Decide qué unidades reingresan a stock (apto) y cuáles no (dañado).
+    condition: apto | danado | mixto
+    inspections (solo mixto): [{variant_id, restock_qty, damaged_qty}]
+    """
+    condition = (condition or "").strip().lower()
+    if condition not in RETURN_CONDITIONS:
+        raise ValueError("return_condition_required")
+    if not stock_lines:
+        raise ValueError("no_lines")
+
+    by_vid = {int(l["variant_id"]): int(l["quantity"]) for l in stock_lines}
+
+    if condition == "apto":
+        restock = [{"variant_id": vid, "quantity": qty} for vid, qty in by_vid.items()]
+        return restock, []
+
+    if condition == "danado":
+        damaged = [{"variant_id": vid, "quantity": qty} for vid, qty in by_vid.items()]
+        return [], damaged
+
+    # mixto: inspección por línea obligatoria
+    if not inspections:
+        raise ValueError("return_inspection_required")
+    restock_map: dict[int, int] = {}
+    damaged_map: dict[int, int] = {}
+    seen: set[int] = set()
+    for item in inspections:
+        vid = int(item.get("variant_id") or 0)
+        if vid < 1 or vid not in by_vid:
+            raise ValueError("invalid_return_line")
+        if vid in seen:
+            raise ValueError("duplicate_return_line")
+        seen.add(vid)
+        ok = int(item.get("restock_qty") if item.get("restock_qty") is not None else item.get("quantity_ok") or 0)
+        bad = int(item.get("damaged_qty") if item.get("damaged_qty") is not None else item.get("quantity_damaged") or 0)
+        if ok < 0 or bad < 0:
+            raise ValueError("invalid_return_qty")
+        ordered = by_vid[vid]
+        if ok + bad != ordered:
+            raise ValueError("return_qty_mismatch")
+        if ok:
+            restock_map[vid] = ok
+        if bad:
+            damaged_map[vid] = bad
+    missing = set(by_vid) - seen
+    if missing:
+        raise ValueError("return_inspection_incomplete")
+    restock = [{"variant_id": vid, "quantity": qty} for vid, qty in restock_map.items()]
+    damaged = [{"variant_id": vid, "quantity": qty} for vid, qty in damaged_map.items()]
+    return restock, damaged
+
+
+def _apply_restock_qty(db, variant_id: int, qty: int) -> None:
+    if qty < 1 or variant_id < 1:
+        return
+    variant = db["product_variants"].find_one({"variant_id": int(variant_id)})
+    if not variant:
+        return
+    db["product_variants"].update_one(
+        {"variant_id": int(variant_id)},
+        {"$inc": {"inventory_quantity": int(qty)}},
+    )
+    inv = db["inventory_items"].find_one({"variant_id": int(variant_id)})
+    if inv:
+        db["inventory_levels"].update_one(
+            {"inventory_item_id": inv["inventory_item_id"]},
+            {"$inc": {"available": int(qty)}},
+        )
+
+
+def return_delivered_request(
+    request_id: int,
+    *,
+    reviewer_email: str | None = None,
+    reason: str | None = None,
+    condition: str | None = None,
+    inspections: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Devolución post-entrega: solo reingresa a stock lo inspeccionado como apto."""
+    db = get_db()
+    req = db["purchase_requests"].find_one({"request_id": int(request_id)})
+    if not req:
+        raise ValueError("not_found")
+    if req.get("status") != "entregada":
+        raise ValueError("must_be_delivered")
+    if req.get("status") == "devuelta" or req.get("returned_at"):
+        raise ValueError("already_returned")
+
+    stock_lines = _request_stock_lines(req)
+    restock_lines, damaged_lines = plan_return_stock(
+        stock_lines,
+        condition=condition or "",
+        inspections=inspections,
+    )
+
+    for line in restock_lines:
+        _apply_restock_qty(db, int(line["variant_id"]), int(line["quantity"]))
+
+    # Registro de merma / no reingreso (no vuelve a available)
+    if damaged_lines:
+        scrap_docs = []
+        for line in damaged_lines:
+            scrap_docs.append(
+                {
+                    "request_id": int(request_id),
+                    "variant_id": int(line["variant_id"]),
+                    "quantity": int(line["quantity"]),
+                    "reason": (reason or "").strip() or None,
+                    "created_at": date.today().isoformat(),
+                    "reviewed_by": reviewer_email,
+                }
+            )
+        if scrap_docs:
+            db["inventory_scrapped"].insert_many(scrap_docs)
+
+    oid = req.get("order_id")
+    if oid:
+        sales_collection().update_many(
+            {"order_id": str(oid)},
+            {
+                "$set": {
+                    "returned": True,
+                    "returned_at": date.today().isoformat(),
+                    "return_reason": (reason or "").strip() or None,
+                    "return_condition": (condition or "").strip().lower(),
+                }
+            },
+        )
+
+    restock_units = sum(int(l["quantity"]) for l in restock_lines)
+    damaged_units = sum(int(l["quantity"]) for l in damaged_lines)
+    db["purchase_requests"].update_one(
+        {"request_id": int(request_id)},
+        {
+            "$set": {
+                "status": "devuelta",
+                "returned_at": date.today().isoformat(),
+                "return_reason": (reason or "").strip() or None,
+                "return_condition": (condition or "").strip().lower(),
+                "return_restock_lines": restock_lines,
+                "return_damaged_lines": damaged_lines,
+                "return_restock_units": restock_units,
+                "return_damaged_units": damaged_units,
+                "reviewed_by": reviewer_email,
+                "stock_restored": restock_units > 0,
+            }
+        },
+    )
+    log_audit(
+        "return_request",
+        entity="purchase_requests",
+        entity_id=request_id,
+        details={
+            "reason": reason,
+            "condition": condition,
+            "order_id": oid,
+            "restock_units": restock_units,
+            "damaged_units": damaged_units,
+        },
+    )
+    full = get_request(request_id) or {}
+    _notify_request_status(full, "devuelta")
+    return full
 
 
 def list_store_products(*, category_id: int | None = None, limit: int = 100, offset: int = 0) -> dict[str, Any]:

@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 .env
+.mongo-data/
 data/parquet/*.parquet
 data/raw/*
 !data/raw/.gitkeep

@@ -5,35 +5,41 @@
 html[data-theme="light"],
 html.theme-light {
   color-scheme: light;
-  --bg: #f6f6f7;
+  --bg: #f3f5f4;
   --surface: #ffffff;
-  --surface2: #f1f2f4;
-  --border: #e1e3e5;
-  --text: #202223;
-  --muted: #6d7175;
+  --surface2: #eef1f0;
+  --border: #dce3e0;
+  --text: #14201c;
+  --muted: #5f6f68;
   --accent: #008060;
   --accent-hover: #004c3f;
-  --accent2: #5c6ac4;
+  --accent2: #2a6f97;
   --accent3: #b98900;
   --danger: #d82c0d;
-  --topbar-bg: #ffffff;
-  --topbar-text: #202223;
-  --topbar-border: #e1e3e5;
-  --topbar-control-bg: #f1f2f4;
-  --topbar-control-border: #c9cccf;
-  --topbar-control-text: #202223;
+  --info: #2a6f97;
+  --warn: #b98900;
+  --ok: #008060;
+  --topbar-bg: rgba(255, 255, 255, 0.92);
+  --topbar-text: #14201c;
+  --topbar-border: #dce3e0;
+  --topbar-control-bg: #eef1f0;
+  --topbar-control-border: #c5d0cb;
+  --topbar-control-text: #14201c;
   --input-bg: #ffffff;
-  --input-border: #c9cccf;
+  --input-border: #c5d0cb;
   --chart-grid: #e5e7eb;
   --chart-text: #6b7280;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --panel-highlight-bg: rgba(0, 128, 96, 0.06);
-  --panel-highlight-border: rgba(0, 128, 96, 0.18);
+  --shadow: 0 1px 2px rgba(20, 32, 28, 0.06), 0 8px 24px rgba(20, 32, 28, 0.04);
+  --shadow-sm: 0 1px 2px rgba(20, 32, 28, 0.05);
+  --panel-highlight-bg: rgba(0, 128, 96, 0.07);
+  --panel-highlight-border: rgba(0, 128, 96, 0.2);
+  --bg-glow: radial-gradient(1200px 500px at 12% -10%, rgba(0, 128, 96, 0.09), transparent 55%),
+             radial-gradient(900px 400px at 100% 0%, rgba(42, 111, 151, 0.06), transparent 50%);
   --shop-sidebar-bg: #ffffff;
-  --shop-sidebar-text: #202223;
-  --shop-sidebar-muted: #6d7175;
-  --shop-sidebar-border: #e1e3e5;
-  --shop-sidebar-hover: #f1f2f4;
+  --shop-sidebar-text: #14201c;
+  --shop-sidebar-muted: #5f6f68;
+  --shop-sidebar-border: #dce3e0;
+  --shop-sidebar-hover: #eef1f0;
   --shop-sidebar-active-bg: rgba(0, 128, 96, 0.12);
   --shop-sidebar-active-border: rgba(0, 128, 96, 0.35);
   --shop-green-light: #e3f1df;
@@ -43,35 +49,41 @@ html.theme-light {
 html[data-theme="dark"],
 html.theme-dark {
   color-scheme: dark;
-  --bg: #0f1115;
-  --surface: #1a1d24;
-  --surface2: #252a33;
-  --border: #3d4553;
-  --text: #f3f4f6;
-  --muted: #9ca3af;
+  --bg: #0c1210;
+  --surface: #151c19;
+  --surface2: #1e2824;
+  --border: #2a3832;
+  --text: #e8efeb;
+  --muted: #9aaba3;
   --accent: #00a47c;
   --accent-hover: #008060;
-  --accent2: #60a5fa;
-  --accent3: #fbbf24;
+  --accent2: #5ba3c9;
+  --accent3: #f0c14b;
   --danger: #f87171;
-  --topbar-bg: #1a1d24;
-  --topbar-text: #f3f4f6;
-  --topbar-border: #3d4553;
-  --topbar-control-bg: #252a33;
-  --topbar-control-border: #4b5563;
-  --topbar-control-text: #f3f4f6;
-  --input-bg: #252a33;
-  --input-border: #4b5563;
-  --chart-grid: #3d4553;
-  --chart-text: #9ca3af;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  --panel-highlight-bg: rgba(0, 164, 124, 0.12);
-  --panel-highlight-border: rgba(0, 164, 124, 0.28);
-  --shop-sidebar-bg: #121418;
-  --shop-sidebar-text: #e3e3e3;
-  --shop-sidebar-muted: #9ca3af;
+  --info: #5ba3c9;
+  --warn: #f0c14b;
+  --ok: #34d399;
+  --topbar-bg: rgba(21, 28, 25, 0.92);
+  --topbar-text: #e8efeb;
+  --topbar-border: #2a3832;
+  --topbar-control-bg: #1e2824;
+  --topbar-control-border: #3a4a43;
+  --topbar-control-text: #e8efeb;
+  --input-bg: #1e2824;
+  --input-border: #3a4a43;
+  --chart-grid: #2a3832;
+  --chart-text: #9aaba3;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --panel-highlight-bg: rgba(0, 164, 124, 0.14);
+  --panel-highlight-border: rgba(0, 164, 124, 0.32);
+  --bg-glow: radial-gradient(1000px 480px at 8% -8%, rgba(0, 164, 124, 0.16), transparent 55%),
+             radial-gradient(800px 360px at 100% 0%, rgba(42, 111, 151, 0.1), transparent 50%);
+  --shop-sidebar-bg: #101613;
+  --shop-sidebar-text: #e8efeb;
+  --shop-sidebar-muted: #9aaba3;
   --shop-sidebar-border: rgba(255, 255, 255, 0.08);
-  --shop-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --shop-sidebar-hover: rgba(255, 255, 255, 0.06);
   --shop-sidebar-active-bg: rgba(0, 128, 96, 0.28);
   --shop-sidebar-active-border: rgba(0, 164, 124, 0.35);
   --shop-green-light: rgba(0, 164, 124, 0.18);
@@ -81,14 +93,17 @@ html.theme-dark {
 /* Superficies principales */
 body {
   background-color: var(--bg) !important;
+  background-image: var(--bg-glow) !important;
+  background-attachment: fixed !important;
   color: var(--text) !important;
+  font-family: var(--font) !important;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .main,
 .content,
 .page-shell {
-  background-color: var(--bg);
+  background-color: transparent;
   color: var(--text);
 }
 
@@ -109,8 +124,27 @@ body {
 
 .sidebar .logo-sub,
 .sidebar .nav-section,
+.sidebar .nav-section-label,
+.sidebar .nav-section-label--toggle,
+.sidebar .nav-group-title,
+.sidebar .nav-group-hint,
 .sidebar-footer {
   color: var(--shop-sidebar-muted) !important;
+}
+
+.sidebar .nav-folder-toggle,
+.sidebar .nav-group-toggle {
+  color: var(--shop-sidebar-muted) !important;
+}
+
+.sidebar .nav-folder-toggle:hover,
+.sidebar .nav-group-toggle:hover {
+  color: var(--shop-sidebar-text) !important;
+  background: var(--shop-sidebar-hover) !important;
+}
+
+.sidebar .nav-block {
+  border-bottom-color: color-mix(in srgb, var(--shop-sidebar-muted) 22%, transparent) !important;
 }
 
 .sidebar .nav-item {
@@ -225,9 +259,11 @@ html.theme-light .sidebar-btn--logout {
   color: var(--text) !important;
 }
 
-#page-tienda,
+#page-tienda {
+  background-color: transparent !important;
+}
 .shop-catalog-wrap {
-  background-color: var(--bg) !important;
+  background-color: transparent !important;
 }
 
 .shop-cart-foot,
@@ -257,7 +293,9 @@ thead tr,
 }
 
 .page-tabs .btn.active,
-.page-tabs .ventas-tab-btn.active {
+.page-tabs .tab-btn.active,
+.page-tabs .ventas-tab-btn.active,
+.page-tabs .compras-tab-btn.active {
   background: var(--surface) !important;
   color: var(--accent) !important;
 }

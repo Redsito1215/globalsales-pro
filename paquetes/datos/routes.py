@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from auth.decorators import admin_required, login_required
+from auth.decorators import login_required, permission_required
 from paquetes.datos import services
 
 datos_bp = Blueprint("datos", __name__, url_prefix="/api")
@@ -43,7 +43,8 @@ def master_get(name: str, row_id: str):
 
 
 @datos_bp.post("/master/<name>")
-@admin_required
+@login_required
+@permission_required("masters.write")
 def master_create(name: str):
     body = request.get_json(silent=True) or {}
     try:
@@ -54,7 +55,8 @@ def master_create(name: str):
 
 
 @datos_bp.put("/master/<name>/<row_id>")
-@admin_required
+@login_required
+@permission_required("masters.write")
 def master_update(name: str, row_id: str):
     body = request.get_json(silent=True) or {}
     try:
@@ -65,7 +67,8 @@ def master_update(name: str, row_id: str):
 
 
 @datos_bp.delete("/master/<name>/<row_id>")
-@admin_required
+@login_required
+@permission_required("masters.write")
 def master_delete(name: str, row_id: str):
     try:
         services.delete_row(name, row_id)
@@ -75,7 +78,8 @@ def master_delete(name: str, row_id: str):
 
 
 @datos_bp.post("/master/dim_producto/<int:product_id>/image")
-@admin_required
+@login_required
+@permission_required("masters.write")
 def product_image(product_id: int):
     if "file" not in request.files:
         return jsonify({"status": "error", "message": "Archivo requerido (campo file)."}), 400
@@ -90,7 +94,8 @@ def product_image(product_id: int):
 
 
 @datos_bp.post("/build_model")
-@admin_required
+@login_required
+@permission_required("elt.run")
 def build_model():
     try:
         stats = services.run_build_model()
@@ -100,7 +105,8 @@ def build_model():
 
 
 @datos_bp.post("/load_dataset")
-@admin_required
+@login_required
+@permission_required("elt.run")
 def load_dataset():
     body = request.get_json(silent=True) or {}
     try:
@@ -123,6 +129,7 @@ def elt_status():
 
 @datos_bp.get("/audit_log")
 @login_required
+@permission_required("audit.read")
 def audit_log():
     data = services.list_audit_log(
         limit=min(int(request.args.get("limit", 50)), 200),
@@ -134,6 +141,50 @@ def audit_log():
 @datos_bp.get("/schema")
 def schema_summary():
     return jsonify({"status": "ok", "tables": services.list_tables()})
+
+
+@datos_bp.get("/meta/data-layers")
+def meta_data_layers():
+    """Contrato demo: capas operativo / landing / estratégico."""
+    from shared.data_layers import layers_overview
+
+    return jsonify({"status": "ok", **layers_overview()})
+
+
+@datos_bp.post("/analytics/sync-order")
+@login_required
+@permission_required("elt.run")
+def analytics_sync_order():
+    from shared.analytics_sync import sync_order_to_fact
+
+    body = request.get_json(silent=True) or {}
+    order_id = body.get("order_id") or request.args.get("order_id")
+    if not order_id:
+        return jsonify({"status": "error", "message": "order_id requerido."}), 400
+    try:
+        result = sync_order_to_fact(order_id)
+        return jsonify({"status": "ok", **result})
+    except ValueError as e:
+        if str(e) == "order_not_in_landing":
+            return jsonify({"status": "error", "message": "Pedido no está en sales_records."}), 404
+        raise
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@datos_bp.post("/analytics/sync-stale")
+@login_required
+@permission_required("elt.run")
+def analytics_sync_stale():
+    from shared.analytics_sync import sync_stale_orders
+
+    body = request.get_json(silent=True) or {}
+    limit = min(int(body.get("limit") or request.args.get("limit") or 50), 200)
+    try:
+        result = sync_stale_orders(limit=limit)
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 def _master_error(exc: ValueError):
