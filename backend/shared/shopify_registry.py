@@ -17,7 +17,14 @@ SHOPIFY_TABLES: dict[str, dict[str, Any]] = {
         "label": "Proveedores",
         "layer": "catalog",
         "editable": True,
-        "fields": ["vendor_id", "name", "email", "country", "active"],
+        "fields": ["vendor_id", "name", "email", "region_id", "country_id", "country", "active"],
+    },
+    "warehouses": {
+        "pk": "warehouse_id",
+        "label": "Bodegas",
+        "layer": "inventory",
+        "editable": False,
+        "fields": ["warehouse_id", "name", "code", "address", "is_default", "active"],
     },
     "collections": {
         "pk": "collection_id",

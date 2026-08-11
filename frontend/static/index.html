@@ -7,25 +7,28 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260731cat4" />
-<link rel="stylesheet" href="/static/css/storefront.css?v=20260731cat2" />
-<link rel="stylesheet" href="/static/css/page-unified.css?v=20260729uo" />
-<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260731cat2" />
-<script src="/static/js/ops-ui.js?v=20260729ur" defer></script>
-<script src="/static/js/auth-nav.js?v=20260731cat4" defer></script>
-<script src="/static/js/q4-datos.js?v=20260715" defer></script>
-<script src="/static/js/q3-ventas.js?v=20260729ur" defer></script>
-<script src="/static/js/q3-pedidos.js?v=20260729uo" defer></script>
-<script src="/static/js/q2-analisis.js?v=20260729uo" defer></script>
-<script src="/static/js/tienda.js?v=20260729uj" defer></script>
-<script src="/static/js/mis-pedidos.js?v=20260729uo" defer></script>
-<script src="/static/js/solicitud-detail.js?v=20260729a" defer></script>
-<script src="/static/js/notificaciones.js?v=20260729uo" defer></script>
-<script src="/static/js/soporte.js?v=20260729uo" defer></script>
-<script src="/static/js/roles-admin.js?v=20260705" defer></script>
-<script src="/static/js/decisiones.js?v=20260731c" defer></script>
-<script src="/static/js/compras.js?v=20260729uo" defer></script>
-<script src="/static/js/reportes.js?v=20260731c" defer></script>
+<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260810v" />
+<link rel="stylesheet" href="/static/css/storefront.css?v=20260810t" />
+<link rel="stylesheet" href="/static/css/page-unified.css?v=20260810t" />
+<link rel="stylesheet" href="/static/css/admin-ui.css?v=20260810t" />
+<link rel="stylesheet" href="/static/css/ux-live.css?v=20260810v" />
+<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260810v" />
+<script src="/static/js/ops-ui.js?v=20260810v" defer></script>
+<script src="/static/js/ops-live.js?v=20260810q" defer></script>
+<script src="/static/js/auth-nav.js?v=20260810q" defer></script>
+<script src="/static/js/q4-datos.js?v=20260810v" defer></script>
+<script src="/static/js/q3-ventas.js?v=20260810v" defer></script>
+<script src="/static/js/q3-pedidos.js?v=20260810v" defer></script>
+<script src="/static/js/q2-analisis.js?v=20260810v" defer></script>
+<script src="/static/js/tienda.js?v=20260810v" defer></script>
+<script src="/static/js/mis-pedidos.js?v=20260810v" defer></script>
+<script src="/static/js/solicitud-detail.js?v=20260810v" defer></script>
+<script src="/static/js/notificaciones.js?v=20260810v" defer></script>
+<script src="/static/js/soporte.js?v=20260810v" defer></script>
+<script src="/static/js/roles-admin.js?v=20260810v" defer></script>
+<script src="/static/js/decisiones.js?v=20260810v" defer></script>
+<script src="/static/js/compras.js?v=20260810v" defer></script>
+<script src="/static/js/reportes.js?v=20260810v" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 (function(){
@@ -42,7 +45,6 @@
   <div class="boot-brand">
     <span class="boot-mark" aria-hidden="true"></span>
     <div class="boot-title">GLOBTRADE</div>
-    <div class="boot-sub">Commerce + Analytics</div>
   </div>
   <div class="boot-spinner" aria-hidden="true"></div>
   <p class="boot-msg">Iniciando plataforma…</p>
@@ -60,7 +62,6 @@
         <span class="logo-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M6 2h8l1 4H5l1-4z" fill="#fff" opacity=".95"/><path d="M5 6h10l-1 11H6L5 6z" fill="#fff"/></svg></span>
         GLOBTRADE
       </div>
-      <div class="logo-sub">Commerce + Analytics</div>
     </div>
   </div>
   <nav class="sidebar-nav" id="sidebar-nav" aria-label="Menú principal">
@@ -77,7 +78,7 @@
         </button>
         <button type="button" class="nav-item" data-page="tienda" data-nav-section="ops" onclick="showPage('tienda', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h8l1 4H5l1-4z"/><path d="M5 6h10l-1 11H6L5 6z"/></svg></span>
-          <span class="nav-label">Tienda B2B</span>
+          <span class="nav-label">Tienda</span>
         </button>
         <button type="button" class="nav-item" data-page="mis-pedidos" data-nav-section="ops" onclick="showPage('mis-pedidos', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h10v14H5z"/><path d="M7 8h6M7 11h4"/></svg></span>
@@ -175,7 +176,7 @@
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h8v14H6z"/><path d="M8 7h4M8 10h4M8 13h2"/></svg></span>
           <span class="nav-label">Auditoría</span>
         </button>
-        <button type="button" class="nav-item" data-page="roles-admin" data-nav-section="admin" onclick="showPage('roles-admin', this)">
+        <button type="button" class="nav-item" data-page="roles-admin" data-nav-section="admin" data-require-perm="users.manage" onclick="showPage('roles-admin', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 2a4 4 0 100 8 4 4 0 000-8zM3 18c0-3.3 3.1-6 7-6s7 2.7 7 6"/></svg></span>
           <span class="nav-label">Roles y usuarios</span>
         </button>
@@ -212,8 +213,9 @@
       <div id="topbar-title">GLOBTRADE S.A. — Inicio</div>
     </div>
     <div class="topbar-right">
-      <button type="button" class="btn-topbar btn-topbar--ghost notif-btn" id="btn-notifications" hidden title="Notificaciones" onclick="showPage('notificaciones', document.querySelector('[data-page=notificaciones]'))">
+      <button type="button" class="btn-topbar btn-topbar--ghost notif-btn" id="btn-notifications" hidden title="Notificaciones en vivo" onclick="showPage('notificaciones', document.querySelector('[data-page=notificaciones]'))">
         <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 2a5 5 0 00-5 5v2.2L3.5 12h13L15 9.2V7a5 5 0 00-5-5z"/><path d="M8 15a2 2 0 004 0"/></svg>
+        <span class="live-dot" id="notif-live-dot" hidden aria-hidden="true"></span>
         <span class="notif-badge" id="notif-badge" hidden>0</span>
       </button>
       <span class="auth-user-label auth-user-label--clickable" id="topbar-auth-user" hidden title="Editar perfil" onclick="openProfileModal()"></span>
@@ -235,8 +237,9 @@
     <div class="page active" id="page-dashboard">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Decisiones con datos</h1>
-        <p class="page-lead">Resumen de ingresos, utilidad y pedidos. Más gráficos en Estratégicas.</p>
+        <span class="page-badge">Tablero Q1</span>
+        <h1 class="page-title">Decisiones con datos</h1>
+        <p class="page-lead">Resumen ejecutivo: KPIs, tendencia y desglose por región, canal, prioridad y país.</p>
         <div id="dash-lag-banner" class="dash-lag-banner" hidden></div>
       </header>
 
@@ -305,25 +308,48 @@
           <section class="dash-section" aria-labelledby="dash-resumen-title">
             <div class="dash-section-head">
               <h2 id="dash-resumen-title">Resumen</h2>
-              <p>Ingresos, utilidad y pedidos</p>
+              <p>Ingresos, utilidad, pedidos y cobertura del histórico</p>
             </div>
             <div class="dash-stats" id="kpi-cards">
               <div class="stat-card stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
               <div class="stat-card stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
               <div class="stat-card stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
             </div>
-            <div class="dash-stats dash-stats--secondary" id="kpi-cards-secondary" hidden></div>
+            <div class="dash-stats dash-stats--secondary" id="kpi-cards-secondary" aria-live="polite">
+              <div class="stat-card stat-card--compact stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
+              <div class="stat-card stat-card--compact stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
+              <div class="stat-card stat-card--compact stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
+              <div class="stat-card stat-card--compact stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
+            </div>
           </section>
 
           <section class="dash-section" aria-labelledby="dash-charts-title">
             <div class="dash-section-head">
-              <h2 id="dash-charts-title">Tendencia</h2>
-              <p>Ingresos y utilidad en el tiempo</p>
+              <h2 id="dash-charts-title">Tendencia y desglose</h2>
+              <p>Ingresos y utilidad en el tiempo, más región, canal, prioridad y países</p>
             </div>
             <div class="charts-row charts-row--hero">
               <div class="chart-box chart-box--hero">
                 <div class="chart-title">Tendencia mensual — ingresos y utilidad</div>
                 <div class="chart-wrap chart-wrap--hero"><canvas id="chart-trend-dash"></canvas></div>
+              </div>
+            </div>
+            <div class="charts-row charts-row--compact charts-row--dash-break">
+              <div class="chart-box">
+                <div class="chart-title">Ingresos por región</div>
+                <div class="chart-wrap"><canvas id="chart-regions-dash"></canvas></div>
+              </div>
+              <div class="chart-box">
+                <div class="chart-title">Pedidos por canal</div>
+                <div class="chart-wrap"><canvas id="chart-channels-dash"></canvas></div>
+              </div>
+              <div class="chart-box">
+                <div class="chart-title">Pedidos por prioridad</div>
+                <div class="chart-wrap"><canvas id="chart-priority-dash"></canvas></div>
+              </div>
+              <div class="chart-box">
+                <div class="chart-title">Top países (ingresos)</div>
+                <div class="chart-wrap"><canvas id="chart-countries-dash"></canvas></div>
               </div>
             </div>
           </section>
@@ -341,16 +367,16 @@
               <div class="table-box">
                 <div class="table-header">
                   <div class="table-title">Registros</div>
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <select id="dash-page-size" onchange="dashTable.setPageSize(+this.value)" style="font-size:11px;padding:5px 8px;width:auto">
+                  <div class="table-toolbar table-toolbar--compact">
+                    <select id="dash-page-size" onchange="dashTable.setPageSize(+this.value)">
                       <option value="25">25 filas</option>
                       <option value="50" selected>50 filas</option>
                       <option value="100">100 filas</option>
                       <option value="200">200 filas</option>
                     </select>
-                    <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="dashTable.prev()">‹ Ant</button>
-                    <span id="dash-page-info" style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap"></span>
-                    <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="dashTable.next()">Sig ›</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="dashTable.prev()">‹ Ant</button>
+                    <span id="dash-page-info" class="table-toolbar-meta"></span>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="dashTable.next()">Sig ›</button>
                   </div>
                 </div>
                 <div class="table-scroll">
@@ -389,7 +415,8 @@
     <div class="page" id="page-catalogo">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Catálogo mayorista</h1>
+        <span class="page-badge">Catálogo Q1</span>
+        <h1 class="page-title">Catálogo mayorista</h1>
         <p class="page-lead">Explora categorías y productos del dataset analítico.</p>
       </header>
       <div class="page-body">
@@ -422,15 +449,16 @@
     <div class="page" id="page-trends">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Tendencias</h1>
+        <span class="page-badge">Análisis Q1</span>
+        <h1 class="page-title">Tendencias</h1>
         <p class="page-lead">Evolución mensual de ingresos, utilidad y mix de productos.</p>
       </header>
       <div class="page-body">
       <div class="charts-row single">
         <div class="chart-box">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-            <div class="chart-title" style="margin:0">Tendencia Mensual — Ingresos & Utilidad</div>
-            <select id="trend-months" onchange="loadTrends()" style="width:auto;font-size:12px;padding:5px 10px">
+          <div class="chart-header-row">
+            <div class="chart-title">Tendencia Mensual — Ingresos & Utilidad</div>
+            <select id="trend-months" onchange="loadTrends()">
               <option value="999" selected>Todo el histórico (2010–2017)</option>
               <option value="12">Últimos 12 meses</option>
               <option value="24">Últimos 24 meses</option>
@@ -461,7 +489,8 @@
     <div class="page" id="page-regions">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Regiones y países</h1>
+        <span class="page-badge">Análisis Q1</span>
+        <h1 class="page-title">Regiones y países</h1>
         <p class="page-lead">Desempeño geográfico por ingresos, utilidad y volumen de pedidos.</p>
       </header>
       <div class="page-body">
@@ -497,7 +526,8 @@
     <div class="page" id="page-products">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Categorías</h1>
+        <span class="page-badge">Análisis Q1</span>
+        <h1 class="page-title">Categorías</h1>
         <p class="page-lead">Rentabilidad y unidades vendidas por categoría de producto.</p>
       </header>
       <div class="page-body">
@@ -520,7 +550,8 @@
     <div class="page" id="page-orders">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Explorar ventas</h1>
+        <span class="page-badge">Análisis Q1</span>
+        <h1 class="page-title">Explorar ventas</h1>
         <p class="page-lead">Consulta histórica de ventas con filtros.</p>
       </header>
       <div class="page-body">
@@ -563,16 +594,16 @@
       <div class="table-box">
         <div class="table-header">
           <div class="table-title">Resultados</div>
-          <div style="display:flex;align-items:center;gap:12px">
-            <span id="orders-count" style="font-family:var(--mono);font-size:11px;color:var(--muted)"></span>
-            <select id="orders-page-size" onchange="ordersTable.setPageSize(+this.value)" style="font-size:11px;padding:5px 8px;width:auto">
+          <div class="table-toolbar table-toolbar--compact">
+            <span id="orders-count" class="table-toolbar-meta"></span>
+            <select id="orders-page-size" onchange="ordersTable.setPageSize(+this.value)">
               <option value="50">50 filas</option>
               <option value="100">100 filas</option>
               <option value="200">200 filas</option>
             </select>
-            <button class="btn btn-ghost btn-ops" onclick="ordersTable.prev()">Ant</button>
-            <span id="orders-page-info" style="font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap"></span>
-            <button class="btn btn-ghost btn-ops" onclick="ordersTable.next()">Sig</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="ordersTable.prev()">Ant</button>
+            <span id="orders-page-info" class="table-toolbar-meta"></span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="ordersTable.next()">Sig</button>
           </div>
         </div>
         <div class="table-scroll">
@@ -594,7 +625,8 @@
     <div class="page" id="page-company">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Empresa y problemática</h1>
+        <span class="page-badge">Acerca de</span>
+        <h1 class="page-title">Empresa y problemática</h1>
         <p class="page-lead">Distribución internacional · 185+ países · misión, visión y retos de sistemas y decisiones.</p>
       </header>
       <div class="page-body">
@@ -769,9 +801,10 @@
     <div class="page" id="page-decisiones">
       <div class="page-shell">
         <header class="page-hero">
-<h1 class="page-title">Decisiones</h1>
-          <p class="page-lead">Margen, stock y embudo comercial para apoyar decisiones.</p>
-        </header>
+        <span class="page-badge">Decisiones Q2</span>
+        <h1 class="page-title">Decisiones</h1>
+        <p class="page-lead">Margen, stock y embudo comercial para apoyar decisiones.</p>
+      </header>
         <div class="page-body">
           <div class="filters">
             <div class="filter-group">
@@ -799,9 +832,10 @@
     <div class="page" id="page-reportes-compuestos">
       <div class="page-shell">
         <header class="page-hero">
-<h1 class="page-title">Informes compuestos</h1>
-          <p class="page-lead">Análisis de ventas, rankings y cruces para ver cómo evoluciona el negocio.</p>
-        </header>
+        <span class="page-badge">Informes Q2</span>
+        <h1 class="page-title">Informes compuestos</h1>
+        <p class="page-lead">Análisis de ventas, rankings y cruces para ver cómo evoluciona el negocio.</p>
+      </header>
         <div class="page-body">
           <div class="filters">
             <div class="filter-group" style="flex:1;min-width:280px">
@@ -809,9 +843,13 @@
               <select id="rc-select" onchange="onRcSelect(); loadRcActual()"></select>
             </div>
             <div class="filter-group filter-group--action">
-              <button type="button" class="btn btn-primary" onclick="loadRcActual()">Actualizar</button>
+              <button type="button" class="btn btn-primary" id="rc-btn-refresh" onclick="loadRcActual()">Actualizar</button>
+              <button type="button" class="btn btn-ghost" id="rc-btn-pdf" onclick="exportRcPdf()">Exportar PDF</button>
+              <button type="button" class="btn btn-ghost" id="rc-btn-csv" onclick="exportRcCsv()">Exportar CSV</button>
             </div>
           </div>
+          <p id="rc-fallback-banner" class="reportes-fallback-banner" hidden></p>
+          <p id="rc-export-status" class="reportes-export-status" hidden></p>
           <p id="rc-meta" class="catalog-meta" style="margin-bottom:12px"></p>
           <div class="table-box">
             <div class="table-header">
@@ -833,9 +871,10 @@
     <div class="page" id="page-reportes">
       <div class="page-shell">
         <header class="page-hero">
-<h1 class="page-title">Informes simples</h1>
-          <p class="page-lead">Consultas del día a día sobre pedidos, stock, soporte y más.</p>
-        </header>
+        <span class="page-badge">Reportes Q2</span>
+        <h1 class="page-title">Informes simples</h1>
+        <p class="page-lead">Consultas del día a día sobre pedidos, stock, soporte y más.</p>
+      </header>
         <div class="page-body">
           <div class="filters">
             <div class="filter-group" style="flex:1;min-width:260px">
@@ -851,9 +890,12 @@
               <input id="reportes-thr" type="number" value="20" style="width:80px" />
             </div>
             <div class="filter-group filter-group--action">
-              <button type="button" class="btn btn-primary" onclick="loadReporteActual()">Actualizar</button>
+              <button type="button" class="btn btn-primary" id="reportes-btn-refresh" onclick="loadReporteActual()">Actualizar</button>
+              <button type="button" class="btn btn-ghost" id="reportes-btn-pdf" onclick="exportReportePdf()">Exportar PDF</button>
+              <button type="button" class="btn btn-ghost" id="reportes-btn-csv" onclick="exportReporteCsv()">Exportar CSV</button>
             </div>
           </div>
+          <p id="reportes-export-status" class="reportes-export-status" hidden></p>
           <p id="reportes-meta" class="catalog-meta" style="margin-bottom:12px"></p>
           <div class="table-box">
             <div class="table-header">
@@ -875,9 +917,10 @@
     <div class="page" id="page-compras">
       <div class="page-shell">
         <header class="page-hero">
-<h1 class="page-title">Compras y stock</h1>
-          <p class="page-lead">Inventario vivo, proveedores y órdenes de compra: borrador → enviar → recibir.</p>
-        </header>
+        <span class="page-badge">Operaciones Q3</span>
+        <h1 class="page-title">Compras y stock</h1>
+        <p class="page-lead">Inventario centralizado en bodega general, proveedores por continente y OCs: borrador → enviar → recibir.</p>
+      </header>
         <div class="page-body" id="compras-root">
           <div class="page-tabs">
             <button type="button" class="btn btn-ghost tab-btn compras-tab-btn active" data-tab="inventario" onclick="showComprasTab('inventario')">Inventario</button>
@@ -885,28 +928,53 @@
             <button type="button" class="btn btn-ghost tab-btn compras-tab-btn" data-tab="ocs" onclick="showComprasTab('ocs')">Órdenes de compra</button>
           </div>
           <div id="compras-panel-inventario" class="compras-panel">
+            <div id="compras-warehouse-banner" class="compras-wh-banner" hidden>
+              <strong id="compras-warehouse-name">Bodega General</strong>
+              <span id="compras-warehouse-meta">Ubicación única · todo el stock se almacena aquí</span>
+            </div>
             <div class="filters">
               <div class="filter-group"><label>Buscar</label><input id="compras-inv-q" type="search" placeholder="SKU o nombre" onkeydown="if(event.key==='Enter')loadComprasInventario()" /></div>
-              <div class="filter-group"><label>Umbral bajo</label><input id="compras-inv-thr" type="number" value="20" style="width:80px" /></div>
+              <div class="filter-group filter-input--narrow"><label>Umbral bajo</label><input id="compras-inv-thr" type="number" value="20" /></div>
               <div class="filter-group"><label><input id="compras-inv-low" type="checkbox" onchange="loadComprasInventario()" /> Solo stock bajo</label></div>
               <div class="filter-group filter-group--action"><button type="button" class="btn btn-ghost" onclick="loadComprasInventario()">Actualizar</button></div>
             </div>
             <div class="table-box">
               <div class="table-header"><div class="table-title">Inventario por variante</div></div>
               <div class="table-scroll">
-                <table><thead><tr><th>Var.</th><th>Producto</th><th>Proveedor</th><th>Stock</th><th>Precio</th><th>Costo</th><th>Ajuste</th></tr></thead>
+                <table><thead><tr><th>Var.</th><th>Producto</th><th>Bodega</th><th>Proveedor</th><th>Stock</th><th>Precio</th><th>Costo</th><th>Ajuste</th></tr></thead>
                 <tbody id="compras-inv-body"></tbody></table>
               </div>
             </div>
           </div>
           <div id="compras-panel-proveedores" class="compras-panel" hidden>
-            <div class="page-panel" style="margin-bottom:14px">
-              <h3 id="vend-form-title" style="font-size:14px;font-weight:700;margin-bottom:10px">Nuevo proveedor</h3>
+            <div class="page-panel panel-form">
+              <h3 id="vend-form-title" class="panel-form-title">Nuevo proveedor</h3>
               <input type="hidden" id="vend-id" />
-              <div class="filters" style="border:none;padding:0;margin:0;box-shadow:none;background:transparent">
+              <div class="filters filters--flat">
                 <div class="filter-group"><label>Nombre</label><input id="vend-name" /></div>
                 <div class="filter-group"><label>Email</label><input id="vend-email" type="email" /></div>
-                <div class="filter-group"><label>País</label><input id="vend-country" /></div>
+              </div>
+              <div class="vendor-geo-picker">
+                <p class="modal-sub vendor-geo-lead">Ubicación del proveedor — elige continente y país en las tablas.</p>
+                <div class="vendor-geo-grid">
+                  <div class="table-box">
+                    <div class="table-header"><div class="table-title">Continente</div></div>
+                    <div class="table-scroll table-scroll--short">
+                      <table class="geo-pick-table"><thead><tr><th>Zona</th><th>Código</th></tr></thead>
+                        <tbody id="vend-region-body"></tbody></table>
+                    </div>
+                  </div>
+                  <div class="table-box">
+                    <div class="table-header"><div class="table-title">País</div></div>
+                    <div class="table-scroll table-scroll--short">
+                      <table class="geo-pick-table"><thead><tr><th>País</th><th>ID</th></tr></thead>
+                        <tbody id="vend-country-body"></tbody></table>
+                    </div>
+                  </div>
+                </div>
+                <p id="vend-geo-summary" class="modal-sub vendor-geo-summary">Elige continente y país del proveedor</p>
+              </div>
+              <div class="filters filters--flat filters--flat-spaced">
                 <div class="filter-group filter-group--action">
                   <button type="button" class="btn btn-primary" onclick="saveVendor()">Guardar</button>
                   <button type="button" class="btn btn-ghost" onclick="resetVendorForm()">Limpiar</button>
@@ -916,20 +984,20 @@
             <div class="table-box">
               <div class="table-header"><div class="table-title">Proveedores</div></div>
               <div class="table-scroll">
-                <table><thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>País</th><th>Estado</th><th></th></tr></thead>
+                <table><thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>Continente · País</th><th>Estado</th><th></th></tr></thead>
                 <tbody id="compras-vend-body"></tbody></table>
               </div>
             </div>
           </div>
           <div id="compras-panel-ocs" class="compras-panel" hidden>
-            <div class="page-panel" style="margin-bottom:14px">
-              <h3 style="font-size:14px;font-weight:700;margin-bottom:10px">Nueva orden de compra</h3>
-              <p id="po-prefill-hint" class="modal-sub" hidden style="margin-bottom:10px"></p>
-              <div class="filters" style="border:none;padding:0;margin:0;box-shadow:none;background:transparent">
+            <div class="page-panel panel-form">
+              <h3 class="panel-form-title">Nueva orden de compra</h3>
+              <p id="po-prefill-hint" class="modal-sub" hidden></p>
+              <div class="filters filters--flat">
                 <div class="filter-group"><label>Proveedor</label><select id="po-vendor"><option value="">—</option></select></div>
                 <div class="filter-group"><label>Variante</label><select id="po-variant"><option value="">—</option></select></div>
-                <div class="filter-group"><label>Cantidad</label><input id="po-qty" type="number" value="50" min="1" style="width:90px" /></div>
-                <div class="filter-group"><label>Costo unit.</label><input id="po-cost" type="number" step="0.01" value="0" style="width:90px" /></div>
+                <div class="filter-group filter-input--narrow"><label>Cantidad</label><input id="po-qty" type="number" value="50" min="1" /></div>
+                <div class="filter-group filter-input--narrow"><label>Costo unit.</label><input id="po-cost" type="number" step="0.01" value="0" /></div>
                 <div class="filter-group filter-group--action"><button type="button" class="btn btn-primary" onclick="createPO()">Crear OC</button></div>
               </div>
             </div>
@@ -952,7 +1020,8 @@
     <div class="page" id="page-schema">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Modelo de datos</h1>
+        <span class="page-badge">Datos Q4</span>
+        <h1 class="page-title">Modelo de datos</h1>
         <p class="page-lead">Estructura y estado de los datos del sistema.</p>
       </header>
       <div class="page-body">
@@ -972,39 +1041,40 @@
         <section class="shop-landing" aria-label="Portada tienda">
           <div class="shop-landing-visual" aria-hidden="true">
             <div class="shop-float shop-float--chart">
-              <span class="shop-float-label">Ingresos filtrados</span>
-              <strong id="shop-float-revenue">—</strong>
+              <span class="shop-float-label">En el catálogo</span>
+              <strong id="shop-highlight-products">—</strong>
             </div>
             <div class="shop-float shop-float--orders">
-              <span class="shop-float-label">Productos activos</span>
-              <strong id="shop-float-products">—</strong>
+              <span class="shop-float-label">Familias de producto</span>
+              <strong id="shop-highlight-categories">—</strong>
             </div>
             <div class="shop-float shop-float--stock">
-              <span class="shop-float-label">Tablas comerciales</span>
-              <strong id="shop-float-tables">21</strong>
+              <span class="shop-float-label">Ofertas activas</span>
+              <strong id="shop-highlight-offers">—</strong>
             </div>
             <div class="shop-float shop-float--mini">
               <div class="shop-mini-bars"><span></span><span></span><span></span><span></span><span></span></div>
             </div>
           </div>
           <div class="shop-landing-copy">
-            <span class="shop-edition-pill">Tienda B2B · Compra asistida</span>
-            <h1 class="shop-landing-title">Más impacto,<br><em>menos fricción</em></h1>
-            <p class="shop-landing-sub">Catálogo con colecciones, variantes, inventario y solicitudes de compra para tu bandeja comercial.</p>
+            <span class="shop-edition-pill">Hecho para tu negocio</span>
+            <h1 class="shop-landing-title">Productos que venden,<br><em>en un solo lugar</em></h1>
+            <p class="shop-landing-sub">Explora alimentos, bebidas, cuidado personal y más. Compara precios, revisa cada ficha y pide lo que necesitas hoy.</p>
             <div class="shop-landing-actions">
               <button type="button" class="shop-btn shop-btn--white" onclick="document.getElementById('shop-catalog-anchor').scrollIntoView({behavior:'smooth'})">Explorar catálogo</button>
               <button type="button" class="shop-btn shop-btn--outline" id="shop-hero-orders-btn" hidden onclick="showPage('mis-pedidos', document.querySelector('[data-page=mis-pedidos]'))">Ver mis pedidos</button>
             </div>
           </div>
-          <div class="shop-trust-bar">
-            <span>Colecciones</span><span>Variantes SKU</span><span>Inventario</span><span>Compra → Ventas</span>
+          <div class="shop-trust-bar" id="shop-trust-bar">
+            <span>Calidad comprobada</span><span>Precios competitivos</span><span>Entrega coordinada</span><span>Compra segura</span>
           </div>
         </section>
 
         <div class="shop-catalog-wrap" id="shop-catalog-anchor">
         <header class="shop-catalog-head">
+          <span class="page-badge">Tienda B2B</span>
 <h2 class="page-title">Catálogo y compra</h2>
-          <p class="page-lead">Colecciones, variantes con SKU e inventario en tiempo real.</p>
+          <p class="page-lead" id="shop-catalog-lead">Descubre productos por categoría y arma tu pedido en minutos.</p>
         </header>
         <div class="shop-layout">
           <aside class="shop-collections">
@@ -1048,10 +1118,10 @@
                 <span>Subtotal</span>
                 <strong id="shop-cart-total">$0.00</strong>
               </div>
-              <button type="button" class="btn btn-primary btn-block" onclick="openSolicitudModal()" id="shop-checkout-btn" disabled>Solicitar compra</button>
-              <div class="shop-trust">
-                <span class="shop-trust-item">✓ Inventario en tiempo real</span>
-                <span class="shop-trust-item">✓ Solicitud → bandeja comercial</span>
+              <button type="button" class="btn btn-primary btn-block" onclick="openSolicitudModal()" id="shop-checkout-btn" disabled>Completar pedido</button>
+              <div class="shop-trust" id="shop-cart-trust">
+                <span class="shop-trust-item">✓ Fichas con peso, proveedor y uso</span>
+                <span class="shop-trust-item">✓ Seguimiento en Mis pedidos</span>
               </div>
             </div>
           </aside>
@@ -1064,14 +1134,15 @@
     <div class="page" id="page-ventas">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Solicitudes y ventas</h1>
+        <span class="page-badge">Operaciones Q3</span>
+        <h1 class="page-title">Solicitudes y ventas</h1>
         <p class="page-lead">Bandeja comercial: revisar, aprobar, pago/crédito, convertir, enviar y devolver con inspección.</p>
       </header>
+      <div class="page-body">
       <div class="page-tabs">
         <button type="button" class="btn btn-ghost tab-btn ventas-tab-btn active" data-tab="solicitudes" onclick="showVentasTab('solicitudes')">Solicitudes</button>
         <button type="button" class="btn btn-ghost tab-btn ventas-tab-btn" data-tab="pedidos" onclick="showVentasTab('pedidos')">Pedidos históricos</button>
       </div>
-      <div class="page-body">
       <div id="ventas-panel-solicitudes" class="ventas-tab-panel">
         <div class="filters">
           <div class="filter-group">
@@ -1143,10 +1214,12 @@
     <div class="page" id="page-mis-pedidos">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Mis pedidos</h1>
+        <span class="page-badge">Mi cuenta</span>
+        <h1 class="page-title">Mis pedidos</h1>
         <p class="page-lead">Seguimiento de tus solicitudes. Cuando estén listas, paga aquí (transferencia o pago simulado).</p>
       </header>
       <div class="page-body">
+      <div id="mis-pedidos-chips" class="ops-chips"></div>
       <div class="table-box">
         <div class="table-header">
           <div class="table-title">Mis solicitudes</div>
@@ -1166,9 +1239,10 @@
     <div class="page" id="page-notificaciones">
       <div class="page-shell">
         <header class="page-hero">
-<h1 class="page-title">Notificaciones</h1>
-          <p class="page-lead">Avisos de pedidos, soporte y compras. Solo lo no leído destaca; lo leído queda atenuado.</p>
-        </header>
+        <span class="page-badge">Mi cuenta</span>
+        <h1 class="page-title">Notificaciones</h1>
+        <p class="page-lead">Avisos de pedidos, soporte y compras. Solo lo no leído destaca; lo leído queda atenuado.</p>
+      </header>
         <div class="page-body">
           <div class="table-box">
             <div class="notif-toolbar">
@@ -1188,9 +1262,10 @@
     <div class="page" id="page-soporte">
       <div class="page-shell">
         <header class="page-hero">
-<h1 class="page-title">Soporte en línea</h1>
-          <p class="page-lead">Chat con el equipo comercial. Staff responde hilos; clientes ven su conversación.</p>
-        </header>
+        <span class="page-badge">Soporte</span>
+        <h1 class="page-title">Soporte en línea</h1>
+        <p class="page-lead">Chat con el equipo comercial. Staff responde hilos; clientes ven su conversación.</p>
+      </header>
         <div class="page-body">
           <div id="soporte-admin-bar" class="filters" hidden>
             <div class="filter-group"><label>Correo del cliente</label><input id="soporte-thread-email" type="email" placeholder="cliente@email.com" /></div>
@@ -1204,9 +1279,10 @@
             <div class="chat-panel">
               <div id="soporte-messages" class="chat-messages"></div>
               <div class="chat-compose">
-                <input id="soporte-input" type="text" placeholder="Escribe tu mensaje…" onkeydown="if(event.key==='Enter')sendSoporteMessage()" />
+                <input id="soporte-input" type="text" placeholder="Escribe tu mensaje (máx. 100 palabras)…" onkeydown="if(event.key==='Enter')sendSoporteMessage()" />
                 <button type="button" class="btn btn-primary" onclick="sendSoporteMessage()">Enviar</button>
               </div>
+              <p id="soporte-word-hint" class="chat-word-hint">0/100 palabras</p>
             </div>
           </div>
         </div>
@@ -1217,26 +1293,39 @@
     <div class="page" id="page-roles-admin">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Roles y usuarios</h1>
-        <p class="page-lead">Define qué páginas ve cada rol y asigna roles a usuarios.</p>
+        <span class="page-badge">Administración</span>
+        <h1 class="page-title">Roles y usuarios</h1>
+        <p class="page-lead">Define qué páginas ve cada rol, inhabilita roles sin borrarlos y asigna usuarios.</p>
       </header>
       <div class="page-body">
-      <p id="roles-admin-denied" class="catalog-meta" hidden>Solo administradores pueden gestionar roles.</p>
+      <p id="roles-admin-denied" class="admin-page-meta" hidden>No tienes permiso para gestionar usuarios y roles (<code>users.manage</code>).</p>
       <div id="roles-admin-content">
-        <div class="table-box" style="margin-bottom:16px">
-          <div class="table-header">
-            <div class="table-title">Roles</div>
-            <button type="button" class="btn btn-primary" onclick="openRoleCreate()">+ Nuevo rol</button>
+        <div class="table-box table-box--admin">
+          <div class="table-header table-header--split">
+            <div class="table-title-wrap">
+              <div class="table-title">Roles</div>
+              <span id="roles-admin-meta" class="dash-records-meta"></span>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" data-require-perm="users.manage" onclick="openRoleCreate()">+ Nuevo rol</button>
           </div>
           <div class="table-scroll">
-            <table><thead><tr><th>ID</th><th>Nombre</th><th>Páginas</th><th></th></tr></thead>
+            <table><thead><tr><th>Identificador</th><th>Nombre</th><th>Acceso</th><th>Acciones</th></tr></thead>
             <tbody id="roles-admin-roles-body"></tbody></table>
           </div>
         </div>
-        <div class="table-box">
-          <div class="table-header"><div class="table-title">Usuarios</div></div>
+        <div class="table-box table-box--admin">
+          <div class="table-header table-header--split">
+            <div class="table-title-wrap">
+              <div class="table-title">Usuarios</div>
+              <span id="roles-users-meta" class="dash-records-meta"></span>
+            </div>
+            <div class="filter-group filter-group--wide" style="max-width:280px;margin:0">
+              <label for="roles-users-search">Buscar</label>
+              <input id="roles-users-search" type="search" placeholder="Correo o nombre…" oninput="onUsersSearchInput(this.value)" autocomplete="off" />
+            </div>
+          </div>
           <div class="table-scroll">
-            <table><thead><tr><th>Usuario</th><th>Rol</th><th>Slug</th><th></th></tr></thead>
+            <table><thead><tr><th>Usuario</th><th>Rol actual</th><th>Asignar rol</th><th>Acciones</th></tr></thead>
             <tbody id="roles-admin-users-body"></tbody></table>
           </div>
         </div>
@@ -1249,7 +1338,8 @@
     <div class="page" id="page-export">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Exportar datos</h1>
+        <span class="page-badge">Exportación Q2</span>
+        <h1 class="page-title">Exportar datos</h1>
         <p class="page-lead">Descarga CSV de ventas filtradas. Requiere sesión de analista o administrador.</p>
       </header>
       <div class="page-body">
@@ -1273,7 +1363,7 @@
           </select>
         </div>
         <div class="filter-group filter-group--action">
-          <button type="button" class="btn btn-primary" onclick="exportAnalysis()">Descargar CSV</button>
+          <button type="button" class="btn btn-primary" data-require-perm="analysis.export" onclick="exportAnalysis()">Descargar CSV</button>
         </div>
       </div>
       <p id="export-status" class="catalog-meta"></p>
@@ -1285,16 +1375,34 @@
     <div class="page" id="page-audit">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Auditoría</h1>
-        <p class="page-lead">Registro de acciones administrativas en el sistema.</p>
+        <span class="page-badge">Gobernanza</span>
+        <h1 class="page-title">Auditoría</h1>
+        <p class="page-lead">Historial permanente de acciones administrativas. Filtra por rol y navega de 100 en 100.</p>
       </header>
       <div class="page-body">
-      <div class="table-box">
-        <div class="table-header"><div class="table-title">Registro de acciones</div></div>
+      <div class="filters page-panel--filters">
+        <div class="filter-group">
+          <label for="audit-role-filter">Rol del usuario</label>
+          <select id="audit-role-filter" onchange="auditGoPage(0)">
+            <option value="">Todos los roles</option>
+          </select>
+        </div>
+        <div class="filter-group filter-group--action">
+          <button type="button" class="btn btn-ghost" onclick="loadAuditPage()">Actualizar</button>
+        </div>
+      </div>
+      <div class="table-box table-box--admin">
+        <div class="table-header table-header--split">
+          <div class="table-title-wrap">
+            <div class="table-title">Registro de acciones</div>
+            <span id="audit-meta" class="dash-records-meta">Cargando…</span>
+          </div>
+        </div>
         <div class="table-scroll">
-          <table><thead><tr><th>Fecha</th><th>Acción</th><th>Entidad</th><th>Usuario</th><th>ID</th></tr></thead>
+          <table><thead><tr><th>Fecha</th><th>Acción</th><th>Entidad</th><th>Usuario</th><th>Rol</th><th>Referencia</th></tr></thead>
           <tbody id="audit-body"></tbody></table>
         </div>
+        <div id="audit-pager" class="table-pager" hidden></div>
       </div>
       </div>
       </div><!-- /page-shell -->
@@ -1304,28 +1412,31 @@
     <div class="page" id="page-datos">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Maestros y comercio</h1>
-        <p class="page-lead">Administra catálogos DW y tablas comerciales de la tienda. Solo administradores pueden editar maestros.</p>
+        <span class="page-badge">Datos Q4</span>
+        <h1 class="page-title">Tablas maestras</h1>
+        <p class="page-lead">Edita las dimensiones del data warehouse (regiones, países, categorías, productos, canales, prioridades y clientes). Las tablas de tienda e inventario se sincronizan con <strong>Sync catálogo</strong>; el calendario (<code>dim_tiempo</code>) lo genera el ELT.</p>
       </header>
       <div class="page-body">
-      <div class="filters">
-        <div class="filter-group">
-          <label>Tabla</label>
-          <select id="datos-table-select" onchange="onDatosTableChange()" style="min-width:280px"></select>
+      <div class="filters page-panel--filters">
+        <div class="filter-group filter-group--wide">
+          <label for="datos-table-select">Tabla</label>
+          <select id="datos-table-select" onchange="onDatosTableChange()"></select>
         </div>
-        <div class="filter-group filter-group--action" style="display:flex;gap:8px;flex-wrap:wrap;max-width:none">
-          <button type="button" class="btn btn-primary" onclick="openMasterCreate()">+ Nuevo</button>
-          <button type="button" class="btn btn-ghost" onclick="syncStaleAnalytics()">Sincronizar fact (incremental)</button>
-          <button type="button" class="btn btn-ghost" onclick="runBuildModel()">Reconstruir modelo</button>
-          <button type="button" class="btn btn-ghost" onclick="runShopSync()">↻ Sync catálogo</button>
-          <button type="button" class="btn btn-ghost" onclick="runShopSync(true)" title="Regenera inventario desde maestros">↻ Sync + reset stock</button>
+        <div class="filter-group filter-group--action filter-group--actions-row">
+          <button type="button" class="btn btn-primary btn-sm" data-require-perm="masters.write" onclick="openMasterCreate()">+ Nuevo</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="syncStaleAnalytics()">Sincronizar fact</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="runBuildModel()">Reconstruir modelo</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync()">Sync catálogo</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync(true)" title="Regenera inventario desde maestros">Sync + reset stock</button>
         </div>
       </div>
-      <p id="datos-build-status" class="catalog-meta" style="margin-bottom:12px"></p>
-      <div class="table-box">
-        <div class="table-header">
-          <div class="table-title">Registros</div>
-          <span id="datos-rows-meta" class="dash-records-meta"></span>
+      <p id="datos-build-status" class="catalog-meta admin-page-meta"></p>
+      <div class="table-box table-box--admin">
+        <div class="table-header table-header--split">
+          <div class="table-title-wrap">
+            <div class="table-title">Registros</div>
+            <span id="datos-rows-meta" class="dash-records-meta"></span>
+          </div>
         </div>
         <div class="table-scroll">
           <table><thead id="datos-rows-head"><tr><th>Cargando…</th></tr></thead>
@@ -1339,8 +1450,9 @@
     <div class="page" id="page-load">
       <div class="page-shell">
       <header class="page-hero">
-<h1 class="page-title">Carga ELT</h1>
-        <p class="page-lead">Carga de archivos de ventas hacia el sistema.</p>
+        <span class="page-badge">Datos Q4</span>
+        <h1 class="page-title">Carga ELT</h1>
+        <p class="page-lead">Carga de ventas hacia la capa estratégica. También puedes orquestar el mismo rebuild con Airflow (DAG <code>globtrade_strategic_etl</code>, UI :8080).</p>
       </header>
       <div class="page-body">
       <div class="load-box">
@@ -1349,17 +1461,17 @@
           <label>Ruta del archivo CSV</label>
           <input id="csv-path" value="data/sales.csv" placeholder="data/sales.csv" />
         </div>
-        <button class="btn btn-primary" onclick="loadDatasetQ4()" id="btn-load">
+        <button class="btn btn-primary" onclick="loadDatasetQ4()" id="btn-load" data-require-perm="elt.run">
           Cargar dataset completo
         </button>
         <div class="log-box" id="load-log">Listo para cargar. Pulsa el botón para iniciar.</div>
         <div class="load-hint">
           <p>
-            Esta operación:<br>
+            Esta operación (igual que el DAG Airflow):<br>
             1. Trunca y recarga <strong>sales_records</strong> con el CSV<br>
-            2. Construye las tablas del modelo empresarial<br>
-            3. Actualiza vistas y KPIs mensuales<br>
-            Tiempo estimado: 15–40 s para 100&nbsp;000 registros.
+            2. Reconstruye dims + <strong>fact_ventas</strong> (modelo estrella)<br>
+            3. Actualiza KPIs mensuales — alimenta Tablero e <strong>Informes compuestos RC</strong><br>
+            Tiempo estimado: 15–40 s para 100&nbsp;000 registros. No es append: es rebuild completo.
           </p>
         </div>
         <hr style="border:none;border-top:1px solid var(--border);margin:20px 0" />
@@ -1369,7 +1481,7 @@
           <div class="filter-group"><label>Cantidad</label><input id="gen-count" type="number" value="1000" min="1" max="300000" style="width:120px" /></div>
           <div class="filter-group"><label>Año (opcional)</label><input id="gen-year" type="number" placeholder="2017" style="width:100px" /></div>
           <div class="filter-group filter-group--action">
-            <button type="button" class="btn btn-primary" id="btn-gen" onclick="generateSalesRecords()">Generar ventas</button>
+            <button type="button" class="btn btn-primary" id="btn-gen" data-require-perm="elt.run" onclick="generateSalesRecords()">Generar ventas</button>
           </div>
         </div>
         <p id="gen-status" class="catalog-meta"></p>
@@ -1542,7 +1654,7 @@ const titles = {
   products:'Ventas por categoría',
   export:'Exportar datos',
   decisiones:'Decisiones',
-  tienda:'Tienda B2B',
+  tienda:'Tienda',
   'mis-pedidos':'Mis pedidos',
   notificaciones:'Notificaciones',
   soporte:'Soporte',
@@ -1581,7 +1693,10 @@ function loadPage(id) {
   else if(id==='mis-pedidos') loadMisPedidosPage();
   else if(id==='notificaciones') loadNotificacionesPage();
   else if(id==='soporte') loadSoportePage();
-  else if(id==='ventas') { showVentasTab('solicitudes'); loadVentasPage(); }
+  else if(id==='ventas') {
+    const tab = document.querySelector('.ventas-tab-btn.active')?.dataset?.tab || 'solicitudes';
+    showVentasTab(tab);
+  }
   else if(id==='datos') loadDatosPage();
   else if(id==='trends') loadTrends();
   else if(id==='regions') loadRegions();
@@ -1644,11 +1759,12 @@ function drawDoughnut(id, labels, data) {
   const COLORS = chartColors();
   const text = cssVar('--text');
   const bg = cssVar('--bg');
+  const compact = id.includes('-dash') || window.matchMedia('(max-width: 900px)').matches;
   chartsMap[id] = new Chart(ctx, {
     type:'doughnut',
     data:{ labels, datasets:[{data, backgroundColor: COLORS.map(c=>c+'cc'), borderColor:bg, borderWidth:2}]},
     options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ position:'right', labels:{color:text, font:{size:11}, padding:12}}}}
+      plugins:{ legend:{ position: compact ? 'bottom' : 'right', labels:{color:text, font:{size:11}, padding: compact ? 8 : 12}}}}
   });
 }
 function drawLine(id, labels, rev, profit) {
@@ -1696,23 +1812,42 @@ function resetDashFilters() {
 
 function applyDashFilters() { loadDashboard(); }
 
+function kpiSkeletonHtml(n, compact) {
+  const cls = compact ? 'stat-card stat-card--compact stat-skeleton' : 'stat-card stat-skeleton';
+  return Array.from({ length: n }, () =>
+    `<div class="${cls}" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>`
+  ).join('');
+}
+
 async function loadDashboard() {
   hideBootScreen();
   setChartsLoading(true);
+  const kpiEl = document.getElementById('kpi-cards');
+  const sec = document.getElementById('kpi-cards-secondary');
+  if (kpiEl) kpiEl.innerHTML = kpiSkeletonHtml(3, false);
+  if (sec) {
+    sec.hidden = false;
+    sec.innerHTML = kpiSkeletonHtml(4, true);
+  }
+
   const { months, region, itemtype, channel, priority } = getDashParams();
   const s = await get('/summary');
   if(!s) {
     setChartsLoading(false);
-    document.getElementById('kpi-cards').innerHTML =
-      '<div class="stat-card stat-card--wide"><div class="stat-value" style="font-size:0.9rem">Sin conexión</div><div class="stat-label">MongoDB no responde. Verifica el servicio y app.py.</div></div>';
-    const sec0 = document.getElementById('kpi-cards-secondary');
-    if (sec0) { sec0.hidden = true; sec0.innerHTML = ''; }
+    if (kpiEl) {
+      kpiEl.innerHTML =
+        '<div class="stat-card stat-card--wide"><div class="stat-value" style="font-size:0.9rem">Sin conexión</div><div class="stat-label">MongoDB no responde. Verifica el servicio y app.py.</div></div>';
+    }
+    if (sec) { sec.hidden = true; sec.innerHTML = ''; }
+    ['chart-trend-dash','chart-regions-dash','chart-channels-dash','chart-priority-dash','chart-countries-dash']
+      .forEach(id => showChartEmpty(id, 'Sin conexión'));
     return;
   }
 
-  const margin = s.avg_margin != null ? s.avg_margin : (s.total_revenue ? ((s.total_profit/s.total_revenue)*100).toFixed(1) : '—');
-  const sec = document.getElementById('kpi-cards-secondary');
-  if (sec) { sec.hidden = true; sec.innerHTML = ''; }
+  const marginRaw = s.avg_margin != null
+    ? Number(s.avg_margin)
+    : (s.total_revenue ? (s.total_profit / s.total_revenue) * 100 : null);
+  const marginLabel = marginRaw == null || !Number.isFinite(marginRaw) ? '—' : marginRaw.toFixed(1);
   let lagging = !!s.strategic_lagging;
   try {
     const mr = await fetch(API + '/meta/data-layers');
@@ -1728,20 +1863,25 @@ async function loadDashboard() {
       lagBanner.innerHTML = `
         <p>Hay ventas nuevas pendientes de actualizar en el tablero.</p>
         <div class="dash-lag-actions">
-          <button type="button" class="btn btn-primary btn-sm" onclick="syncStaleAnalytics()">Sincronizar ahora</button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="goConstruirModelo()">Ir a Construir modelo</button>
+          <button type="button" class="btn btn-primary btn-sm" data-require-perm="elt.run" onclick="syncStaleAnalytics()">Sincronizar ahora</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="goConstruirModelo()">Ir a Construir modelo</button>
         </div>`;
+      if (typeof applyPermissionUi === 'function') applyPermissionUi();
     } else {
       lagBanner.hidden = true;
       lagBanner.innerHTML = '';
     }
   }
   if (s.strategic_ready === false || !(s.total_orders > 0)) {
-    document.getElementById('kpi-cards').innerHTML =
-      `<div class="stat-card stat-card--wide"><div class="stat-value" style="font-size:0.95rem">'Sin datos de ventas para mostrar'</div>
-      <div class="stat-label">${s.message || 'Carga o sincroniza los datos desde Administración.'}</div></div>`;
+    if (kpiEl) {
+      kpiEl.innerHTML =
+        `<div class="stat-card stat-card--wide"><div class="stat-value" style="font-size:0.95rem">Sin datos de ventas para mostrar</div>
+        <div class="stat-label">${s.message || 'Carga o sincroniza los datos desde Administración.'}</div></div>`;
+    }
+    if (sec) { sec.hidden = true; sec.innerHTML = ''; }
   } else {
-    document.getElementById('kpi-cards').innerHTML = `
+    if (kpiEl) {
+      kpiEl.innerHTML = `
       <div class="stat-card stat-card--accent">
         <div class="stat-value">${fmtUSD(s.total_revenue)}</div>
         <div class="stat-label">Ingresos</div>
@@ -1750,21 +1890,60 @@ async function loadDashboard() {
       <div class="stat-card">
         <div class="stat-value">${fmtUSD(s.total_profit)}</div>
         <div class="stat-label">Utilidad</div>
-        <div class="stat-hint">Margen ${margin}%</div>
+        <div class="stat-hint">Margen ${marginLabel}%</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${fmtNum(s.total_orders)}</div>
         <div class="stat-label">Pedidos</div>
         <div class="stat-hint">Datos de ventas</div>
       </div>`;
+    }
+    if (sec) {
+      sec.hidden = false;
+      sec.innerHTML = `
+        <div class="stat-card stat-card--compact">
+          <div class="stat-value">${fmtUSD(s.total_cost)}</div>
+          <div class="stat-label">Costo total</div>
+          <div class="stat-hint">USD acumulados</div>
+        </div>
+        <div class="stat-card stat-card--compact">
+          <div class="stat-value">${fmtPct(marginRaw)}</div>
+          <div class="stat-label">Margen promedio</div>
+          <div class="stat-hint">Utilidad / ingresos</div>
+        </div>
+        <div class="stat-card stat-card--compact">
+          <div class="stat-value">${fmtNum(s.countries)}</div>
+          <div class="stat-label">Países</div>
+          <div class="stat-hint">Con ventas en el filtro</div>
+        </div>
+        <div class="stat-card stat-card--compact">
+          <div class="stat-value">${fmtNum(s.item_types)}</div>
+          <div class="stat-label">Categorías</div>
+          <div class="stat-hint">Tipos de producto</div>
+        </div>`;
+    }
   }
 
   let trend = null;
+  let regions = null;
+  let channels = null;
+  let priorities = null;
+  let countries = null;
   try {
-    const r = await fetch(apiUrlTrend());
-    if (!r.ok) throw new Error(r.statusText);
-    setDbStatus(true);
-    trend = await r.json();
+    const [trendRes, regionsRes, channelsRes, prioritiesRes, countriesRes] = await Promise.all([
+      fetch(apiUrlTrend()),
+      fetch(apiUrl('/regions')),
+      fetch(apiUrl('/channels')),
+      fetch(apiUrl('/priorities')),
+      fetch(apiUrl('/countries?top=10')),
+    ]);
+    const okAny = [trendRes, regionsRes, channelsRes, prioritiesRes, countriesRes].some(r => r.ok);
+    setDbStatus(okAny);
+    if (trendRes.ok) trend = await trendRes.json();
+    if (regionsRes.ok) regions = await regionsRes.json();
+    if (channelsRes.ok) channels = await channelsRes.json();
+    if (prioritiesRes.ok) priorities = await prioritiesRes.json();
+    if (countriesRes.ok) countries = await countriesRes.json();
   } catch (e) {
     setDbStatus(false);
   }
@@ -1774,6 +1953,30 @@ async function loadDashboard() {
     drawLine('chart-trend-dash', trend.map(r => r.month), trend.map(r => r.revenue), trend.map(r => r.profit));
   } else {
     showChartEmpty('chart-trend-dash', 'Sin datos de tendencia para este periodo');
+  }
+
+  if (regions && regions.length) {
+    drawBar('chart-regions-dash', regions.map(r => r.region), regions.map(r => r.revenue), 'Ingresos');
+  } else {
+    showChartEmpty('chart-regions-dash', 'Sin datos de región');
+  }
+
+  if (channels && channels.length) {
+    drawDoughnut('chart-channels-dash', channels.map(r => r.sales_channel), channels.map(r => r.orders));
+  } else {
+    showChartEmpty('chart-channels-dash', 'Sin datos de canal');
+  }
+
+  if (priorities && priorities.length) {
+    drawBar('chart-priority-dash', priorities.map(r => r.order_priority), priorities.map(r => r.orders), 'Pedidos');
+  } else {
+    showChartEmpty('chart-priority-dash', 'Sin datos de prioridad');
+  }
+
+  if (countries && countries.length) {
+    drawBarH('chart-countries-dash', countries.map(r => r.country), countries.map(r => r.revenue));
+  } else {
+    showChartEmpty('chart-countries-dash', 'Sin datos de países');
   }
 
   const tableFilters = {};
@@ -1836,13 +2039,22 @@ function showChartEmpty(canvasId, msg) {
 async function loadTrends() {
   const n = document.getElementById('trend-months')?.value || 999;
   const [trend, prods] = await Promise.all([get('/trend?months='+n), get('/products')]);
-  if(trend) drawLine('chart-trend',
+  if (!trend) {
+    showChartEmpty('chart-trend', 'Sin conexión o sin datos');
+    showChartEmpty('chart-products-bar', 'Sin datos');
+    showChartEmpty('chart-products-pie', 'Sin datos');
+    return;
+  }
+  drawLine('chart-trend',
     trend.map(r=>r.month), trend.map(r=>r.revenue), trend.map(r=>r.profit));
-  if(prods) {
+  if(prods && prods.length) {
     drawBar('chart-products-bar',
-      prods.map(r=>r.item_type), prods.map(r=>r.revenue), 'Ingresos', '#00aaf5');
+      prods.map(r=>r.item_type), prods.map(r=>r.revenue), 'Ingresos');
     drawDoughnut('chart-products-pie',
       prods.map(r=>r.item_type), prods.map(r=>r.units));
+  } else {
+    showChartEmpty('chart-products-bar', 'Sin datos de categoría');
+    showChartEmpty('chart-products-pie', 'Sin datos de categoría');
   }
 }
 
@@ -1852,8 +2064,14 @@ let countriesLimit = 20;
 
 async function loadRegions() {
   const regs = await get('/regions');
-  if(regs) {
-    document.getElementById('body-regions').innerHTML = regs.map(r=>{
+  const tbody = document.getElementById('body-regions');
+  if (!tbody) return;
+  if (!regs || !regs.length) {
+    tbody.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(5, { title: regs ? 'Sin datos' : 'Sin conexión', hint: 'Revisa MongoDB o filtros del tablero.' })
+      : `<tr><td colspan="5">${regs ? 'Sin datos' : 'Sin conexión'}</td></tr>`;
+  } else {
+    tbody.innerHTML = regs.map(r=>{
       const m = r.revenue>0 ? ((r.profit/r.revenue)*100).toFixed(1) : '—';
       return `<tr>
         <td>${r.region}</td>
@@ -1900,18 +2118,24 @@ function expandCountries() {
 // ── Products ──────────────────────────────────────────────────────────
 async function loadProducts() {
   const data = await get('/products');
-  if(data) {
-    document.getElementById('body-products').innerHTML = data.map(r=>{
-      const m = r.revenue>0 ? ((r.profit/r.revenue)*100).toFixed(1) : '—';
-      return `<tr>
-        <td>${r.item_type}</td>
-        <td>${fmtNum(r.units)}</td>
-        <td>${fmtUSD(r.revenue)}</td>
-        <td>${fmtUSD(r.profit)}</td>
-        <td>${m}%</td>
-      </tr>`;
-    }).join('');
+  const tbody = document.getElementById('body-products');
+  if (!tbody) return;
+  if (!data || !data.length) {
+    tbody.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(5, { title: data ? 'Sin datos' : 'Sin conexión', hint: 'Carga el modelo ELT o revisa filtros.' })
+      : `<tr><td colspan="5">${data ? 'Sin datos' : 'Sin conexión'}</td></tr>`;
+    return;
   }
+  tbody.innerHTML = data.map(r=>{
+    const m = r.revenue>0 ? ((r.profit/r.revenue)*100).toFixed(1) : '—';
+    return `<tr>
+      <td>${r.item_type}</td>
+      <td>${fmtNum(r.units)}</td>
+      <td>${fmtUSD(r.revenue)}</td>
+      <td>${fmtUSD(r.profit)}</td>
+      <td>${m}%</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── Orders (server-side pagination) ─────────────────────────────────
@@ -1964,7 +2188,14 @@ class OrdersTable {
     this._loading = false;
     document.getElementById('orders-page-info').textContent =
       `Pág ${this.page} / ${this._totalPages()}`;
-    document.getElementById('body-orders').innerHTML = (rows || []).map(r => `<tr>
+    const tbody = document.getElementById('body-orders');
+    if (!rows || !rows.length) {
+      tbody.innerHTML = typeof opsEmptyRow === 'function'
+        ? opsEmptyRow(11, { title: rows ? 'Sin resultados' : 'Sin conexión', hint: 'Ajusta filtros o revisa la carga de datos.' })
+        : '';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
       <td style="font-family:var(--mono);color:var(--muted);font-size:10px">${r.order_id}</td>
       <td>${r.country}</td>
       <td style="color:var(--muted);font-size:11px">${r.region||'—'}</td>
@@ -2012,7 +2243,7 @@ async function loadDataLayersPanel() {
       </div>`;
     }).join('');
     panel.innerHTML = `
-      <p class="catalog-meta" style="margin-bottom:12px">${data.message || 'Resumen de datos del sistema.'}</p>
+      <p class="catalog-meta" style="margin-bottom:12px">${data.message || 'Resumen de datos del sistema.'}${data.topology?.split_enabled ? ` · Bases: <code>${data.topology.ops_database}</code> + <code>${data.topology.dw_database}</code>` : ''}</p>
       <div class="data-layers-grid">${cards}</div>`;
   } catch (e) {
     panel.innerHTML = `<p class="catalog-meta">Error: ${e.message}</p>`;
@@ -2208,11 +2439,24 @@ class DashTable {
 const dashTable = new DashTable();
 
 async function generateSalesRecords() {
+  if (typeof canRunElt === 'function' && !canRunElt()) {
+    notifyErr('No tienes permiso para generar ventas (ELT).');
+    return;
+  }
   const count = parseInt(document.getElementById('gen-count')?.value, 10) || 100000;
   const yearEl = document.getElementById('gen-year');
   const year = yearEl ? parseInt(yearEl.value, 10) : null;
   const yearLabel = year ? ` para el año ${year}` : '';
-  if (!confirm(`¿Generar ${count.toLocaleString('es-EC')} ventas nuevas en sales_records${yearLabel}?`)) return;
+  if (typeof opsConfirm !== 'function') {
+    notifyErr('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).');
+    return;
+  }
+  const ok = await opsConfirm({
+    title: 'Generar ventas',
+    message: `¿Generar ${count.toLocaleString('es-EC')} ventas nuevas en sales_records${yearLabel}?`,
+    confirmLabel: 'Generar',
+  });
+  if (!ok) return;
   const btn = document.getElementById('btn-gen');
   const status = document.getElementById('gen-status');
   if (!btn || !status) return;
@@ -2230,9 +2474,11 @@ async function generateSalesRecords() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.message || r.statusText);
     status.textContent = `✓ ${data.year ? 'Año ' + data.year + ': ' : ''}Generados: ${data.inserted?.toLocaleString('es-EC')} · Total sales_records: ${data.total_after?.toLocaleString('es-EC')}`;
+    notifyOk(`Se generaron ${Number(data.inserted || 0).toLocaleString('es-EC')} ventas.`);
     loadDashboard();
   } catch (e) {
     status.textContent = '✗ Error: ' + e.message;
+    notifyErr(e.message || 'Error al generar ventas');
   } finally {
     btn.disabled = false;
   }
@@ -2458,6 +2704,7 @@ function refreshAuthUi(user, access) {
     topUser.hidden = !logged;
   }
   applyNavAccess();
+  if (typeof applyPermissionUi === 'function') applyPermissionUi();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
   if (typeof refreshVentasBadge === 'function') refreshVentasBadge();
 }
@@ -2508,7 +2755,7 @@ async function submitRegister(e) {
     closeRegisterModal();
     refreshAuthUi(data.user, data.access);
     showPage(defaultPageForUser(), document.querySelector('.nav-item[data-page="' + defaultPageForUser() + '"]'));
-    alert(data.message || 'Cuenta creada. ¡Bienvenido!');
+    notifyOk(data.message || 'Cuenta creada. ¡Bienvenido!');
   } catch (e) {
     errEl.textContent = String(e.message || e);
   }
@@ -2531,6 +2778,7 @@ async function submitLogin(e) {
     closeLoginModal();
     refreshAuthUi(data.user, data.access);
     showPage(defaultPageForUser(), document.querySelector('.nav-item[data-page="' + defaultPageForUser() + '"]'));
+    notifyOk(data.message || `Sesión iniciada. Hola, ${data.user?.name || email}.`);
   } catch (e) {
     errEl.textContent = String(e.message || e);
   }
@@ -2557,7 +2805,7 @@ async function submitForgotPassword() {
   const data = await r.json();
   if (!r.ok) { err.textContent = data.message || 'Error'; return; }
   closeForgotModal();
-  alert(data.message);
+  notifyOk(data.message || 'Revisa tu correo (demo: usa el token de restablecimiento).');
   openResetModal();
 }
 function openResetModal() {
@@ -2579,7 +2827,7 @@ async function submitResetPassword() {
   const data = await r.json();
   if (!r.ok) { err.textContent = data.message || 'Error'; return; }
   closeResetModal();
-  alert(data.message);
+  notifyOk(data.message || 'Contraseña actualizada. Ya puedes iniciar sesión.');
   openLoginModal();
 }
 function openProfileModal() {
@@ -2593,9 +2841,15 @@ function openProfileModal() {
   document.getElementById('profile-new-pass').value = '';
   document.getElementById('profile-new-pass2').value = '';
   document.getElementById('profile-error').textContent = '';
-  document.getElementById('profile-role').textContent = user.role || '';
   const sem1w = document.getElementById('profile-sem1-wrap');
   if (sem1w) sem1w.hidden = user.role !== 'administrador';
+  const soundEl = document.getElementById('profile-notif-sound');
+  if (soundEl) {
+    const stored = localStorage.getItem('gt-notif-sound');
+    soundEl.checked = stored === null
+      ? (typeof opsUxDefaultSoundForRole === 'function' ? opsUxDefaultSoundForRole() : false)
+      : stored === '1';
+  }
   m.hidden = false;
   m.setAttribute('aria-hidden', 'false');
   document.getElementById('profile-name')?.focus();
@@ -2631,6 +2885,7 @@ async function submitProfile(e) {
     }
     closeProfileModal();
     refreshAuthUi(data.user, data.access);
+    notifyOk(data.message || 'Perfil actualizado.');
   } catch (e) {
     errEl.textContent = String(e.message || e);
   }
@@ -2641,6 +2896,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeUi();
   fetchMe().then(data => {
     refreshAuthUi(data?.user || null, data?.access);
+    if (typeof opsLiveSeed === 'function') opsLiveSeed(data?.user || null, data?.access);
     const active = document.querySelector('.page.active');
     const currentId = active?.id?.replace('page-', '') || 'dashboard';
     if (!canAccessPage(currentId)) {
@@ -2723,11 +2979,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <label for="profile-email">Correo electrónico</label>
         <input type="email" id="profile-email" autocomplete="email" required />
       </div>
-      <div class="fg">
-        <label>Rol</label>
-        <div id="profile-role" class="profile-role-badge"></div>
-      </div>
-      <div id="profile-sem1-wrap" class="fg" hidden style="margin-top:4px">
+      <label class="ux-pref-row" for="profile-notif-sound">
+        <input type="checkbox" id="profile-notif-sound" onchange="opsUxSetNotifSound(this.checked)" />
+        Sonido al recibir notificaciones nuevas
+      </label>
+      <div id="profile-sem1-wrap" class="fg fg--spaced" hidden>
         <button type="button" class="btn btn-primary btn-block" onclick="window.location.href='/sem1'">SEM1</button>
         <p class="modal-sub" style="margin-top:6px;margin-bottom:0">Dashboard clásico (misma vista que el puerto 5000), sin otro Docker.</p>
       </div>
@@ -2766,15 +3022,40 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
+<div id="product-detail-modal" class="modal" hidden aria-hidden="true" role="dialog" aria-labelledby="prod-detail-title">
+  <div class="modal-backdrop" onclick="closeProductDetail()"></div>
+  <div class="modal-card modal-card--wide shop-detail-modal">
+    <div class="shop-detail-layout">
+      <div class="shop-detail-media" id="prod-detail-media"></div>
+      <div class="shop-detail-main">
+        <h2 id="prod-detail-title">Producto</h2>
+        <p id="prod-detail-category" class="modal-sub"></p>
+        <div id="prod-detail-body"></div>
+        <div class="shop-detail-actions">
+          <label for="prod-detail-qty" class="shop-bulk-label">Cantidad</label>
+          <input type="number" id="prod-detail-qty" min="1" value="1" style="width:72px" />
+          <button type="button" class="btn btn-primary" onclick="tiendaAddFromDetail()">Agregar al carrito</button>
+          <button type="button" class="btn btn-ghost" onclick="closeProductDetail()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="solicitud-modal" class="modal" hidden>
   <div class="modal-backdrop" onclick="closeSolicitudModal()"></div>
   <div class="modal-card">
-    <h2>Solicitar compra</h2>
-    <p class="modal-sub" id="sol-modal-lead">Confirma tus datos. Se creará una solicitud comercial para revisar y confirmar la venta.</p>
+    <h2>Completar pedido</h2>
+    <p class="modal-sub" id="sol-modal-lead">Confirma tus datos de entrega y contacto para procesar tu compra.</p>
     <div class="fg"><label for="sol-client-name">Nombre</label><input id="sol-client-name" required /></div>
     <div class="fg"><label for="sol-client-email">Correo</label><input type="email" id="sol-client-email" required /></div>
     <div class="fg"><label for="sol-client-phone">Teléfono</label><input id="sol-client-phone" /></div>
-    <div class="fg"><label for="sol-country-id">País</label><select id="sol-country-id"></select></div>
+    <div class="fg"><label for="sol-country-id">País de destino</label><select id="sol-country-id"></select></div>
+    <div class="fg" id="sol-destination-wrap">
+      <label for="sol-shipping-destination">Destino de entrega</label>
+      <input id="sol-shipping-destination" placeholder="Ciudad, dirección o ruta logística" required />
+      <p class="modal-sub" style="margin-top:6px">Indica dónde debe llegar el pedido (bodega, sucursal o dirección).</p>
+    </div>
     <div class="fg" id="sol-channel-wrap" hidden>
       <label for="sol-channel-id">Canal preferido</label>
       <select id="sol-channel-id"></select>
@@ -2782,9 +3063,8 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div class="fg"><label for="sol-notes">Notas</label><input id="sol-notes" placeholder="Opcional" /></div>
     <div class="fg"><label for="sol-coupon">Cupón de descuento</label>
-      <div style="display:flex;gap:8px"><input id="sol-coupon" placeholder="Ej. WELCOME10 o GLOBTRADE50" style="flex:1" />
+      <div style="display:flex;gap:8px"><input id="sol-coupon" placeholder="Código promocional (opcional)" style="flex:1" />
       <button type="button" class="btn btn-ghost" onclick="applyCheckoutCoupon()">Aplicar</button></div>
-      <p class="modal-sub" style="margin-top:6px">Cupones de prueba: <code>WELCOME10</code> (10%) · <code>GLOBTRADE50</code> ($50)</p>
     </div>
     <p id="sol-checkout-summary" class="modal-sub" style="font-weight:600"></p>
     <button type="button" class="btn btn-primary btn-block" onclick="submitSolicitud()">Completar compra</button>
@@ -2792,17 +3072,15 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
-<div id="pago-modal" class="modal" hidden>
+<div id="pago-modal" class="modal" hidden aria-hidden="true">
   <div class="modal-backdrop" onclick="closePagoModal()"></div>
   <div class="modal-card">
-    <h2>Pagar solicitud</h2>
+    <h2 id="pago-modal-title">Pagar solicitud</h2>
     <p class="modal-sub" id="pago-modal-lead">Simulación de pago (sin pasarela real). Elige un método para marcar tu pedido como pagado.</p>
     <input type="hidden" id="pago-request-id" value="" />
+    <input type="hidden" id="pago-mode" value="client" />
     <div class="fg"><label for="pago-method">Método de pago</label>
-      <select id="pago-method">
-        <option value="transferencia">Transferencia bancaria</option>
-        <option value="tarjeta">Tarjeta</option>
-      </select>
+      <select id="pago-method"></select>
     </div>
     <button type="button" class="btn btn-primary btn-block" onclick="confirmClientePagar()">Confirmar pago</button>
     <button type="button" class="btn btn-ghost btn-block" onclick="closePagoModal()">Cancelar</button>
@@ -2872,17 +3150,20 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
-<div id="role-editor-modal" class="modal" hidden>
+<div id="role-editor-modal" class="modal" hidden aria-hidden="true">
   <div class="modal-backdrop" onclick="closeRoleEditor()"></div>
-  <div class="modal-card" style="max-width:520px;max-height:90vh;overflow:auto">
+  <div class="modal-card modal-card--admin" role="dialog" aria-labelledby="role-editor-title">
     <h2 id="role-editor-title">Editar rol</h2>
-    <div class="fg"><label>Identificador (slug)</label><input id="role-editor-slug" type="text" placeholder="ej. comprador-vip" /></div>
-    <div class="fg"><label>Nombre visible</label><input id="role-editor-label" type="text" /></div>
-    <div class="fg"><label><input type="checkbox" id="role-editor-assignable" checked /> Asignable a usuarios</label></div>
-    <div class="fg"><label>Páginas visibles</label><div id="role-editor-pages" style="max-height:160px;overflow:auto;border:1px solid var(--border);padding:8px;border-radius:8px"></div></div>
-    <div class="fg"><label>Permisos de acción</label><div id="role-editor-perms" style="max-height:140px;overflow:auto;border:1px solid var(--border);padding:8px;border-radius:8px"></div></div>
-    <button type="button" class="btn btn-primary btn-block" onclick="saveRoleEditor()">Guardar rol</button>
-    <button type="button" class="btn btn-ghost btn-block" onclick="closeRoleEditor()">Cancelar</button>
+    <p class="modal-sub">Las páginas y permisos definen qué puede ver y hacer cada perfil.</p>
+    <div class="fg"><label for="role-editor-slug">Identificador (slug)</label><input id="role-editor-slug" type="text" placeholder="ej. comprador-vip" /></div>
+    <div class="fg"><label for="role-editor-label">Nombre visible</label><input id="role-editor-label" type="text" /></div>
+    <div class="fg"><label class="modal-check"><input type="checkbox" id="role-editor-assignable" checked /> Asignable a usuarios</label></div>
+    <div class="fg"><label>Páginas visibles</label><div id="role-editor-pages" class="modal-checklist"></div></div>
+    <div class="fg"><label>Permisos de acción</label><div id="role-editor-perms" class="modal-checklist"></div></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary btn-block" onclick="saveRoleEditor()">Guardar rol</button>
+      <button type="button" class="btn btn-ghost btn-block" onclick="closeRoleEditor()">Cancelar</button>
+    </div>
   </div>
 </div>
 </body>

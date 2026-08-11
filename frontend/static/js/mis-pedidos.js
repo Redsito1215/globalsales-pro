@@ -1,4 +1,6 @@
 /* Mis pedidos — cliente B2B */
+const pagoModalState = { requestId: null, staff: false, offline: false };
+
 async function loadMisPedidosPage() {
   const body = document.getElementById('mis-pedidos-body');
   const meta = document.getElementById('mis-pedidos-meta');
@@ -27,7 +29,9 @@ async function loadMisPedidosPage() {
     const counts = { pending_pay: 0, open: 0, delivered: 0 };
     rows.forEach(req => {
       const pay = req.payment_status || 'pendiente_pago';
-      if (pay === 'pendiente_pago' && !['rechazada', 'cancelada', 'devuelta'].includes(req.status)) counts.pending_pay++;
+      const offline = typeof isOfflineRequest === 'function' && isOfflineRequest(req);
+      const needsPay = pay === 'pendiente_pago' || (pay === 'credito' && !offline);
+      if (needsPay && !['rechazada', 'cancelada', 'devuelta'].includes(req.status)) counts.pending_pay++;
       if (['pendiente', 'en_revision', 'aprobada', 'convertida', 'enviada'].includes(req.status)) counts.open++;
       if (req.status === 'entregada') counts.delivered++;
     });
@@ -59,7 +63,9 @@ async function loadMisPedidosPage() {
     const pay = req.payment_status || 'pendiente_pago';
     const payHtml = typeof paymentBadge === 'function' ? paymentBadge(pay) : pay;
     const canCancel = ['pendiente', 'en_revision'].includes(req.status);
-    const canPay = pay === 'pendiente_pago' && !['rechazada', 'cancelada', 'devuelta'].includes(req.status);
+    const offline = typeof isOfflineRequest === 'function' && isOfflineRequest(req);
+    const canPay = (pay === 'pendiente_pago' || (pay === 'credito' && !offline))
+      && !['rechazada', 'cancelada', 'devuelta'].includes(req.status);
     const n = Number(req.client_order_no) || noMap[req.request_id] || 0;
     const pedidoLabel = n ? `Pedido ${n}` : 'Pedido';
     const actions = `
@@ -83,56 +89,118 @@ async function loadMisPedidosPage() {
   }).join('');
 }
 
-function openPagoModal(requestId) {
+async function openPagoModal(requestId, opts) {
+  const o = opts || {};
   const modal = document.getElementById('pago-modal');
   const hid = document.getElementById('pago-request-id');
+  const modeEl = document.getElementById('pago-mode');
+  const lead = document.getElementById('pago-modal-lead');
+  const methodSel = document.getElementById('pago-method');
   if (!modal || !hid) return;
+
+  let offline = false;
+  try {
+    const r = await fetch(`${API}/solicitudes/${requestId}`, { credentials: 'same-origin' });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok && data.request) {
+      offline = typeof isOfflineRequest === 'function' && isOfflineRequest(data.request);
+    }
+  } catch (_) { /* ignore */ }
+
+  pagoModalState.requestId = requestId;
+  pagoModalState.staff = !!o.staff;
+  pagoModalState.offline = offline;
   hid.value = String(requestId);
+  if (modeEl) modeEl.value = o.staff ? 'staff' : 'client';
+  if (typeof fillPaymentMethodSelect === 'function') {
+    fillPaymentMethodSelect(methodSel, offline);
+  }
+  if (lead) {
+    lead.textContent = o.staff
+      ? (offline
+        ? 'Registra el pago presencial. Solo aplica cuando el cliente no tiene cuenta o el pedido es offline.'
+        : 'Registra el pago porque el correo del pedido no tiene cuenta en la plataforma.')
+      : (offline
+        ? 'Simulación de pago presencial. Elige tarjeta o efectivo y tarjeta bancaria.'
+        : 'Simulación de pago online. Elige tarjeta, crédito o cuenta bancaria.');
+  }
+  const title = document.getElementById('pago-modal-title');
+  if (title) title.textContent = o.staff ? 'Registrar pago (vendedor)' : 'Pagar solicitud';
   modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
 }
 
 function closePagoModal() {
   const modal = document.getElementById('pago-modal');
-  if (modal) modal.hidden = true;
+  if (modal) {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  pagoModalState.requestId = null;
+  pagoModalState.staff = false;
 }
 
 async function confirmClientePagar() {
   const id = parseInt(document.getElementById('pago-request-id')?.value || '0', 10);
-  const method = document.getElementById('pago-method')?.value || 'transferencia';
+  const method = document.getElementById('pago-method')?.value || 'tarjeta';
+  const staff = pagoModalState.staff || document.getElementById('pago-mode')?.value === 'staff';
   if (!id) return;
   const base = (typeof API !== 'undefined' && API) ? API : (window.location.origin + '/api');
+  const url = staff ? `${base}/solicitudes/${id}/registrar-pago` : `${base}/solicitudes/${id}/pagar`;
   let r;
   try {
-    r = await fetch(`${base}/solicitudes/${id}/pagar`, {
+    r = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ method }),
     });
   } catch (e) {
-    if (typeof opsToast === 'function') opsToast('Error de red al pagar. ¿Está el servidor en marcha?', 'danger');
-    else alert('Error de red al pagar. ¿Está el servidor en marcha?');
+    notifyErr('Error de red al pagar. ¿Está el servidor en marcha?');
     return;
   }
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     const msg = data.message || (`No se pudo registrar el pago (${r.status}). Reinicia la web e intenta de nuevo.`);
-    if (typeof opsToast === 'function') opsToast(msg, 'danger');
-    else alert(msg);
+    notifyErr(msg);
     return;
   }
   closePagoModal();
-  if (typeof opsToast === 'function') opsToast('Pago registrado. El vendedor podrá convertir y enviar.', 'ok');
-  else alert('Pago registrado. El vendedor podrá convertir y enviar el pedido.');
-  loadMisPedidosPage();
+  const offline = pagoModalState.offline
+    || String(data.request?.channel_name || '').trim().toLowerCase() === 'offline'
+    || Number(data.request?.channel_id) === 2;
+  if (staff) {
+    notifyOk('Pago registrado por el vendedor.');
+    if (typeof loadSolicitudes === 'function') loadSolicitudes();
+  } else {
+    notifyOk(offline
+      ? 'Pago registrado. El vendedor podrá convertir la venta presencial.'
+      : 'Pago registrado. El vendedor podrá convertir y enviar.');
+    loadMisPedidosPage();
+  }
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
 }
 
 async function cancelarMiSolicitud(id) {
-  if (!confirm('¿Cancelar esta solicitud?')) return;
+  if (typeof opsConfirm !== 'function') {
+    notifyErr('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).');
+    return;
+  }
+  const ok = await opsConfirm({
+    title: 'Cancelar solicitud',
+    message: '¿Cancelar esta solicitud? Esta acción no se puede deshacer.',
+    confirmLabel: 'Cancelar pedido',
+    danger: true,
+  });
+  if (!ok) return;
   const r = await fetch(`${API}/solicitudes/${id}/cancelar`, { method: 'POST', credentials: 'same-origin' });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  notifyOk('Solicitud cancelada.');
   loadMisPedidosPage();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
 }
+
+window.openPagoModal = openPagoModal;
+window.closePagoModal = closePagoModal;
+window.confirmClientePagar = confirmClientePagar;

@@ -1,6 +1,7 @@
 """Servicios tienda — modelo y procesos tipo Shopify."""
 from __future__ import annotations
 
+import hashlib
 import re
 import threading
 import uuid
@@ -9,6 +10,22 @@ from typing import Any
 
 from shared.audit import log_audit
 from shared.mongo import get_db
+from shared.warehouse import DEFAULT_WAREHOUSE_NAME, ensure_default_warehouse, warehouse_summary
+
+_CATEGORY_WEIGHT_KG: dict[str, tuple[float, float]] = {
+    "Baby Food": (0.12, 0.45),
+    "Beverages": (0.35, 2.0),
+    "Cereal": (0.25, 1.5),
+    "Clothes": (0.15, 0.9),
+    "Cosmetics": (0.05, 0.35),
+    "Fruits": (0.08, 1.2),
+    "Household": (0.2, 4.5),
+    "Meat": (0.25, 1.8),
+    "Office Supplies": (0.05, 2.5),
+    "Personal Care": (0.08, 0.6),
+    "Snacks": (0.05, 0.8),
+    "Vegetables": (0.1, 1.5),
+}
 
 _sync_lock = threading.Lock()
 
@@ -64,6 +81,10 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     db = get_db()
     counts: dict[str, int] = {}
 
+    from shared.retail_pricing import patch_dim_producto_prices
+
+    counts["dim_producto_prices_patched"] = patch_dim_producto_prices(db)
+
     # Conservar stock previo por product_id antes de regenerar catálogo
     previous_stock: dict[int, int] = {}
     if not reset_stock:
@@ -84,6 +105,7 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
         }
     )
     counts["shop_settings"] = 1
+    ensure_default_warehouse()
 
     # Conservar proveedores custom; solo asegurar el proveedor por defecto
     if db["vendors"].count_documents({}) == 0:
@@ -175,7 +197,7 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
             media.append({"media_id": mid, "product_id": pid, "src": p["image_url"], "alt": p.get("name"), "position": 1})
             mid += 1
         inv_items.append({"inventory_item_id": iid, "variant_id": vid, "sku": f"GT-{pid:05d}", "tracked": True})
-        inv_levels.append({"level_id": lid, "inventory_item_id": iid, "location": "Main Warehouse", "available": qty, "committed": 0})
+        inv_levels.append({"level_id": lid, "inventory_item_id": iid, "location": DEFAULT_WAREHOUSE_NAME, "available": qty, "committed": 0})
         vid += 1
         iid += 1
         lid += 1
@@ -278,6 +300,132 @@ def list_collections_public() -> list[dict[str, Any]]:
     return rows
 
 
+def _derive_product_specs(dim: dict[str, Any], category_name: str, category_desc: str) -> dict[str, Any]:
+    from paquetes.tablero.catalogo_modelo import CATEGORY_DESC
+
+    pid = int(dim.get("product_id") or 0)
+    line = int(dim.get("line") or 1)
+    stored_weight = dim.get("weight_kg")
+    if stored_weight not in (None, ""):
+        weight_kg = round(float(stored_weight), 2)
+    else:
+        lo, hi = _CATEGORY_WEIGHT_KG.get(category_name, (0.15, 3.0))
+        h = hashlib.md5(f"{pid}:{line}".encode()).hexdigest()
+        frac = int(h[:8], 16) / 0xFFFFFFFF
+        weight_kg = round(lo + (hi - lo) * frac, 2)
+
+    main_function = (dim.get("main_function") or "").strip()
+    if not main_function:
+        desc = category_desc or CATEGORY_DESC.get(category_name, category_name)
+        main_function = f"{desc}. Variante de línea {line} para venta y distribución B2B."
+
+    description = (dim.get("description") or "").strip()
+
+    return {
+        "weight_kg": weight_kg,
+        "main_function": main_function,
+        "description": description or None,
+    }
+
+
+def _enrich_shop_products(db, products: list[dict[str, Any]]) -> None:
+    """Añade variante, imagen, proveedor y ficha comercial al listado de vitrina."""
+    if not products:
+        return
+    pids = [int(p["product_id"]) for p in products]
+    variants = {
+        int(v["product_id"]): v
+        for v in db["product_variants"].find({"product_id": {"$in": pids}}, {"_id": 0})
+    }
+    media = {
+        int(m["product_id"]): m
+        for m in db["product_media"].find({"product_id": {"$in": pids}}, {"_id": 0, "src": 1, "alt": 1})
+    }
+    dims = {
+        int(d["product_id"]): d
+        for d in db["dim_producto"].find({"product_id": {"$in": pids}}, {"_id": 0})
+    }
+    cat_ids = {int(d["category_id"]) for d in dims.values() if d.get("category_id") is not None}
+    cats: dict[int, dict[str, Any]] = {}
+    if cat_ids:
+        cats = {
+            int(c["category_id"]): c
+            for c in db["dim_categoria"].find(
+                {"category_id": {"$in": list(cat_ids)}},
+                {"_id": 0, "category_id": 1, "name": 1, "description": 1},
+            )
+        }
+    vendor_ids = {int(p["vendor_id"]) for p in products if p.get("vendor_id") is not None}
+    vendors: dict[int, dict[str, Any]] = {}
+    if vendor_ids:
+        vendors = {
+            int(v["vendor_id"]): v
+            for v in db["vendors"].find(
+                {"vendor_id": {"$in": list(vendor_ids)}},
+                {"_id": 0, "vendor_id": 1, "name": 1, "country": 1, "region_name": 1},
+            )
+        }
+    cp_rows = list(db["collection_products"].find({"product_id": {"$in": pids}}, {"product_id": 1, "collection_id": 1}))
+    col_ids = {int(r["collection_id"]) for r in cp_rows if r.get("collection_id") is not None}
+    collections: dict[int, dict[str, Any]] = {}
+    if col_ids:
+        collections = {
+            int(c["collection_id"]): c
+            for c in db["collections"].find(
+                {"collection_id": {"$in": list(col_ids)}},
+                {"_id": 0, "collection_id": 1, "title": 1},
+            )
+        }
+    cp_map = {int(r["product_id"]): int(r["collection_id"]) for r in cp_rows if r.get("collection_id") is not None}
+    wh_name = DEFAULT_WAREHOUSE_NAME
+    try:
+        wh_name = warehouse_summary()["name"]
+    except Exception:
+        pass
+
+    for p in products:
+        pid = int(p["product_id"])
+        dim = dims.get(pid, {})
+        if not dim.get("product_id"):
+            dim = {**dim, "product_id": pid, "name": dim.get("name") or p.get("title")}
+        variant = variants.get(pid)
+        p["variant"] = variant
+        image = media.get(pid)
+        if not image and dim.get("image_url"):
+            image = {"src": dim["image_url"], "alt": dim.get("name")}
+        p["image"] = image
+
+        cat = cats.get(int(dim.get("category_id") or 0), {})
+        category_name = cat.get("name") or p.get("product_type") or "General"
+        category_desc = cat.get("description") or ""
+        specs = _derive_product_specs(dim, category_name, category_desc)
+
+        vendor = vendors.get(int(p.get("vendor_id") or 0), {})
+        vendor_geo = " · ".join(x for x in [vendor.get("region_name"), vendor.get("country")] if x)
+        col_id = cp_map.get(pid)
+        collection = collections.get(col_id) if col_id else None
+
+        margin_pct = dim.get("margin_pct")
+        if margin_pct is None and variant:
+            price = float(variant.get("price") or 0)
+            cost = float(variant.get("cost") or 0)
+            if price > 0:
+                margin_pct = round((price - cost) / price * 100, 1)
+
+        p["name"] = p.get("title") or dim.get("name")
+        p["category_name"] = category_name
+        p["category_description"] = category_desc
+        p["collection_title"] = (collection or {}).get("title")
+        p["vendor_name"] = vendor.get("name") or "GLOBTRADE Supply"
+        p["vendor_location"] = vendor_geo or None
+        p["warehouse"] = wh_name
+        p["line"] = dim.get("line")
+        p["margin_pct"] = margin_pct
+        p["unit_price"] = float((variant or {}).get("price") or dim.get("unit_price") or 0)
+        p["unit_cost"] = float((variant or {}).get("cost") or dim.get("unit_cost") or 0)
+        p.update(specs)
+
+
 def list_products_shop(*, collection_id: int | None = None, limit: int = 48, offset: int = 0) -> dict[str, Any]:
     ensure_shop_catalog()
     db = get_db()
@@ -293,21 +441,39 @@ def list_products_shop(*, collection_id: int | None = None, limit: int = 48, off
     col = db["products"]
     total = col.count_documents(query)
     products = list(col.find(query, {"_id": 0}).sort("product_id", 1).skip(offset).limit(limit))
-    for p in products:
-        pid = p["product_id"]
-        variant = db["product_variants"].find_one({"product_id": pid}, {"_id": 0})
-        p["variant"] = variant
-        p["image"] = db["product_media"].find_one({"product_id": pid}, {"_id": 0, "src": 1, "alt": 1})
-        if not p.get("image") and db["dim_producto"].find_one({"product_id": pid}, {"image_url": 1}):
-            dim = db["dim_producto"].find_one({"product_id": pid}, {"image_url": 1, "name": 1})
-            if dim and dim.get("image_url"):
-                p["image"] = {"src": dim["image_url"], "alt": dim.get("name")}
+    _enrich_shop_products(db, products)
     return {"total": total, "products": products}
+
+
+def get_product_shop(product_id: int) -> dict[str, Any] | None:
+    """Ficha comercial de un producto para la vitrina."""
+    ensure_shop_catalog()
+    db = get_db()
+    product = db["products"].find_one({"product_id": int(product_id)}, {"_id": 0})
+    if not product:
+        return None
+    _enrich_shop_products(db, [product])
+    return product
+
+
+def quote_shipping(data: dict[str, Any]) -> dict[str, Any]:
+    from shared.shipping_rates import shipping_quote
+
+    db = get_db()
+    country_id = int(data.get("country_id") or 0)
+    if country_id < 1:
+        raise ValueError("invalid_country")
+    lines = data.get("lines") or []
+    if not lines:
+        raise ValueError("lines_required")
+    quote = shipping_quote(db, country_id=country_id, lines=lines)
+    return {"status": "ok", **quote}
 
 
 def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
     """Checkout estilo Shopify → también crea purchase_request legacy."""
     from paquetes.ventas import services as ventas
+    from shared.shipping_rates import is_online_channel, shipping_quote
 
     db = get_db()
     lines_in = data.get("lines") or []
@@ -321,7 +487,12 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
     pr_lines = []
     for item in lines_in:
         vid = int(item.get("variant_id") or item.get("product_id") or 0)
-        qty = int(item.get("quantity") or 1)
+        try:
+            qty = int(item.get("quantity") or 0)
+        except (TypeError, ValueError):
+            qty = 0
+        if qty < 1:
+            raise ValueError("invalid_quantity")
         variant = db["product_variants"].find_one({"variant_id": vid}) or db["product_variants"].find_one({"product_id": vid})
         if not variant:
             raise ValueError("invalid_variant")
@@ -346,7 +517,20 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
     discount_amount = 0.0
     if discount_code:
         discount_amount, _coupon = _apply_coupon(db, discount_code, subtotal)
-    total = max(subtotal - discount_amount, 0.0)
+
+    country_id = int(data.get("country_id") or 1)
+    channel_id = int(data.get("channel_id") or 1)
+    shipping_cost = 0.0
+    shipping_destination = (data.get("shipping_destination") or data.get("destination") or "").strip() or None
+    shipping_region = None
+    if is_online_channel(db, channel_id):
+        if not shipping_destination:
+            raise ValueError("destination_required")
+        quote = shipping_quote(db, country_id=country_id, lines=lines_in)
+        shipping_cost = float(quote.get("shipping_cost") or 0)
+        shipping_region = quote.get("region_name")
+
+    total = max(subtotal - discount_amount + shipping_cost, 0.0)
 
     email = (data.get("email") or data.get("client_email") or "").strip()
     name = (data.get("name") or data.get("client_name") or "Cliente").strip()
@@ -356,6 +540,7 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
             "email": email,
             "status": "open",
             "subtotal": round(subtotal, 2),
+            "shipping_cost": round(shipping_cost, 2),
             "discount_code": discount_code or None,
             "discount_amount": round(discount_amount, 2),
             "total_price": round(total, 2),
@@ -377,8 +562,6 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
     if discount_code:
         db["discount_codes"].update_one({"code": discount_code}, {"$inc": {"usage_count": 1}})
 
-    country_id = int(data.get("country_id") or 1)
-    channel_id = int(data.get("channel_id") or 1)
     req = ventas.create_request(
         {
             "client_name": name,
@@ -391,6 +574,9 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
             "discount_code": discount_code,
             "discount_amount": discount_amount,
             "subtotal": subtotal,
+            "shipping_cost": shipping_cost,
+            "shipping_destination": shipping_destination,
+            "shipping_region": shipping_region,
             "total": total,
             "stock_lines": stock_lines,
         }
@@ -399,6 +585,7 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "checkout_id": checkout_id,
         "subtotal": round(subtotal, 2),
+        "shipping_cost": round(shipping_cost, 2),
         "discount_amount": round(discount_amount, 2),
         "total_price": round(total, 2),
         "request": req,

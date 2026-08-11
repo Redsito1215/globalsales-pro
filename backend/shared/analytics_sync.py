@@ -17,82 +17,121 @@ def _next_venta_id(db) -> int:
     return int(row["venta_id"]) + 1 if row and row.get("venta_id") is not None else 1
 
 
-def _ensure_tiempo(db, fecha_id: str | None) -> int | None:
+def _ensure_tiempo(db, fecha_id: str | None, cache: dict | None = None) -> int | None:
     if not fecha_id:
         return None
-    existing = db["dim_tiempo"].find_one({"fecha_id": fecha_id}, {"tiempo_id": 1, "_id": 0})
+    key = str(fecha_id)[:10]
+    if cache is not None and ("t", key) in cache:
+        return cache[("t", key)]
+    existing = db["dim_tiempo"].find_one({"fecha_id": key}, {"tiempo_id": 1, "_id": 0})
     if existing:
-        return int(existing["tiempo_id"])
-    try:
-        dt = datetime.fromisoformat(str(fecha_id)[:10])
-    except ValueError:
-        return None
-    last = db["dim_tiempo"].find_one({}, {"tiempo_id": 1, "_id": 0}, sort=[("tiempo_id", -1)])
-    tid = int(last["tiempo_id"]) + 1 if last and last.get("tiempo_id") is not None else 1
-    q = (dt.month - 1) // 3 + 1
-    db["dim_tiempo"].insert_one(
-        {
-            "tiempo_id": tid,
-            "fecha_id": fecha_id[:10],
-            "anio": dt.year,
-            "mes": dt.month,
-            "trimestre": q,
-        }
-    )
-    return tid
+        val = int(existing["tiempo_id"])
+    else:
+        try:
+            dt = datetime.fromisoformat(key)
+        except ValueError:
+            val = None
+        else:
+            last = db["dim_tiempo"].find_one({}, {"tiempo_id": 1, "_id": 0}, sort=[("tiempo_id", -1)])
+            tid = int(last["tiempo_id"]) + 1 if last and last.get("tiempo_id") is not None else 1
+            q = (dt.month - 1) // 3 + 1
+            db["dim_tiempo"].insert_one(
+                {
+                    "tiempo_id": tid,
+                    "fecha_id": key,
+                    "anio": dt.year,
+                    "mes": dt.month,
+                    "trimestre": q,
+                }
+            )
+            val = tid
+    if cache is not None:
+        cache[("t", key)] = val
+    return val
 
 
-def _lookup_region_id(db, name: str | None) -> int | None:
+def _lookup_region_id(db, name: str | None, cache: dict | None = None) -> int | None:
     if not name:
         return None
+    if cache is not None and ("r", name) in cache:
+        return cache[("r", name)]
     doc = db["dim_region"].find_one({"name": name}, {"region_id": 1, "_id": 0})
-    return int(doc["region_id"]) if doc else None
+    val = int(doc["region_id"]) if doc else None
+    if cache is not None:
+        cache[("r", name)] = val
+    return val
 
 
-def _lookup_country_id(db, name: str | None) -> int | None:
+def _lookup_country_id(db, name: str | None, cache: dict | None = None) -> int | None:
     if not name:
         return None
+    if cache is not None and ("c", name) in cache:
+        return cache[("c", name)]
     doc = db["dim_pais"].find_one({"name": name}, {"country_id": 1, "_id": 0})
-    return int(doc["country_id"]) if doc else None
+    val = int(doc["country_id"]) if doc else None
+    if cache is not None:
+        cache[("c", name)] = val
+    return val
 
 
-def _lookup_category_id(db, name: str | None) -> int | None:
+def _lookup_category_id(db, name: str | None, cache: dict | None = None) -> int | None:
     if not name:
         return None
+    if cache is not None and ("cat", name) in cache:
+        return cache[("cat", name)]
     doc = db["dim_categoria"].find_one({"name": name}, {"category_id": 1, "_id": 0})
-    return int(doc["category_id"]) if doc else None
+    val = int(doc["category_id"]) if doc else None
+    if cache is not None:
+        cache[("cat", name)] = val
+    return val
 
 
-def _lookup_channel_id(db, name: str | None) -> int | None:
+def _lookup_channel_id(db, name: str | None, cache: dict | None = None) -> int | None:
     if not name:
         return None
+    if cache is not None and ("ch", name) in cache:
+        return cache[("ch", name)]
     doc = db["dim_canal"].find_one({"name": name}, {"channel_id": 1, "_id": 0})
-    return int(doc["channel_id"]) if doc else None
+    val = int(doc["channel_id"]) if doc else None
+    if cache is not None:
+        cache[("ch", name)] = val
+    return val
 
 
-def _lookup_priority_id(db, code_or_name: str | None) -> int | None:
+def _lookup_priority_id(db, code_or_name: str | None, cache: dict | None = None) -> int | None:
     if not code_or_name:
         return None
+    if cache is not None and ("p", code_or_name) in cache:
+        return cache[("p", code_or_name)]
     doc = db["dim_prioridad"].find_one(
         {"$or": [{"code": code_or_name}, {"name": code_or_name}]},
         {"priority_id": 1, "_id": 0},
     )
-    return int(doc["priority_id"]) if doc else None
+    val = int(doc["priority_id"]) if doc else None
+    if cache is not None:
+        cache[("p", code_or_name)] = val
+    return val
 
 
-def _lookup_client_id(db, country: str | None, channel: str | None) -> int | None:
-    c_id = _lookup_country_id(db, country)
-    ch_id = _lookup_channel_id(db, channel)
+def _lookup_client_id(db, country: str | None, channel: str | None, cache: dict | None = None) -> int | None:
+    c_id = _lookup_country_id(db, country, cache)
+    ch_id = _lookup_channel_id(db, channel, cache)
     if c_id is None or ch_id is None:
         return None
+    key = ("cl", c_id, ch_id)
+    if cache is not None and key in cache:
+        return cache[key]
     doc = db["dim_cliente"].find_one(
         {"country_id": c_id, "channel_id": ch_id},
         {"client_id": 1, "_id": 0},
     )
-    return int(doc["client_id"]) if doc else None
+    val = int(doc["client_id"]) if doc else None
+    if cache is not None:
+        cache[key] = val
+    return val
 
 
-def _row_to_fact(db, row: dict[str, Any], venta_id: int) -> dict[str, Any]:
+def _row_to_fact(db, row: dict[str, Any], venta_id: int, cache: dict | None = None) -> dict[str, Any]:
     fecha_raw = row.get("order_date")
     fecha_id = str(fecha_raw)[:10] if fecha_raw else None
     u = int(row.get("units_sold") or 0)
@@ -104,14 +143,14 @@ def _row_to_fact(db, row: dict[str, Any], venta_id: int) -> dict[str, Any]:
     return {
         "venta_id": venta_id,
         "order_id": str(row.get("order_id")),
-        "tiempo_id": _ensure_tiempo(db, fecha_id),
+        "tiempo_id": _ensure_tiempo(db, fecha_id, cache),
         "fecha_id": fecha_id,
-        "region_id": _lookup_region_id(db, row.get("region")),
-        "country_id": _lookup_country_id(db, row.get("country")),
-        "category_id": _lookup_category_id(db, row.get("item_type")),
-        "channel_id": _lookup_channel_id(db, row.get("sales_channel")),
-        "priority_id": _lookup_priority_id(db, row.get("order_priority")),
-        "client_id": _lookup_client_id(db, row.get("country"), row.get("sales_channel")),
+        "region_id": _lookup_region_id(db, row.get("region"), cache),
+        "country_id": _lookup_country_id(db, row.get("country"), cache),
+        "category_id": _lookup_category_id(db, row.get("item_type"), cache),
+        "channel_id": _lookup_channel_id(db, row.get("sales_channel"), cache),
+        "priority_id": _lookup_priority_id(db, row.get("order_priority"), cache),
+        "client_id": _lookup_client_id(db, row.get("country"), row.get("sales_channel"), cache),
         "units_sold": u,
         "unit_price": up,
         "unit_cost": uc,
@@ -124,8 +163,8 @@ def _row_to_fact(db, row: dict[str, Any], venta_id: int) -> dict[str, Any]:
     }
 
 
-def sync_order_to_fact(order_id: str | int) -> dict[str, Any]:
-    """Append hechos de un order_id desde sales_records → fact_ventas."""
+def sync_order_to_fact(order_id: str | int, *, force: bool = False) -> dict[str, Any]:
+    """Append (o re-sincroniza con force) hechos de un order_id desde sales_records → fact_ventas."""
     db = get_db()
     oid = str(order_id)
     rows = list(db["sales_records"].find({"order_id": oid}, {"_id": 0}))
@@ -138,21 +177,28 @@ def sync_order_to_fact(order_id: str | int) -> dict[str, Any]:
     if not rows:
         raise ValueError("order_not_in_landing")
 
-    # Idempotencia: si ya hay hechos, no duplicar
-    existing = db["fact_ventas"].count_documents({"order_id": oid}, limit=1)
-    if not existing:
+    if force:
+        db["fact_ventas"].delete_many({"order_id": oid})
         try:
-            existing = db["fact_ventas"].count_documents({"order_id": int(oid)}, limit=1)
+            db["fact_ventas"].delete_many({"order_id": int(oid)})
         except (TypeError, ValueError):
-            existing = 0
-    if existing:
-        return {
-            "order_id": oid,
-            "synced": 0,
-            "skipped": True,
-            "analytics_stale": False,
-            "message": "Ya estaba en fact_ventas.",
-        }
+            pass
+    else:
+        # Idempotencia: si ya hay hechos, no duplicar
+        existing = db["fact_ventas"].count_documents({"order_id": oid}, limit=1)
+        if not existing:
+            try:
+                existing = db["fact_ventas"].count_documents({"order_id": int(oid)}, limit=1)
+            except (TypeError, ValueError):
+                existing = 0
+        if existing:
+            return {
+                "order_id": oid,
+                "synced": 0,
+                "skipped": True,
+                "analytics_stale": False,
+                "message": "Ya estaba en fact_ventas.",
+            }
 
     next_id = _next_venta_id(db)
     hechos = []
@@ -177,6 +223,54 @@ def sync_order_to_fact(order_id: str | int) -> dict[str, Any]:
         "fact_ventas_count": db["fact_ventas"].estimated_document_count(),
         "message": f"Sincronizados {len(hechos)} hecho(s) a fact_ventas.",
     }
+
+
+def sync_orders_bulk(order_ids, *, limit: int | None = None) -> dict[str, Any]:
+    """Sincroniza una lista de order_ids (landing) → fact_ventas con caché de dimensiones."""
+    db = get_db()
+    cache: dict = {}
+    next_id = _next_venta_id(db)
+    synced = 0
+    facts_inserted = 0
+    done: set[str] = set()
+    for raw in order_ids:
+        if limit and synced >= limit:
+            break
+        oid = str(raw)
+        if oid in done:
+            continue
+        done.add(oid)
+        if db["fact_ventas"].count_documents({"order_id": oid}, limit=1):
+            continue
+        try:
+            if db["fact_ventas"].count_documents({"order_id": int(oid)}, limit=1):
+                continue
+        except (TypeError, ValueError):
+            pass
+        rows = list(db["sales_records"].find({"order_id": oid}, {"_id": 0}))
+        if not rows:
+            try:
+                rows = list(db["sales_records"].find({"order_id": int(oid)}, {"_id": 0}))
+            except (TypeError, ValueError):
+                pass
+        if not rows:
+            continue
+        hechos = [_row_to_fact(db, r, next_id + i, cache) for i, r in enumerate(rows)]
+        if hechos:
+            db["fact_ventas"].insert_many(hechos)
+            next_id += len(hechos)
+            facts_inserted += len(hechos)
+            synced += 1
+
+    if facts_inserted:
+        try:
+            from paquetes.tablero.queries import clear_query_cache
+
+            clear_query_cache()
+        except Exception:
+            pass
+        set_strategic_lag(False)
+    return {"synced_orders": synced, "facts_inserted": facts_inserted}
 
 
 def set_strategic_lag(lagging: bool, *, detail: str | None = None) -> None:

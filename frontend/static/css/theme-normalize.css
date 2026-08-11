@@ -8,6 +8,7 @@ html.theme-light {
   --bg: #f3f5f4;
   --surface: #ffffff;
   --surface2: #eef1f0;
+  --surface-2: var(--surface2);
   --border: #dce3e0;
   --text: #14201c;
   --muted: #5f6f68;
@@ -52,6 +53,7 @@ html.theme-dark {
   --bg: #0c1210;
   --surface: #151c19;
   --surface2: #1e2824;
+  --surface-2: var(--surface2);
   --border: #2a3832;
   --text: #e8efeb;
   --muted: #9aaba3;
@@ -342,4 +344,133 @@ tr:hover td {
 
 #db-status {
   color: var(--accent) !important;
+}
+
+/* Banners informativos — respetan claro/oscuro */
+.compras-wh-banner,
+.dash-lag-banner,
+.load-hint,
+.reportes-fallback-banner {
+  color: var(--text) !important;
+}
+
+.compras-wh-banner strong,
+.dash-lag-banner p,
+.reportes-fallback-banner {
+  color: var(--text) !important;
+}
+
+.compras-wh-banner span {
+  color: var(--muted) !important;
+}
+
+.table-pager,
+.modal-checklist {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* Utilidades responsive (sustituyen inline styles) */
+.filter-input--narrow {
+  max-width: 5.5rem;
+}
+
+.filter-group--grow {
+  flex: 2 1 240px;
+  max-width: 360px;
+}
+
+.filters--flat {
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.panel-form {
+  margin-bottom: 0.875rem;
+}
+
+.panel-form-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: 0.65rem;
+  color: var(--text);
+}
+
+.table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.table-toolbar-meta {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.filters--flat-spaced {
+  margin-top: 0.5rem !important;
+}
+
+.vendor-geo-lead {
+  margin: 0 0 0.5rem !important;
+}
+
+.vendor-geo-summary {
+  margin-top: 0.5rem !important;
+}
+
+.vendor-geo-picker {
+  margin-top: 0.75rem;
+}
+
+.chart-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.chart-header-row .chart-title {
+  margin: 0;
+}
+
+.table-scroll--short {
+  max-height: 11.25rem;
+}
+
+@media (max-width: 640px) {
+  .table-toolbar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .filter-group--action {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .filter-group--action .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .table-pager {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .table-pager .btn {
+    width: 100%;
+  }
 }

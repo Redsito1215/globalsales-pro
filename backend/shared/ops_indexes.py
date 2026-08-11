@@ -36,6 +36,7 @@ def ensure_ops_indexes() -> dict[str, int]:
         ("sales_records", [("country", ASCENDING), ("order_date", DESCENDING)], {"name": "sales_country_date"}),
         ("inventory_scrapped", [("request_id", ASCENDING)], {"name": "scrap_request"}),
         ("audit_log", [("at", DESCENDING)], {"name": "audit_at"}),
+        ("audit_log", [("role", ASCENDING), ("at", DESCENDING)], {"name": "audit_role_at"}),
         # Estratégico (hechos)
         ("fact_ventas", [("fecha_id", DESCENDING)], {"name": "fact_fecha"}),
         ("fact_ventas", [("order_id", ASCENDING)], {"name": "fact_order"}),

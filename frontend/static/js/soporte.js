@@ -1,5 +1,90 @@
 /* Chat de soporte + bandeja de hilos para staff */
 let soporteThread = null;
+let soporteLastMessageId = 0;
+
+function soporteBubbleHtml(m) {
+  const text = String(m.text || '').replace(/</g, '&lt;');
+  return `
+      <div class="chat-bubble ${m.staff ? 'chat-bubble--staff' : 'chat-bubble--user'}">
+        <div class="chat-meta">${m.author_name || m.author_email}${m.staff ? ' · Soporte' : ''}</div>
+        <div class="chat-body">${text}</div>
+        <div class="chat-time">${(m.created_at || '').slice(0, 16).replace('T', ' ')}</div>
+      </div>`;
+}
+
+function soporteWordCount(text) {
+  return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+function updateSoporteWordHint() {
+  const input = document.getElementById('soporte-input');
+  const hint = document.getElementById('soporte-word-hint');
+  if (!input || !hint) return;
+  const n = soporteWordCount(input.value);
+  hint.textContent = `${n}/100 palabras`;
+  hint.classList.toggle('chat-word-hint--warn', n > 100);
+}
+
+function soporteActiveThreadEmail() {
+  const isStaff = isSoporteStaff();
+  if (isStaff) {
+    return (document.getElementById('soporte-thread-email')?.value || soporteThread || '').trim().toLowerCase();
+  }
+  return (window._authUser?.email || '').toLowerCase();
+}
+
+function setSoporteLastMessageIdFromList(msgs) {
+  if (!msgs?.length) {
+    soporteLastMessageId = 0;
+    return;
+  }
+  soporteLastMessageId = Math.max(...msgs.map(m => Number(m.message_id) || 0));
+}
+
+function appendSoporteMessages(msgs, opts) {
+  const o = opts || {};
+  const box = document.getElementById('soporte-messages');
+  if (!box || !msgs?.length) return;
+  const wasEmpty = !!box.querySelector('.ops-empty, .catalog-empty');
+  if (wasEmpty) {
+    box.innerHTML = msgs.map(soporteBubbleHtml).join('');
+  } else {
+    box.insertAdjacentHTML('beforeend', msgs.map(soporteBubbleHtml).join(''));
+  }
+  box.scrollTop = box.scrollHeight;
+  soporteLastMessageId = Math.max(soporteLastMessageId, ...msgs.map(m => Number(m.message_id) || 0));
+
+  if (o.toast && typeof opsToast === 'function') {
+    const last = msgs[msgs.length - 1];
+    const who = last.staff ? 'Soporte' : (last.author_name || 'Cliente');
+    opsToast(`${who}: ${String(last.text || '').slice(0, 140)}`, last.staff ? 'info' : 'ok', { ttl: 7000 });
+  }
+}
+
+async function pollSoporteMessages() {
+  if (!window._authUser) return;
+  const thread = soporteActiveThreadEmail();
+  if (!thread) return;
+  if (isSoporteStaff() && !thread) return;
+
+  const q = new URLSearchParams({ thread, after: String(soporteLastMessageId || 0) });
+  const r = await fetch(`${API}/soporte/mensajes?${q}`, { credentials: 'same-origin' });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) return;
+
+  const msgs = data.messages || [];
+  if (msgs.length) {
+    const typing = document.activeElement?.id === 'soporte-input';
+    appendSoporteMessages(msgs, { toast: !typing });
+    if (isSoporteStaff() && typeof loadSoporteInbox === 'function') {
+      await loadSoporteInbox();
+    }
+  } else if (data.latest_id && data.latest_id > soporteLastMessageId) {
+    soporteLastMessageId = Number(data.latest_id);
+  }
+}
+
+window.pollSoporteMessages = pollSoporteMessages;
 
 function isSoporteStaff() {
   return hasPermission('soporte.inbox') || window._authUser?.role === 'administrador';
@@ -61,15 +146,12 @@ async function loadSoportePage() {
     box.innerHTML = typeof opsEmpty === 'function'
       ? opsEmpty({ title: 'Sin mensajes aún', hint: 'Escribe abajo para iniciar la conversación.' })
       : '<p class="catalog-empty">Sin mensajes aún. Escribe abajo para iniciar la conversación.</p>';
+    soporteLastMessageId = Number(data.latest_id) || 0;
   } else {
-    box.innerHTML = msgs.map(m => `
-      <div class="chat-bubble ${m.staff ? 'chat-bubble--staff' : 'chat-bubble--user'}">
-        <div class="chat-meta">${m.author_name || m.author_email}${m.staff ? ' · Soporte' : ''}</div>
-        <div>${m.text.replace(/</g, '&lt;')}</div>
-        <div class="chat-time">${(m.created_at || '').slice(0, 16).replace('T', ' ')}</div>
-      </div>`).join('');
+    box.innerHTML = msgs.map(soporteBubbleHtml).join('');
     box.scrollTop = box.scrollHeight;
   }
+  setSoporteLastMessageIdFromList(msgs);
 }
 
 async function loadSoporteInbox() {
@@ -108,14 +190,17 @@ async function sendSoporteMessage() {
   const input = document.getElementById('soporte-input');
   const text = (input?.value || '').trim();
   if (!text) return;
+  if (soporteWordCount(text) > 100) {
+    notifyWarn('El mensaje no puede superar 100 palabras.');
+    return;
+  }
   const isStaff = isSoporteStaff();
   const body = { text };
   if (isStaff) {
     body.as_staff = true;
     body.thread_email = (document.getElementById('soporte-thread-email')?.value || soporteThread || '').trim().toLowerCase();
     if (!body.thread_email) {
-      if (typeof opsToast === 'function') opsToast('Indica el correo del cliente.', 'warn');
-      else alert('Indica el correo del cliente.');
+      notifyWarn('Indica el correo del cliente.');
       return;
     }
   }
@@ -127,13 +212,22 @@ async function sendSoporteMessage() {
   });
   const data = await r.json();
   if (!r.ok) {
-    if (typeof opsToast === 'function') opsToast(data.message || 'Error', 'danger');
-    else alert(data.message || 'Error');
+    notifyErr(data.message || 'Error');
     return;
   }
   if (input) input.value = '';
+  updateSoporteWordHint();
+  notifyOk('Mensaje enviado.');
   loadSoportePage();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
 }
 
 window.openSoporteThread = openSoporteThread;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('soporte-input');
+  if (input) {
+    input.addEventListener('input', updateSoporteWordHint);
+    updateSoporteWordHint();
+  }
+});

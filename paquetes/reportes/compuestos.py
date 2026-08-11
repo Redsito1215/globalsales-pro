@@ -111,7 +111,7 @@ def _cat_lookup_pipe(local: str = "category_id") -> list[dict[str, Any]]:
 
 def rc01(*, limit: int = 200) -> dict[str, Any]:
     if not strategic_ready():
-        return {"rows": [], "total": 0, "message": "fact_ventas vacío — ejecuta Construir modelo."}
+        return {"rows": [], "total": 0, "message": "fact_ventas vacío — ejecuta Construir modelo o el DAG Airflow globtrade_strategic_etl."}
     pipe = [
         {
             "$group": {
@@ -150,7 +150,7 @@ def rc01(*, limit: int = 200) -> dict[str, Any]:
 
 def rc02(*, limit: int = 10) -> dict[str, Any]:
     if not strategic_ready():
-        return {"rows": [], "total": 0, "message": "fact_ventas vacío."}
+        return {"rows": [], "total": 0, "message": "fact_ventas vacío — Construir modelo o DAG Airflow globtrade_strategic_etl."}
     base = [
         {
             "$group": {
@@ -399,7 +399,7 @@ def rc06(*, limit: int = 50) -> dict[str, Any]:
 
 def rc07(*, limit: int = 200) -> dict[str, Any]:
     if not strategic_ready():
-        return {"rows": [], "total": 0, "message": "fact_ventas vacío."}
+        return {"rows": [], "total": 0, "message": "fact_ventas vacío — Construir modelo o DAG Airflow globtrade_strategic_etl."}
     pipe = [
         {
             "$group": {
@@ -469,7 +469,7 @@ def rc08(*, limit: int = 20) -> dict[str, Any]:
         {
             "indicador": "fact_ventas (estratégico)",
             "valor": f"{fact:,}",
-            "estado": "OK" if ready else "Vacío — Construir modelo",
+            "estado": "OK" if ready else "Vacío — Construir modelo o DAG Airflow",
         },
         {
             "indicador": "Alineación landing ↔ fact",
@@ -477,14 +477,19 @@ def rc08(*, limit: int = 20) -> dict[str, Any]:
             "estado": "Desfasado" if lag or (landing and not fact) else "Alineado / aceptable",
         },
         {
-            "indicador": "Último build_model / ELT",
+            "indicador": "Último build_model / ELT / Airflow",
             "valor": last_build or "—",
-            "estado": "Registrado" if last_build else "Sin auditoría de build",
+            "estado": "Registrado" if last_build else "Sin auditoría de build (el DAG Airflow también puede poblar la capa)",
+        },
+        {
+            "indicador": "Orquestación Airflow",
+            "valor": "globtrade_strategic_etl",
+            "estado": "UI http://localhost:8080 — rebuild diario (truncate+reload)",
         },
         {
             "indicador": "strategic_ready",
             "valor": str(ready),
-            "estado": "Listo para Tablero" if ready else "Bloqueado",
+            "estado": "Listo para Tablero / RC" if ready else "Bloqueado",
         },
     ]
     return {"rows": rows[:limit], "total": len(rows)}

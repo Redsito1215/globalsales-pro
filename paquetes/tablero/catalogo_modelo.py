@@ -6,6 +6,7 @@ from typing import Any
 
 from paquetes.tablero import catalogo_nombres as nombres
 from shared.mongo import get_db, sales_collection
+from shared.retail_pricing import retail_unit_price
 
 PRODUCTS_PER_CATEGORY = 10
 
@@ -91,8 +92,6 @@ def build_products_for_category(
         raise ValueError(f"Categoría {category_id}: se esperaban {PRODUCTS_PER_CATEGORY} productos")
 
     stats = stats or category_stats(category_name)
-    base_p = stats["unit_price"] or 1.0
-    base_c = stats["unit_cost"] or base_p * 0.65
     total_rev = stats["revenue"]
     total_units = stats["units"]
     total_orders = stats["orders"]
@@ -104,9 +103,7 @@ def build_products_for_category(
     revenue_running = 0.0
 
     for line, defn in enumerate(defs, start=1):
-        factor = _PRICE_FACTORS[line - 1]
-        unit_price = round(base_p * factor, 2)
-        unit_cost = round(base_c * factor, 2)
+        unit_price, unit_cost, margin = retail_unit_price(category_name, line)
         units = units_parts[line - 1]
         orders = orders_parts[line - 1]
 
@@ -116,7 +113,6 @@ def build_products_for_category(
             revenue = round(total_rev - revenue_running, 2)
 
         revenue_running += revenue
-        margin = round(((unit_price - unit_cost) / unit_price * 100) if unit_price else 0, 2)
 
         products.append(
             {

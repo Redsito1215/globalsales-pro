@@ -13,6 +13,7 @@ function setAccess(access) {
 }
 
 function canAccessPage(pageId) {
+  if (!window._authUser) return pageId === 'tienda';
   if (window._authUser?.role === 'administrador' || window._access?.role === 'administrador') {
     return true;
   }
@@ -26,6 +27,7 @@ function hasPermission(code) {
 }
 
 function defaultPageForUser() {
+  if (!window._authUser) return 'tienda';
   const pages = window._access?.pages || ['tienda'];
   const role = window._authUser?.role || window._access?.role || null;
   const pick = (id) => (pages.includes(id) || role === 'administrador' ? id : null);
@@ -59,7 +61,11 @@ function openNavGroupForPage(pageId) {
 
 function applyNavAccess() {
   const role = window._authUser?.role || window._access?.role || null;
-  const pages = new Set(window._access?.pages || ['tienda']);
+  const loggedIn = !!window._authUser;
+  // Sin sesión: solo Tienda (nada de Administración ni otras secciones)
+  const pages = new Set(
+    !loggedIn ? ['tienda'] : (window._access?.pages || ['tienda'])
+  );
   const isAdmin = role === 'administrador';
   document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
     const id = btn.getAttribute('data-page');
@@ -72,8 +78,32 @@ function applyNavAccess() {
     block.hidden = !anyVisible;
   });
 
+  // Visitante: sin títulos de carpeta; solo el ítem Tienda
+  document.querySelectorAll('.nav-folder-toggle').forEach((toggle) => {
+    toggle.hidden = !loggedIn;
+  });
+  if (!loggedIn) {
+    document.querySelectorAll('.nav-folder').forEach((folder) => {
+      folder.classList.add('is-open');
+      const t = folder.querySelector('.nav-folder-toggle');
+      if (t) t.setAttribute('aria-expanded', 'true');
+    });
+  }
+
   const ordersBtn = document.getElementById('shop-hero-orders-btn');
   if (ordersBtn) ordersBtn.hidden = !canAccessPage('mis-pedidos');
+
+  applyPermissionUi();
+}
+
+function applyPermissionUi() {
+  document.querySelectorAll('[data-require-perm]').forEach(el => {
+    const code = el.getAttribute('data-require-perm');
+    const allowed = !code || hasPermission(code);
+    el.hidden = !allowed;
+    if ('disabled' in el) el.disabled = !allowed;
+    el.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+  });
 }
 
 function guardPageAccess(pageId) {

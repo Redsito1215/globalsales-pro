@@ -4,8 +4,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from shared.mongo import get_db
+from shared.mongo import get_collection, get_ops_db
 from shared.roles_registry import (
+    ADMIN_ROLE,
+    DEFAULT_REGISTER_ROLE,
     DEFAULT_ROLES,
     PAGE_CATALOG,
     PERMISSION_CATALOG,
@@ -16,7 +18,7 @@ COLLECTION = "app_roles"
 
 
 def _col():
-    return get_db()[COLLECTION]
+    return get_collection(COLLECTION)
 
 
 def _slugify(text: str) -> str:
@@ -25,104 +27,53 @@ def _slugify(text: str) -> str:
 
 
 def ensure_roles_seed() -> None:
+    """Siembra roles por defecto sin pisar páginas/permisos ya personalizados."""
     col = _col()
     for role in DEFAULT_ROLES:
-        col.update_one({"slug": role["slug"]}, {"$setOnInsert": dict(role)}, upsert=True)
-    # Actualizar administrador con todas las páginas/permisos si faltan nuevas
-    all_pages = list(PAGE_CATALOG.keys())
-    all_perms = list(PERMISSION_CATALOG.keys())
-    col.update_one(
-        {"slug": "administrador"},
-        {"$set": {"pages": all_pages, "permissions": all_perms}},
-    )
-    col.update_one(
-        {"slug": "cliente"},
-        {
-            "$set": {
-                "pages": ["tienda", "company", "mis-pedidos", "soporte", "notificaciones"],
-                "permissions": ["shop.view", "shop.checkout"],
-            }
-        },
-    )
-    col.update_one(
-        {"slug": "vendedor"},
-        {
-            "$setOnInsert": {
-                "slug": "vendedor",
-                "label": "Vendedor comercial",
-                "system": True,
-                "assignable": True,
+        slug = role["slug"]
+        existing = col.find_one({"slug": slug}, {"active": 1})
+        patch: dict[str, Any] = {
+            "label": role["label"],
+            "system": bool(role.get("system")),
+        }
+        if not existing or existing.get("active") is not False:
+            patch["assignable"] = bool(role.get("assignable", True))
+        col.update_one(
+            {"slug": slug},
+            {
+                "$setOnInsert": {
+                    "slug": slug,
+                    "pages": list(role.get("pages") or []),
+                    "permissions": list(role.get("permissions") or []),
+                    "active": True,
+                },
+                "$set": patch,
             },
-            "$set": {
-                "pages": [
-                    "tienda",
-                    "company",
-                    "ventas",
-                    "compras",
-                    "reportes",
-                    "reportes-compuestos",
-                    "orders",
-                    "decisiones",
-                    "mis-pedidos",
-                    "soporte",
-                    "notificaciones",
-                ],
-                "permissions": [
-                    "shop.view",
-                    "shop.checkout",
-                    "ventas.manage",
-                    "compras.manage",
-                    "reportes.view",
-                    "orders.read",
-                    "soporte.inbox",
-                    "decisiones.view",
-                ],
-            },
-        },
-        upsert=True,
-    )
-    col.update_one(
-        {"slug": "analista"},
-        {
-            "$set": {
-                "pages": [
-                    "dashboard",
-                    "catalogo",
-                    "company",
-                    "trends",
-                    "regions",
-                    "products",
-                    "export",
-                    "decisiones",
-                    "reportes-compuestos",
-                    "tienda",
-                    "orders",
-                    "ventas",
-                    "reportes",
-                    "soporte",
-                    "notificaciones",
-                ],
-                "permissions": [
-                    "shop.view",
-                    "orders.read",
-                    "analysis.export",
-                    "decisiones.view",
-                    "reportes.view",
-                ],
-            }
-        },
-    )
+            upsert=True,
+        )
 
 
 def list_roles() -> list[dict[str, Any]]:
     ensure_roles_seed()
     rows = list(_col().find({}, {"_id": 0}).sort("slug", 1))
+    for row in rows:
+        if row.get("active") is not False:
+            row["active"] = True
     return rows
+
+
+def _role_is_active(role: dict[str, Any] | None) -> bool:
+    if not role:
+        return False
+    return role.get("active") is not False
 
 
 def get_role(slug: str) -> dict[str, Any] | None:
     ensure_roles_seed()
-    return _col().find_one({"slug": slug}, {"_id": 0})
+    row = _col().find_one({"slug": slug}, {"_id": 0})
+    if row and row.get("active") is not False:
+        row["active"] = True
+    return row
 
 
 def role_exists(slug: str) -> bool:
@@ -132,8 +83,10 @@ def role_exists(slug: str) -> bool:
 def pages_for_role(slug: str | None) -> list[str]:
     if not slug:
         return list(PUBLIC_PAGES)
+    if slug == ADMIN_ROLE:
+        return list(PAGE_CATALOG.keys())
     role = get_role(slug)
-    if not role:
+    if not role or not _role_is_active(role):
         return list(PUBLIC_PAGES)
     pages = role.get("pages") or []
     return pages if pages else list(PUBLIC_PAGES)
@@ -142,13 +95,17 @@ def pages_for_role(slug: str | None) -> list[str]:
 def permissions_for_role(slug: str | None) -> list[str]:
     if not slug:
         return []
+    if slug == ADMIN_ROLE:
+        return list(PERMISSION_CATALOG.keys())
     role = get_role(slug)
-    if not role:
+    if not role or not _role_is_active(role):
         return []
     return list(role.get("permissions") or [])
 
 
 def has_permission(slug: str | None, permission: str) -> bool:
+    if slug == ADMIN_ROLE:
+        return True
     perms = permissions_for_role(slug)
     return "*" in perms or permission in perms
 
@@ -197,9 +154,13 @@ def create_role(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def update_role(slug: str, data: dict[str, Any]) -> dict[str, Any]:
+    if slug == ADMIN_ROLE:
+        raise ValueError("protected_role")
     existing = get_role(slug)
     if not existing:
         raise ValueError("not_found")
+    if not _role_is_active(existing):
+        raise ValueError("role_inactive")
     patch: dict[str, Any] = {}
     if "label" in data and data["label"]:
         patch["label"] = str(data["label"]).strip()
@@ -214,18 +175,62 @@ def update_role(slug: str, data: dict[str, Any]) -> dict[str, Any]:
     return get_role(slug) or {}
 
 
-def delete_role(slug: str) -> None:
+def disable_role(slug: str) -> dict[str, Any]:
+    """Inhabilita un rol y reasigna sus usuarios al rol cliente (usuario normal)."""
     existing = get_role(slug)
     if not existing:
         raise ValueError("not_found")
-    if existing.get("system"):
-        raise ValueError("system_role")
-    db = get_db()
-    if db["users"].count_documents({"role": slug, "active": True}):
-        raise ValueError("role_in_use")
-    _col().delete_one({"slug": slug})
+    if slug in {ADMIN_ROLE, DEFAULT_REGISTER_ROLE}:
+        raise ValueError("protected_role")
+    if not _role_is_active(existing):
+        raise ValueError("already_inactive")
+    db = get_ops_db()
+    moved = db["users"].count_documents({"role": slug, "active": True})
+    db["users"].update_many(
+        {"role": slug, "active": True},
+        {"$set": {"role": DEFAULT_REGISTER_ROLE}},
+    )
+    _col().update_one({"slug": slug}, {"$set": {"active": False, "assignable": False}})
+    return {"slug": slug, "users_reassigned": moved, "fallback_role": DEFAULT_REGISTER_ROLE}
+
+
+def _default_assignable(slug: str) -> bool:
+    for role in DEFAULT_ROLES:
+        if role["slug"] == slug:
+            return bool(role.get("assignable", True))
+    return True
+
+
+def enable_role(slug: str) -> dict[str, Any]:
+    """Reactiva un rol inhabilitado (no reasigna usuarios automáticamente)."""
+    existing = get_role(slug)
+    if not existing:
+        raise ValueError("not_found")
+    if slug == ADMIN_ROLE:
+        raise ValueError("protected_role")
+    if _role_is_active(existing):
+        raise ValueError("already_active")
+    assignable = _default_assignable(slug)
+    _col().update_one({"slug": slug}, {"$set": {"active": True, "assignable": assignable}})
+    return {"slug": slug, "assignable": assignable}
+
+
+def delete_role(slug: str) -> None:
+    """Compatibilidad: inhabilitar en lugar de borrar."""
+    disable_role(slug)
 
 
 def assignable_roles() -> list[dict[str, Any]]:
     ensure_roles_seed()
-    return list(_col().find({"assignable": True}, {"_id": 0, "slug": 1, "label": 1}).sort("label", 1))
+    return list(
+        _col()
+        .find(
+            {
+                "assignable": True,
+                "active": {"$ne": False},
+                "slug": {"$ne": ADMIN_ROLE},
+            },
+            {"_id": 0, "slug": 1, "label": 1},
+        )
+        .sort("label", 1)
+    )

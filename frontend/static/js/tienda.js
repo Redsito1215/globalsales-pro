@@ -7,37 +7,89 @@ let tiendaState = {
   cart: [],
   discountCode: '',
   discountAmount: 0,
+  shippingCost: 0,
+  shippingRegion: '',
 };
 
 function shopMoney(n) {
   return '$' + Number(n || 0).toFixed(2);
 }
 
+function parsePositiveQty(raw, opts) {
+  const o = opts || {};
+  const text = String(raw ?? '').trim();
+  if (!text || !/^\d+$/.test(text)) {
+    if (o.notify !== false) notifyWarn(o.message || 'La cantidad debe ser un entero mayor a 0.');
+    return null;
+  }
+  const n = parseInt(text, 10);
+  if (!Number.isFinite(n) || n < 1) {
+    if (o.notify !== false) notifyWarn(o.message || 'La cantidad debe ser un entero mayor a 0.');
+    return null;
+  }
+  return n;
+}
+
+function clampQtyInput(el) {
+  if (!el) return;
+  const q = parsePositiveQty(el.value, { notify: false });
+  el.value = q == null ? '1' : String(q);
+}
+
 async function loadTiendaPage() {
-  await loadShopStats();
   await loadShopCollections();
   await loadTiendaProducts();
+  updateShopHighlights();
   renderTiendaCart();
 }
 
-async function loadShopStats() {
-  try {
-    const [stats, summary] = await Promise.all([
-      fetch(API + '/shop/stats').then(r => r.json()),
-      fetch(API + '/summary').then(r => r.json()).catch(() => ({})),
-    ]);
-    const counts = stats.counts || {};
-    const total = Object.keys(counts).length;
-    const filled = Object.values(counts).filter(n => n > 0).length;
-    const products = counts.products || 0;
-    const rev = summary.total_revenue;
-    const revEl = document.getElementById('shop-float-revenue');
-    const prodEl = document.getElementById('shop-float-products');
-    const tabEl = document.getElementById('shop-float-tables');
-    if (revEl && rev != null) revEl.textContent = '$' + Number(rev).toLocaleString('en-US', { maximumFractionDigits: 0 });
-    if (prodEl) prodEl.textContent = String(products);
-    if (tabEl) tabEl.textContent = `${filled}/${total}`;
-  } catch (e) { /* ignore */ }
+function updateShopHighlights() {
+  const products = tiendaState.products || [];
+  const collections = tiendaState.collections || [];
+  const offers = products.filter(p => {
+    const v = p.variant || {};
+    return v.compare_at_price && Number(v.compare_at_price) > Number(v.price || 0);
+  }).length;
+  const inStock = products.filter(p => Number((p.variant || {}).inventory_quantity || 0) > 0).length;
+
+  const prodEl = document.getElementById('shop-highlight-products');
+  const catEl = document.getElementById('shop-highlight-categories');
+  const offEl = document.getElementById('shop-highlight-offers');
+  if (prodEl) prodEl.textContent = products.length ? `${products.length} productos` : '—';
+  if (catEl) catEl.textContent = collections.length ? String(collections.length) : '—';
+  if (offEl) offEl.textContent = offers ? String(offers) : '0';
+
+  const lead = document.getElementById('shop-catalog-lead');
+  if (lead && products.length) {
+    const prices = products.map(p => Number((p.variant || {}).price || 0)).filter(n => n > 0);
+    const minPrice = prices.length ? Math.min(...prices) : null;
+    const sample = products.slice(0, 3).map(p => p.title).filter(Boolean);
+    const intro = sample.length
+      ? `Destacados: ${sample.join(' · ')}.`
+      : 'Elige por categoría y revisa cada ficha antes de comprar.';
+    lead.textContent = minPrice != null
+      ? `${intro} Precios desde ${shopMoney(minPrice)}.`
+      : intro;
+  }
+
+  const trustBar = document.getElementById('shop-trust-bar');
+  if (trustBar && products.length) {
+    const tags = [];
+    collections.slice(0, 3).forEach(c => { if (c.title) tags.push(c.title); });
+    products.filter(p => {
+      const v = p.variant || {};
+      return v.compare_at_price && Number(v.compare_at_price) > Number(v.price || 0);
+    }).slice(0, 2).forEach(p => tags.push(`${p.title} en oferta`));
+    if (inStock > 0) tags.push(`${inStock} listos para pedir`);
+    if (tags.length >= 2) {
+      trustBar.innerHTML = tags.slice(0, 4).map(t => `<span>${t}</span>`).join('');
+    }
+  }
+
+  const meta = document.getElementById('shop-products-meta');
+  if (meta && products.length) {
+    meta.textContent = `${products.length} productos · ${inStock} disponibles ahora`;
+  }
 }
 
 async function loadShopCollections() {
@@ -114,15 +166,31 @@ async function loadTiendaProducts() {
   const grid = document.getElementById('tienda-grid');
   const meta = document.getElementById('shop-products-meta');
   if (!grid) return;
+  if (meta) meta.textContent = 'Cargando catálogo…';
   grid.innerHTML = '<div class="shop-cart-empty" style="grid-column:1/-1">Cargando productos…</div>';
   const q = new URLSearchParams({ limit: 100 });
   if (tiendaState.collectionId != null) q.set('collection_id', tiendaState.collectionId);
-  const r = await fetch(API + '/shop/products?' + q);
-  const data = await r.json();
+  let r;
+  let data = {};
+  try {
+    r = await fetch(API + '/shop/products?' + q);
+    data = await r.json().catch(() => ({}));
+  } catch (_) {
+    grid.innerHTML = '<div class="shop-cart-empty" style="grid-column:1/-1">No se pudo conectar con el servidor.</div>';
+    if (meta) meta.textContent = 'Error de conexión';
+    notifyErr('No se pudo cargar el catálogo. Revisa que el servidor esté en marcha.');
+    return;
+  }
+  if (!r.ok) {
+    grid.innerHTML = `<div class="shop-cart-empty" style="grid-column:1/-1">${data.message || 'Error al cargar productos.'}</div>`;
+    if (meta) meta.textContent = 'Error al cargar';
+    notifyErr(data.message || 'Error al cargar el catálogo.');
+    return;
+  }
   tiendaState.products = data.products || [];
   tiendaState.filtered = tiendaState.products.slice();
-  if (meta) meta.textContent = `${data.total || 0} productos en catálogo`;
   filterShopProducts();
+  updateShopHighlights();
 }
 
 function filterShopProducts() {
@@ -138,12 +206,10 @@ function filterShopProducts() {
   if (!tiendaState.filtered.length) {
     grid.innerHTML = typeof opsEmpty === 'function'
       ? `<div style="grid-column:1/-1">${opsEmpty({
-          title: 'Catálogo vacío',
-          hint: 'Un administrador debe sincronizar el catálogo en Maestros para publicar productos.',
-          ctaLabel: 'Ir a Maestros',
-          ctaOnclick: "showPage('datos')",
+          title: 'Catálogo en preparación',
+          hint: 'Pronto tendremos productos disponibles para ti. Vuelve a visitarnos.',
         })}</div>`
-      : '<div class="shop-cart-empty" style="grid-column:1/-1">Catálogo vacío. Sincroniza en Maestros.</div>';
+      : '<div class="shop-cart-empty" style="grid-column:1/-1">Catálogo en preparación. Vuelve pronto.</div>';
     return;
   }
   grid.innerHTML = tiendaState.filtered.map(p => {
@@ -151,23 +217,29 @@ function filterShopProducts() {
     const img = p.image?.src;
     const compare = v.compare_at_price && v.compare_at_price > v.price;
     const vid = v.variant_id || p.product_id;
-    const qty = v.inventory_quantity ?? '—';
+    const qty = v.inventory_quantity ?? 0;
+    const avail = Number(qty) > 0
+      ? `<span class="shop-product-avail shop-product-avail--ok">Disponible</span>`
+      : `<span class="shop-product-avail">Agotado</span>`;
+    const pid = p.product_id;
     return `
-    <article class="shop-product-card">
-      <div class="shop-product-media">
+    <article class="shop-product-card" data-product-id="${pid}">
+      <div class="shop-product-media shop-product-media--clickable" role="button" tabindex="0"
+        onclick="event.stopPropagation(); openProductDetail(${pid})" onkeydown="if(event.key==='Enter'){event.preventDefault();openProductDetail(${pid})}">
         ${img ? `<img src="${img}" alt="${p.image?.alt || p.title || ''}">` : '<div class="shop-product-media--empty" aria-hidden="true"></div>'}
         ${compare ? '<span class="shop-product-badge">Oferta</span>' : ''}
       </div>
       <div class="shop-product-body">
-        <div class="shop-product-vendor">${p.product_type || 'General'}</div>
-        <div class="shop-product-title">${p.title}</div>
+        <div class="shop-product-vendor">${p.category_name || p.product_type || 'Catálogo'}</div>
+        <button type="button" class="shop-product-title shop-product-title--link" onclick="event.stopPropagation(); openProductDetail(${pid})">${p.title}</button>
         <div class="shop-product-prices">
           <span class="shop-price">${shopMoney(v.price)}</span>
           ${compare ? `<span class="shop-compare">${shopMoney(v.compare_at_price)}</span>` : ''}
         </div>
-        <div style="font-size:0.7rem;color:var(--shop-muted);margin-top:4px">SKU ${v.sku || vid} · Stock ${qty}</div>
+        <div class="shop-product-meta">${avail}${p.main_function ? ` · ${String(p.main_function).slice(0, 42)}${String(p.main_function).length > 42 ? '…' : ''}` : ''}</div>
         <div class="shop-product-actions">
-          <input type="number" min="1" value="1" id="qty-${vid}" />
+          <input type="number" min="1" step="1" value="1" id="qty-${vid}" onclick="event.stopPropagation()" oninput="clampQtyInput(this)" />
+          <button type="button" class="btn btn-ghost" onclick="event.stopPropagation(); openProductDetail(${pid})">Detalles</button>
           <button type="button" class="btn btn-primary" onclick="tiendaAddToCart(${vid})">Agregar</button>
         </div>
       </div>
@@ -197,26 +269,30 @@ function tiendaAddProductToCart(prod, qty) {
 
 function tiendaAddToCart(variantId) {
   const qtyEl = document.getElementById('qty-' + variantId);
-  const qty = parseInt(qtyEl?.value, 10) || 1;
+  const qty = parsePositiveQty(qtyEl?.value);
+  if (qty == null) {
+    if (qtyEl) clampQtyInput(qtyEl);
+    return;
+  }
   const prod = tiendaState.products.find(p => (p.variant?.variant_id || p.product_id) === variantId);
   if (!prod) return;
   tiendaAddProductToCart(prod, qty);
   renderTiendaCart();
+  notifyOk('Producto agregado al carrito.');
 }
 
-function tiendaAddCollectionToCart() {
+async function tiendaAddCollectionToCart() {
   if (tiendaState.collectionId == null) {
-    alert('Elige una colección en el panel izquierdo.');
+    notifyWarn('Elige una colección en el panel izquierdo.');
     return;
   }
-  const qty = parseInt(document.getElementById('shop-bulk-qty')?.value, 10) || 1;
-  if (qty < 1) {
-    alert('Indica una cantidad válida por producto.');
-    return;
-  }
+  const qty = parsePositiveQty(
+    document.getElementById('shop-bulk-qty')?.value || document.getElementById('shop-bulk-qty-side')?.value
+  );
+  if (qty == null) return;
   const products = tiendaState.filtered.slice();
   if (!products.length) {
-    alert('No hay productos visibles en esta colección.');
+    notify('No hay productos visibles en esta colección.');
     return;
   }
   const collection = tiendaState.collections.find(c => c.collection_id === tiendaState.collectionId);
@@ -225,7 +301,16 @@ function tiendaAddCollectionToCart() {
   const scope = search
     ? `${products.length} productos visibles (filtro activo)`
     : `${products.length} productos de ${label}`;
-  if (!confirm(`¿Agregar ${scope} al carrito con ${qty} unidad(es) de cada uno?`)) return;
+  if (typeof opsConfirm !== 'function') {
+    notifyErr('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).');
+    return;
+  }
+  const ok = await opsConfirm({
+    title: 'Agregar colección al carrito',
+    message: `¿Agregar ${scope} al carrito con ${qty} unidad(es) de cada uno?`,
+    confirmLabel: 'Agregar',
+  });
+  if (!ok) return;
   products.forEach(p => tiendaAddProductToCart(p, qty));
   renderTiendaCart();
 }
@@ -242,7 +327,7 @@ function renderTiendaCart() {
   if (btn) btn.disabled = !tiendaState.cart.length;
   if (!el) return;
   if (!tiendaState.cart.length) {
-    el.innerHTML = '<div class="shop-cart-empty"><strong>Carrito vacío</strong>Elige productos del catálogo o una colección completa.</div>';
+    el.innerHTML = '<div class="shop-cart-empty"><strong>Tu carrito está vacío</strong>Explora el catálogo y agrega los productos que necesitas.</div>';
     return;
   }
   el.innerHTML = tiendaState.cart.map(c => `
@@ -263,26 +348,181 @@ function tiendaRemoveFromCart(variantId) {
   renderTiendaCart();
 }
 
+let productDetailState = { productId: null, variantId: null };
+let productDetailLoading = false;
+
+function escHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function closeProductDetail() {
+  const m = document.getElementById('product-detail-modal');
+  if (!m) return;
+  m.hidden = true;
+  m.setAttribute('aria-hidden', 'true');
+  productDetailState = { productId: null, variantId: null };
+}
+
+function renderProductDetailRows(rows) {
+  return rows.map(([label, value]) => `
+    <div class="shop-detail-row">
+      <span class="shop-detail-label">${label}</span>
+      <span class="shop-detail-value">${value}</span>
+    </div>`).join('');
+}
+
+function renderProductDetailModal(p) {
+  const media = document.getElementById('prod-detail-media');
+  const title = document.getElementById('prod-detail-title');
+  const category = document.getElementById('prod-detail-category');
+  const body = document.getElementById('prod-detail-body');
+  if (!p || !body) return;
+
+  const v = p.variant || {};
+  const vid = v.variant_id || p.product_id;
+  productDetailState = { productId: p.product_id, variantId: vid };
+
+  if (title) title.textContent = p.name || p.title || 'Producto';
+  if (category) {
+    const bits = [p.category_name, p.collection_title].filter(Boolean);
+    category.textContent = bits.length ? bits.join(' · ') : (p.product_type || 'Catálogo GLOBTRADE');
+  }
+  if (media) {
+    const img = p.image?.src;
+    media.innerHTML = img
+      ? `<img src="${escHtml(img)}" alt="${escHtml(p.image?.alt || p.name || '')}">`
+      : '<div class="shop-product-media--empty" style="min-height:220px"></div>';
+  }
+
+  const stock = v.inventory_quantity ?? '—';
+  const vendorLoc = p.vendor_location ? ` (${p.vendor_location})` : '';
+  const rows = [
+    ['Nombre', p.name || p.title || '—'],
+    ['Función principal', p.main_function || '—'],
+    ['Peso', p.weight_kg != null ? `${Number(p.weight_kg).toFixed(2)} kg` : '—'],
+    ['Proveedor', `${p.vendor_name || '—'}${vendorLoc}`],
+    ['Categoría', p.category_name || p.product_type || '—'],
+    ['Colección', p.collection_title || '—'],
+    ['SKU', v.sku || vid],
+    ['Precio unitario', shopMoney(p.unit_price ?? v.price)],
+    ['Costo', shopMoney(p.unit_cost ?? v.cost)],
+    ['Margen', p.margin_pct != null ? `${Number(p.margin_pct).toFixed(1)}%` : '—'],
+    ['Stock disponible', String(stock)],
+    ['Bodega', p.warehouse || 'Bodega General'],
+    ['Línea catálogo', p.line != null ? String(p.line) : '—'],
+  ];
+  body.innerHTML = `
+    ${p.description ? `<p class="shop-detail-desc">${escHtml(p.description)}</p>` : ''}
+    <div class="shop-detail-grid">${renderProductDetailRows(rows.map(([k, val]) => [k, escHtml(val)]))}</div>`;
+
+  const qtyEl = document.getElementById('prod-detail-qty');
+  if (qtyEl) qtyEl.value = '1';
+}
+
+function findTiendaProduct(productId) {
+  const id = Number(productId);
+  return tiendaState.products.find(p => Number(p.product_id) === id)
+    || tiendaState.filtered.find(p => Number(p.product_id) === id);
+}
+
+async function openProductDetail(productId) {
+  if (productDetailLoading) return;
+  productDetailLoading = true;
+
+  const m = document.getElementById('product-detail-modal');
+  const body = document.getElementById('prod-detail-body');
+  if (!m || !body) {
+    productDetailLoading = false;
+    return;
+  }
+
+  m.hidden = false;
+  m.setAttribute('aria-hidden', 'false');
+
+  const cached = findTiendaProduct(productId);
+  if (cached) {
+    renderProductDetailModal(cached);
+    productDetailLoading = false;
+    return;
+  }
+
+  const title = document.getElementById('prod-detail-title');
+  const category = document.getElementById('prod-detail-category');
+  const media = document.getElementById('prod-detail-media');
+  if (title) title.textContent = 'Cargando…';
+  if (category) category.textContent = '';
+  if (media) media.innerHTML = '<div class="shop-product-media--empty" style="min-height:220px"></div>';
+  body.innerHTML = '<p class="modal-sub">Cargando ficha del producto…</p>';
+
+  try {
+    const r = await fetch(`${API}/shop/products/${productId}`);
+    let data = {};
+    try {
+      data = await r.json();
+    } catch {
+      data = {};
+    }
+    if (!r.ok || !data.product) {
+      closeProductDetail();
+      notifyErr(data.message || 'No se pudo cargar el producto.');
+      return;
+    }
+    renderProductDetailModal(data.product);
+  } catch (_) {
+    closeProductDetail();
+    notifyErr('No se pudo conectar con el servidor.');
+  } finally {
+    productDetailLoading = false;
+  }
+}
+
+function tiendaAddFromDetail() {
+  const vid = productDetailState.variantId;
+  if (!vid) return;
+  const qtyEl = document.getElementById('prod-detail-qty');
+  const qty = parsePositiveQty(qtyEl?.value);
+  if (qty == null) {
+    if (qtyEl) clampQtyInput(qtyEl);
+    return;
+  }
+  const prod = tiendaState.products.find(p =>
+    Number(p.product_id) === Number(productDetailState.productId)
+    || (p.variant?.variant_id || p.product_id) === vid);
+  if (!prod) {
+    notifyWarn('Producto no disponible en el listado actual.');
+    return;
+  }
+  tiendaAddProductToCart(prod, qty);
+  renderTiendaCart();
+  notifyOk('Producto agregado al carrito.');
+  closeProductDetail();
+}
+
+window.openProductDetail = openProductDetail;
+window.closeProductDetail = closeProductDetail;
+window.tiendaAddFromDetail = tiendaAddFromDetail;
+
 function isAssistedPurchase() {
-  return !!(window._authUser && (
-    window._authUser.role === 'administrador'
-    || (typeof hasPermission === 'function' && hasPermission('ventas.manage'))
-  ));
+  return !!(window._authUser && window._authUser.role !== 'cliente');
 }
 
 function openSolicitudModal() {
-  if (!tiendaState.cart.length) { alert('Agrega productos al carrito.'); return; }
+  if (!tiendaState.cart.length) { notifyWarn('Agrega productos al carrito.'); return; }
   if (!window._authUser) {
-    alert('Inicia sesión para solicitar la compra. Así verás el pedido en Mis pedidos.');
+    notifyWarn('Inicia sesión para solicitar la compra. Así verás el pedido en Mis pedidos.');
     if (typeof openLoginModal === 'function') openLoginModal();
     return;
   }
   if (!hasPermission('shop.checkout')) {
-    alert('Tu rol no permite solicitar compras en la vitrina.');
+    notifyWarn('Tu rol no permite solicitar compras en la vitrina.');
     return;
   }
   loadTiendaMasterSelects();
-  updateCheckoutSummary();
+  refreshShippingQuote();
   const user = window._authUser;
   const assisted = isAssistedPurchase();
   const n = document.getElementById('sol-client-name');
@@ -300,9 +540,11 @@ function openSolicitudModal() {
   if (channelWrap) channelWrap.hidden = !assisted;
   if (lead) {
     lead.textContent = assisted
-      ? 'Pedido asistido: indica el cliente fijo y el canal. Se creará una solicitud comercial a su nombre.'
-      : 'Confirma tus datos. Se creará una solicitud comercial para revisar y confirmar la venta.';
+      ? 'Pedido asistido: indica el cliente y el canal. El pedido quedará registrado a su nombre.'
+      : 'Confirma destino, país y contacto. El total incluye envío estimado para pedidos online.';
   }
+  const destWrap = document.getElementById('sol-destination-wrap');
+  if (destWrap) destWrap.hidden = assisted && (parseInt(document.getElementById('sol-channel-id')?.value, 10) || 1) !== 1;
   document.getElementById('solicitud-modal').hidden = false;
 }
 
@@ -314,14 +556,58 @@ function checkoutSubtotal() {
   return tiendaState.cart.reduce((s, c) => s + c.price * c.quantity, 0);
 }
 
+async function refreshShippingQuote() {
+  tiendaState.shippingCost = 0;
+  tiendaState.shippingRegion = '';
+  const assisted = isAssistedPurchase();
+  const channelSel = document.getElementById('sol-channel-id');
+  const channelId = assisted ? (parseInt(channelSel?.value, 10) || 1) : 1;
+  const isOnline = channelId === 1;
+  if (!isOnline || !tiendaState.cart.length) {
+    updateCheckoutSummary();
+    return;
+  }
+  const country_id = parseInt(document.getElementById('sol-country-id')?.value, 10);
+  if (!country_id) {
+    updateCheckoutSummary();
+    return;
+  }
+  try {
+    const r = await fetch(API + '/shop/shipping/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        country_id,
+        lines: tiendaState.cart.map(c => ({ variant_id: c.variant_id, quantity: c.quantity })),
+      }),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      tiendaState.shippingCost = Number(data.shipping_cost || 0);
+      tiendaState.shippingRegion = data.region_name || '';
+    }
+  } catch (_) { /* ignore */ }
+  updateCheckoutSummary();
+}
+
 function updateCheckoutSummary() {
   const sub = checkoutSubtotal();
   const disc = Number(tiendaState.discountAmount || 0);
+  const ship = Number(tiendaState.shippingCost || 0);
+  const total = Math.max(sub - disc + ship, 0);
   const el = document.getElementById('sol-checkout-summary');
   if (el) {
+    const assisted = isAssistedPurchase();
+    const channelSel = document.getElementById('sol-channel-id');
+    const channelId = assisted ? (parseInt(channelSel?.value, 10) || 1) : 1;
+    const shipLine = channelId === 1
+      ? ` · Envío: <strong>${shopMoney(ship)}</strong>${tiendaState.shippingRegion ? ` <span style="color:var(--muted);font-weight:400">(${tiendaState.shippingRegion})</span>` : ''}`
+      : '';
     el.innerHTML = `Subtotal: <strong>${shopMoney(sub)}</strong>`
       + (disc ? ` · Descuento: <strong>-${shopMoney(disc)}</strong>` : '')
-      + ` · Total: <strong>${shopMoney(Math.max(sub - disc, 0))}</strong>`;
+      + shipLine
+      + ` · Total: <strong>${shopMoney(total)}</strong>`;
   }
 }
 
@@ -334,32 +620,46 @@ async function applyCheckoutCoupon() {
     body: JSON.stringify({ code, subtotal: checkoutSubtotal() }),
   });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Cupón inválido'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Cupón inválido'); return; }
   tiendaState.discountAmount = data.discount_amount || 0;
   tiendaState.discountCode = data.code || code;
   updateCheckoutSummary();
+  notifyOk('Cupón aplicado.');
 }
 
 async function submitSolicitud() {
   if (!window._authUser) {
-    alert('Inicia sesión para completar la compra.');
+    notifyWarn('Inicia sesión para completar la compra.');
     return;
   }
   const assisted = isAssistedPurchase();
   const name = (document.getElementById('sol-client-name').value || window._authUser.name || '').trim();
   const email = (document.getElementById('sol-client-email').value || window._authUser.email || '').trim();
-  if (!name || !email) { alert('Nombre y correo del cliente son obligatorios.'); return; }
+  if (!name || !email) { notifyWarn('Nombre y correo del cliente son obligatorios.'); return; }
+  for (const c of tiendaState.cart) {
+    if (!c.quantity || c.quantity < 1) {
+      notifyWarn('Hay productos con cantidad inválida en el carrito.');
+      return;
+    }
+  }
   const phone = document.getElementById('sol-client-phone').value.trim();
   const country_id = parseInt(document.getElementById('sol-country-id').value, 10);
+  const destination = (document.getElementById('sol-shipping-destination')?.value || '').trim();
   const channelSel = document.getElementById('sol-channel-id');
   const channel_id = assisted
     ? (parseInt(channelSel?.value, 10) || 1)
-    : 1; // Online por defecto para el cliente
+    : 1;
+  if (channel_id === 1 && !assisted && !destination) {
+    notifyWarn('Indica el destino de entrega (ciudad, dirección o ruta).');
+    return;
+  }
   const notes = document.getElementById('sol-notes').value.trim();
   const body = {
     name, email, phone, country_id, channel_id, notes,
     client_name: name,
     client_email: email,
+    shipping_destination: destination || undefined,
+    destination: destination || undefined,
     discount_code: tiendaState.discountCode || '',
     lines: tiendaState.cart.map(c => ({ variant_id: c.variant_id, quantity: c.quantity })),
   };
@@ -370,12 +670,14 @@ async function submitSolicitud() {
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Error al solicitar la compra'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al solicitar la compra'); return; }
   tiendaState.cart = [];
   tiendaState.discountAmount = 0;
   tiendaState.discountCode = '';
+  tiendaState.shippingCost = 0;
   renderTiendaCart();
   closeSolicitudModal();
+  notifyOk(data.message || 'Pedido registrado. Revísalo en Mis pedidos.');
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
   if (typeof refreshVentasBadge === 'function') refreshVentasBadge();
   const misBtn = document.querySelector('[data-page=mis-pedidos]');
@@ -395,6 +697,7 @@ async function loadTiendaMasterSelects() {
       countrySel.innerHTML = countries.map(p =>
         `<option value="${p.country_id}">${p.name}</option>`).join('');
       if (prev) countrySel.value = prev;
+      countrySel.onchange = () => refreshShippingQuote();
     }
     const chSel = document.getElementById('sol-channel-id');
     if (chSel && (chSel.options.length <= 1 || isAssistedPurchase())) {
@@ -404,9 +707,18 @@ async function loadTiendaMasterSelects() {
           `<option value="${c.channel_id}">${c.name}</option>`).join('');
         const online = rows.find(c => String(c.name || '').toLowerCase() === 'online');
         if (online) chSel.value = String(online.channel_id);
+        chSel.onchange = () => {
+          const destWrap = document.getElementById('sol-destination-wrap');
+          if (destWrap) destWrap.hidden = parseInt(chSel.value, 10) !== 1;
+          refreshShippingQuote();
+        };
       }
     }
   } catch (e) { /* ignore */ }
 }
 
-document.addEventListener('DOMContentLoaded', () => { loadTiendaMasterSelects(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadTiendaMasterSelects();
+  const destInput = document.getElementById('sol-shipping-destination');
+  if (destInput) destInput.addEventListener('input', () => { /* destino validado al enviar */ });
+});

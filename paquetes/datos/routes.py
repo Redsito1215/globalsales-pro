@@ -11,7 +11,7 @@ datos_bp = Blueprint("datos", __name__, url_prefix="/api")
 
 @datos_bp.get("/master/tables")
 def master_tables():
-    return jsonify({"status": "ok", "tables": services.list_tables()})
+    return jsonify({"status": "ok", "tables": services.list_editable_masters()})
 
 
 @datos_bp.get("/master/<name>")
@@ -131,11 +131,18 @@ def elt_status():
 @login_required
 @permission_required("audit.read")
 def audit_log():
-    data = services.list_audit_log(
-        limit=min(int(request.args.get("limit", 50)), 200),
-        offset=max(int(request.args.get("offset", 0)), 0),
-    )
-    return jsonify({"status": "ok", **data})
+    try:
+        role = (request.args.get("role") or "").strip() or None
+        data = services.list_audit_log(
+            limit=min(int(request.args.get("limit", 100)), 100),
+            offset=max(int(request.args.get("offset", 0)), 0),
+            role=role,
+        )
+        return jsonify({"status": "ok", **data})
+    except Exception as e:
+        return jsonify(
+            {"status": "error", "message": str(e), "code": "audit_error"}
+        ), 500
 
 
 @datos_bp.get("/schema")
@@ -197,6 +204,7 @@ def _master_error(exc: ValueError):
         "has_children": ("No se puede eliminar: hay registros relacionados.", 409),
         "invalid_image_type": ("Formato no permitido. Use JPG, PNG o WEBP.", 400),
         "image_too_large": ("Imagen demasiado grande.", 400),
+        "invalid_field": ("Revisa los campos: IDs y precios deben ser números positivos.", 400),
     }
     msg, status = messages.get(code, (code, 400))
     return jsonify({"status": "error", "message": msg, "code": code}), status

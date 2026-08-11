@@ -224,9 +224,25 @@ def cliente_pagar(request_id: int):
         req = services.client_pay(
             request_id,
             client_email=session.get("email") or "",
-            method=(body.get("method") or body.get("payment_method") or "transferencia"),
+            method=(body.get("method") or body.get("payment_method") or "tarjeta"),
         )
         return jsonify({"status": "ok", "message": "Pago registrado.", "request": req})
+    except ValueError as e:
+        return _ventas_error(e)
+
+
+@ventas_bp.post("/solicitudes/<int:request_id>/registrar-pago")
+@permission_required("ventas.manage")
+def staff_registrar_pago(request_id: int):
+    """Staff registra pago presencial o cuando el correo del cliente no tiene cuenta."""
+    body = request.get_json(silent=True) or {}
+    try:
+        req = services.staff_register_payment(
+            request_id,
+            staff_email=session.get("email") or "",
+            method=(body.get("method") or body.get("payment_method") or "tarjeta"),
+        )
+        return jsonify({"status": "ok", "message": "Pago registrado por el vendedor.", "request": req})
     except ValueError as e:
         return _ventas_error(e)
 
@@ -290,13 +306,26 @@ def _ventas_error(exc: ValueError):
         "invalid_product": ("Producto no encontrado en catálogo.", 404),
         "not_found": ("Solicitud no encontrada.", 404),
         "invalid_status": ("Estado no válido.", 400),
-        "invalid_payment": ("Estado de pago no válido.", 400),
+        "invalid_payment_method": (
+            "Método de pago no válido para este canal.",
+            400,
+        ),
         "cannot_pay_closed": ("No se puede registrar pago en una solicitud cerrada.", 409),
         "already_paid": ("Esta solicitud ya está pagada.", 409),
         "client_must_pay": ("Solo el cliente puede marcar el pedido como pagado.", 409),
-        "payment_required": ("Espera el pago del cliente o registra crédito antes de enviar.", 409),
+        "payment_required": (
+            "En pedidos online el cliente debe pagar antes de enviar. "
+            "En venta presencial puedes registrar crédito.",
+            409,
+        ),
         "payment_required_before_convert": (
-            "No se puede convertir: el cliente debe pagar primero (o registra crédito).",
+            "En pedidos online el cliente debe pagar primero (Mis pedidos → Pagar). "
+            "En venta presencial puedes registrar crédito.",
+            409,
+        ),
+        "credit_offline_only": (
+            "El crédito comercial solo aplica a ventas presenciales (Offline). "
+            "En online el cliente debe pagar en Mis pedidos.",
             409,
         ),
         "already_converted": ("La solicitud ya fue convertida.", 409),
@@ -327,6 +356,7 @@ def _ventas_error(exc: ValueError):
         "approval_required": ("Debes aprobar la solicitud antes de convertirla.", 409),
         "must_convert_first": ("Primero convierte la solicitud en venta.", 409),
         "must_ship_first": ("Marca el pedido como enviado antes de entregarlo.", 409),
+        "offline_no_shipping": ("Las ventas Offline no requieren confirmar envío.", 409),
         "invalid_transition": ("Transición de estado no permitida.", 409),
         "use_dedicated_endpoint": (
             "Usa el endpoint dedicado (convertir, devolver o cancelar).",

@@ -1,4 +1,5 @@
 """GLOBTRADE S.A. — Plataforma web (Q1–Q4)."""
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -7,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT))
 
-from flask import Flask, redirect, send_from_directory, session
+from flask import Flask, redirect, request, send_from_directory, session
 from flask_cors import CORS
 
 from auth import users as user_store
@@ -74,9 +75,39 @@ def _init_uploads():
     settings.product_uploads_dir.mkdir(parents=True, exist_ok=True)
 
 
+def _init_legacy_order_ids():
+    try:
+        from paquetes.ventas.services import repair_legacy_platform_order_ids
+
+        fixed = repair_legacy_platform_order_ids()
+        if fixed:
+            print(f"[ventas] order_id legacy reparados: {fixed} pedido(s) (1000000000 → V-xxxxx)")
+    except Exception as e:
+        print(f"[ventas] reparación order_id legacy: {e}")
+
+
 _init_auth()
 _init_ops_indexes()
 _init_uploads()
+_init_legacy_order_ids()
+
+
+@app.after_request
+def _security_and_cache_headers(resp):
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    resp.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=()",
+    )
+    path = request.path or ""
+    if path.startswith("/static/") and (
+        path.endswith(".js") or path.endswith(".css") or path.endswith(".html")
+    ):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+    return resp
 
 
 @app.route("/")
@@ -108,6 +139,20 @@ def sem1_master_tables():
 
 if __name__ == "__main__":
     port = settings.web_port
+    debug = os.getenv("FLASK_DEBUG", "1").lower() in ("1", "true", "yes", "on")
+    from shared.mongo import mongo_topology
+
+    topo = mongo_topology()
     print(f"GLOBTRADE S.A. → http://127.0.0.1:{port}")
-    print(f"MongoDB: {settings.mongo_uri} / {settings.mongo_db}")
-    app.run(host="0.0.0.0", debug=False, port=port)
+    if topo["split_enabled"]:
+        print(
+            f"MongoDB ops: {topo['mongo_uri']} / {topo['ops_database']} · "
+            f"DW: {topo['dw_database']}"
+        )
+    else:
+        print(f"MongoDB: {topo['mongo_uri']} / {topo['dw_database']} (base única)")
+    if topo["replica_reads"]:
+        print(f"MongoDB lecturas analíticas: réplica {topo['replica_uri']}")
+    if debug:
+        print("[web] FLASK_DEBUG=1 — recarga automática de Python")
+    app.run(host="0.0.0.0", debug=debug, use_reloader=debug, port=port)

@@ -1,5 +1,118 @@
 /* Q4 Compras — proveedores, inventario, OCs */
 let comprasTab = 'inventario';
+let vendorGeoState = { regions: [], countries: [], regionId: null, countryId: null };
+
+const REGION_LABELS = {
+  'South America': 'América del Sur',
+  'North America': 'América del Norte',
+  'Europe': 'Europa',
+  'Asia': 'Asia',
+  'Africa': 'África',
+  'Oceania': 'Oceanía',
+  'Central America and the Caribbean': 'Centroamérica y Caribe',
+};
+
+function regionLabel(name) {
+  return REGION_LABELS[name] || name || '—';
+}
+
+function vendorGeoDisplay(v) {
+  const parts = [];
+  if (v.region_name) parts.push(regionLabel(v.region_name));
+  if (v.country) parts.push(v.country);
+  return parts.length ? parts.join(' · ') : '—';
+}
+
+async function ensureVendorGeoMasters() {
+  if (vendorGeoState.regions.length) return;
+  try {
+    const [regR, coR] = await Promise.all([
+      fetch(`${API}/master/dim_region?limit=50`, { credentials: 'same-origin' }),
+      fetch(`${API}/shop/countries?limit=500`, { credentials: 'same-origin' }),
+    ]);
+    const regData = await regR.json();
+    const coData = await coR.json();
+    vendorGeoState.regions = (regData.rows || []).sort((a, b) =>
+      regionLabel(a.name).localeCompare(regionLabel(b.name), 'es'));
+    vendorGeoState.countries = coData.countries || coData.rows || [];
+  } catch { /* ignore */ }
+}
+
+function renderVendorRegionTable() {
+  const body = document.getElementById('vend-region-body');
+  if (!body) return;
+  body.innerHTML = (vendorGeoState.regions || []).map(r => {
+    const sel = Number(vendorGeoState.regionId) === Number(r.region_id);
+    return `<tr class="geo-pick-row${sel ? ' geo-pick-row--active' : ''}" onclick="selectVendorRegion(${r.region_id})">
+      <td>${regionLabel(r.name)}</td>
+      <td><span class="table-sub">${r.name || ''}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="2">Sin continentes en maestros</td></tr>';
+  renderVendorCountryTable();
+  updateVendorGeoSummary();
+}
+
+function renderVendorCountryTable() {
+  const body = document.getElementById('vend-country-body');
+  if (!body) return;
+  const rid = vendorGeoState.regionId;
+  if (!rid) {
+    body.innerHTML = '<tr><td colspan="2">Elige un continente arriba</td></tr>';
+    updateVendorGeoSummary();
+    return;
+  }
+  const list = vendorGeoState.countries.filter(c => Number(c.region_id) === Number(rid));
+  body.innerHTML = list.map(c => {
+    const sel = Number(vendorGeoState.countryId) === Number(c.country_id);
+    return `<tr class="geo-pick-row${sel ? ' geo-pick-row--active' : ''}" onclick="selectVendorCountry(${c.country_id})">
+      <td>${c.name}</td>
+      <td>${c.country_id}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="2">Sin países para este continente</td></tr>';
+  updateVendorGeoSummary();
+}
+
+function updateVendorGeoSummary() {
+  const el = document.getElementById('vend-geo-summary');
+  if (!el) return;
+  const reg = vendorGeoState.regions.find(r => Number(r.region_id) === Number(vendorGeoState.regionId));
+  const co = vendorGeoState.countries.find(c => Number(c.country_id) === Number(vendorGeoState.countryId));
+  if (reg && co) el.textContent = `Seleccionado: ${regionLabel(reg.name)} · ${co.name}`;
+  else if (reg) el.textContent = `Continente: ${regionLabel(reg.name)} — elige un país`;
+  else el.textContent = 'Elige continente y país del proveedor';
+}
+
+function setVendorGeo(regionId, countryId) {
+  vendorGeoState.regionId = regionId ? Number(regionId) : null;
+  vendorGeoState.countryId = countryId ? Number(countryId) : null;
+  renderVendorRegionTable();
+}
+
+function selectVendorRegion(regionId) {
+  vendorGeoState.regionId = Number(regionId);
+  vendorGeoState.countryId = null;
+  renderVendorRegionTable();
+}
+
+function selectVendorCountry(countryId) {
+  vendorGeoState.countryId = Number(countryId);
+  const c = vendorGeoState.countries.find(x => Number(x.country_id) === Number(countryId));
+  if (c) vendorGeoState.regionId = Number(c.region_id);
+  renderVendorRegionTable();
+}
+
+function renderWarehouseBanner(warehouse) {
+  const banner = document.getElementById('compras-warehouse-banner');
+  const nameEl = document.getElementById('compras-warehouse-name');
+  const metaEl = document.getElementById('compras-warehouse-meta');
+  if (!banner) return;
+  const wh = warehouse || { name: 'Bodega General', address: 'Ubicación única' };
+  if (nameEl) nameEl.textContent = wh.name || 'Bodega General';
+  if (metaEl) {
+    metaEl.textContent = wh.address || `${wh.code || 'BG-01'} · ubicación única · todo el stock se almacena aquí`;
+  }
+  banner.hidden = false;
+}
 
 function poStatusBadge(st) {
   const map = {
@@ -13,8 +126,7 @@ function poStatusBadge(st) {
 }
 
 function toast(msg, type) {
-  if (typeof opsToast === 'function') opsToast(msg, type || 'info');
-  else alert(msg);
+  notify(msg, type || 'info');
 }
 
 async function loadComprasPage() {
@@ -109,7 +221,7 @@ async function refreshComprasChips() {
 async function loadComprasInventario() {
   const body = document.getElementById('compras-inv-body');
   if (!body) return;
-  body.innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+  body.innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
   const q = new URLSearchParams({ limit: 100 });
   const term = (document.getElementById('compras-inv-q')?.value || '').trim();
   const low = document.getElementById('compras-inv-low')?.checked;
@@ -120,23 +232,25 @@ async function loadComprasInventario() {
   const data = await r.json();
   if (!r.ok) {
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(7, { title: 'Error', hint: data.message || 'No se pudo cargar inventario' })
-      : `<tr><td colspan="7">${data.message || 'Error'}</td></tr>`;
+      ? opsEmptyRow(8, { title: 'Error', hint: data.message || 'No se pudo cargar inventario' })
+      : `<tr><td colspan="8">${data.message || 'Error'}</td></tr>`;
     return;
   }
+  renderWarehouseBanner(data.warehouse);
   const rows = data.items || [];
   refreshComprasChips();
   if (!rows.length) {
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(7, {
+      ? opsEmptyRow(8, {
           title: 'Sin SKUs',
           hint: 'Ejecuta Sync catálogo en Maestros para generar variantes e inventario.',
           ctaLabel: 'Ir a Maestros',
           ctaOnclick: "showPage('datos')",
         })
-      : '<tr><td colspan="7">Sin SKUs. Ejecuta Sync catálogo en Maestros.</td></tr>';
+      : '<tr><td colspan="8">Sin SKUs. Ejecuta Sync catálogo en Maestros.</td></tr>';
     return;
   }
+  const whName = (data.warehouse && data.warehouse.name) || 'Bodega General';
   const thr = parseInt(document.getElementById('compras-inv-thr')?.value || '20', 10);
   body.innerHTML = rows.map(row => {
     const qty = Number(row.inventory_quantity || 0);
@@ -145,6 +259,7 @@ async function loadComprasInventario() {
     return `<tr>
       <td>${row.variant_id}</td>
       <td>${row.title}<br><span class="table-sub">${row.sku || ''}</span></td>
+      <td><span class="badge badge--info">${row.warehouse || whName}</span></td>
       <td>${row.vendor}</td>
       <td><strong>${qty}</strong> ${lowBadge}</td>
       <td>$${Number(row.price || 0).toFixed(2)}</td>
@@ -201,6 +316,8 @@ async function bumpStock(variantId, delta) {
 async function loadComprasProveedores() {
   const body = document.getElementById('compras-vend-body');
   if (!body) return;
+  await ensureVendorGeoMasters();
+  renderVendorRegionTable();
   body.innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
   const r = await fetch(API + '/compras/vendors', { credentials: 'same-origin' });
   const data = await r.json();
@@ -222,28 +339,35 @@ async function loadComprasProveedores() {
       <td>${v.vendor_id}</td>
       <td>${v.name}</td>
       <td>${v.email || '—'}</td>
-      <td>${v.country || '—'}</td>
+      <td>${vendorGeoDisplay(v)}</td>
       <td>${v.active === false ? '<span class="badge badge--danger">Inactivo</span>' : '<span class="badge badge--ok">Activo</span>'}</td>
       <td>
         <button type="button" class="btn btn-ghost btn-ops"
-          onclick='editVendor(${v.vendor_id}, ${JSON.stringify(v.name)}, ${JSON.stringify(v.email || "")}, ${JSON.stringify(v.country || "")})'>Editar</button>
+          onclick='editVendor(${JSON.stringify({
+            id: v.vendor_id,
+            name: v.name,
+            email: v.email || '',
+            region_id: v.region_id || null,
+            country_id: v.country_id || null,
+          })})'>Editar</button>
       </td>
     </tr>`).join('');
 }
 
-function editVendor(id, name, email, country) {
-  document.getElementById('vend-id').value = id;
-  document.getElementById('vend-name').value = name || '';
-  document.getElementById('vend-email').value = email || '';
-  document.getElementById('vend-country').value = country || '';
-  document.getElementById('vend-form-title').textContent = 'Editar proveedor #' + id;
+function editVendor(v) {
+  const row = typeof v === 'object' ? v : { id: v };
+  document.getElementById('vend-id').value = row.id || '';
+  document.getElementById('vend-name').value = row.name || '';
+  document.getElementById('vend-email').value = row.email || '';
+  setVendorGeo(row.region_id, row.country_id);
+  document.getElementById('vend-form-title').textContent = 'Editar proveedor #' + row.id;
 }
 
 function resetVendorForm() {
   document.getElementById('vend-id').value = '';
   document.getElementById('vend-name').value = '';
   document.getElementById('vend-email').value = '';
-  document.getElementById('vend-country').value = '';
+  setVendorGeo(null, null);
   document.getElementById('vend-form-title').textContent = 'Nuevo proveedor';
 }
 
@@ -252,10 +376,12 @@ async function saveVendor() {
   const body = {
     name: document.getElementById('vend-name').value.trim(),
     email: document.getElementById('vend-email').value.trim(),
-    country: document.getElementById('vend-country').value.trim(),
+    region_id: vendorGeoState.regionId,
+    country_id: vendorGeoState.countryId,
     active: true,
   };
   if (!body.name) { toast('Nombre obligatorio', 'warn'); return; }
+  if (!body.country_id) { toast('Elige continente y país del proveedor', 'warn'); return; }
   const url = id ? `${API}/compras/vendors/${id}` : `${API}/compras/vendors`;
   const method = id ? 'PUT' : 'POST';
   const r = await fetch(url, {
@@ -360,7 +486,16 @@ async function createPO() {
 }
 
 async function sendPO(id) {
-  if (!confirm('¿Enviar OC #' + id + ' al proveedor?')) return;
+  if (typeof opsConfirm !== 'function') {
+    toast('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).', 'danger');
+    return;
+  }
+  const ok = await opsConfirm({
+    title: 'Enviar orden de compra',
+    message: `¿Enviar OC #${id} al proveedor?`,
+    confirmLabel: 'Enviar',
+  });
+  if (!ok) return;
   const r = await fetch(`${API}/compras/purchase-orders/${id}/send`, {
     method: 'POST', credentials: 'same-origin',
   });
@@ -387,29 +522,77 @@ async function receivePO(id, linesRaw) {
 
   let receipts = null;
   if (pending.length === 1) {
-    const raw = prompt(
-      `Cantidad a recibir de ${pending[0].label} (máx ${pending[0].pending}).\nVacío o Cancelar en el siguiente paso: vacío = todo.`,
-      String(pending[0].pending)
-    );
+    const p0 = pending[0];
+    if (typeof opsPrompt !== 'function') {
+      toast('No se pudo abrir el formulario. Recarga la página (Ctrl+F5).', 'danger');
+      return;
+    }
+    const raw = await opsPrompt({
+      title: 'Recibir mercancía',
+      message: `Cantidad a recibir de ${p0.label} (máx. ${p0.pending}). Deja vacío para recibir todo el pendiente.`,
+      label: 'Cantidad',
+      defaultValue: String(p0.pending),
+      inputType: 'number',
+      confirmLabel: 'Recibir',
+      validate: (val) => {
+        if (val === '') return null;
+        const qty = parseInt(val, 10);
+        if (!Number.isFinite(qty) || qty < 1) return 'Indica un entero mayor a 0.';
+        if (qty > p0.pending) return `Máximo ${p0.pending}.`;
+        return null;
+      },
+    });
     if (raw === null) return;
-    const qty = raw.trim() === '' ? pending[0].pending : parseInt(raw, 10);
-    if (!Number.isFinite(qty) || qty < 1) { toast('Cantidad inválida', 'warn'); return; }
-    receipts = [{ line_id: pending[0].line_id, quantity: Math.min(qty, pending[0].pending) }];
+    const qty = raw === '' ? p0.pending : parseInt(raw, 10);
+    receipts = [{ line_id: p0.line_id, quantity: Math.min(qty, p0.pending) }];
   } else if (pending.length > 1) {
-    const all = confirm('¿Recibir TODO lo pendiente de todas las líneas?\n\nAceptar = todo · Cancelar = indicar cantidades por línea.');
+    let all = false;
+    if (typeof opsConfirm === 'function') {
+      all = await opsConfirm({
+        title: 'Recibir mercancía',
+        message: '¿Recibir TODO lo pendiente de todas las líneas? Cancelar te permitirá indicar cantidades por línea.',
+        confirmLabel: 'Recibir todo',
+      });
+    }
     if (!all) {
+      if (typeof opsPrompt !== 'function') {
+        toast('No se pudo abrir el formulario. Recarga la página (Ctrl+F5).', 'danger');
+        return;
+      }
       receipts = [];
       for (const p of pending) {
-        const raw = prompt(`Recibir ${p.label} (máx ${p.pending}). 0 para omitir.`, String(p.pending));
+        const raw = await opsPrompt({
+          title: 'Recibir mercancía',
+          message: `${p.label}: máximo ${p.pending}. Usa 0 para omitir esta línea.`,
+          label: 'Cantidad',
+          defaultValue: String(p.pending),
+          inputType: 'number',
+          confirmLabel: 'Aplicar',
+          validate: (val) => {
+            if (val === '') return 'Indica una cantidad (0 para omitir).';
+            const qty = parseInt(val, 10);
+            if (!Number.isFinite(qty) || qty < 0) return 'Cantidad inválida.';
+            if (qty > p.pending) return `Máximo ${p.pending}.`;
+            return null;
+          },
+        });
         if (raw === null) return;
         const qty = parseInt(raw, 10);
-        if (!Number.isFinite(qty) || qty < 0) { toast('Cantidad inválida', 'warn'); return; }
         if (qty > 0) receipts.push({ line_id: p.line_id, quantity: Math.min(qty, p.pending) });
       }
       if (!receipts.length) { toast('Nada que recibir', 'warn'); return; }
     }
-  } else if (!confirm('¿Recibir cantidades pendientes y sumarlas al stock?')) {
-    return;
+  } else {
+    if (typeof opsConfirm !== 'function') {
+      toast('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).', 'danger');
+      return;
+    }
+    const ok = await opsConfirm({
+      title: 'Recibir mercancía',
+      message: '¿Recibir cantidades pendientes y sumarlas al stock?',
+      confirmLabel: 'Recibir',
+    });
+    if (!ok) return;
   }
 
   const r = await fetch(`${API}/compras/purchase-orders/${id}/receive`, {
@@ -425,7 +608,17 @@ async function receivePO(id, linesRaw) {
 }
 
 async function cancelPO(id) {
-  if (!confirm('¿Cancelar OC #' + id + '?')) return;
+  if (typeof opsConfirm !== 'function') {
+    toast('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).', 'danger');
+    return;
+  }
+  const ok = await opsConfirm({
+    title: 'Cancelar orden de compra',
+    message: `¿Cancelar OC #${id}?`,
+    confirmLabel: 'Cancelar OC',
+    danger: true,
+  });
+  if (!ok) return;
   const r = await fetch(`${API}/compras/purchase-orders/${id}/cancel`, { method: 'POST', credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
@@ -433,6 +626,8 @@ async function cancelPO(id) {
   loadComprasOCs();
 }
 
+window.selectVendorRegion = selectVendorRegion;
+window.selectVendorCountry = selectVendorCountry;
 window.loadComprasPage = loadComprasPage;
 window.showComprasTab = showComprasTab;
 window.quickPOFromStock = quickPOFromStock;

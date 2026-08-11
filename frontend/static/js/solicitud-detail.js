@@ -23,13 +23,13 @@ async function openSolicitudDetail(id) {
     const data = await r.json();
     if (!r.ok) {
       showSolicitudDetailModal(false);
-      alert(data.message || 'Error al cargar la solicitud');
+      notifyErr(data.message || 'Error al cargar la solicitud');
       return;
     }
     const req = data.request;
     if (!req) {
       showSolicitudDetailModal(false);
-      alert('Respuesta inválida del servidor.');
+      notifyErr('Respuesta inválida del servidor.');
       return;
     }
     const labelFn = typeof solicitudStatusLabel === 'function' ? solicitudStatusLabel : (s => s || '—');
@@ -54,7 +54,8 @@ async function openSolicitudDetail(id) {
       <div><span class="detail-label">Estado</span><span class="${classFn(req.status)}">${labelFn(req.status)}</span></div>
       <div><span class="detail-label">Pago</span>${typeof paymentBadge === 'function' ? paymentBadge(pay) : payLabel}</div>
       <div><span class="detail-label">Fecha</span>${req.created_at || '—'}</div>
-      <div><span class="detail-label">País</span>${req.country_name || req.country_id || '—'}</div>
+      <div><span class="detail-label">País destino</span>${req.country_name || req.country_id || '—'}</div>
+      ${req.shipping_destination ? `<div><span class="detail-label">Destino</span>${req.shipping_destination}</div>` : ''}
       <div><span class="detail-label">Canal</span>${req.channel_name || req.channel_id || '—'}</div>
       <div><span class="detail-label">Pedido venta</span>${req.order_id || '—'}</div>
       ${req.tracking_number ? `<div><span class="detail-label">Seguimiento</span><code>${req.tracking_number}</code></div>` : ''}
@@ -68,19 +69,24 @@ async function openSolicitudDetail(id) {
     <table class="detail-table"><thead><tr><th>Producto</th><th>Cant.</th><th>P.unit.</th><th>Desc.</th><th>Neto</th></tr></thead><tbody>${lines || '<tr><td colspan="5">Sin líneas</td></tr>'}</tbody></table>
     <div class="detail-totals">
       <div>Subtotal: $${Number(req.subtotal || 0).toFixed(2)}</div>
+      ${Number(req.shipping_cost || 0) > 0 ? `<div>Envío: $${Number(req.shipping_cost).toFixed(2)}${req.shipping_region ? ` (${req.shipping_region})` : ''}</div>` : ''}
       ${req.discount_code ? `<div>Descuento <code>${req.discount_code}</code>: -$${Number(req.discount_amount || 0).toFixed(2)}</div>` : ''}
       <div><strong>Total:</strong> $${Number(req.total || req.subtotal || 0).toFixed(2)}</div>
     </div>
     ${canManage && !['rechazada','cancelada'].includes(req.status) && pay === 'pendiente_pago' ? `
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <span class="modal-sub" style="margin:0">El pago lo confirma el cliente en Mis pedidos.</span>
-        <button type="button" class="btn btn-ghost" onclick="setSolicitudPago(${id},'credito');closeSolicitudDetail()">Dar crédito</button>
+        <span class="modal-sub" style="margin:0">${typeof isOfflineRequest === 'function' && isOfflineRequest(req)
+          ? 'El pago lo confirma el cliente en Mis pedidos, o puedes dar crédito (solo presencial).'
+          : 'En pedidos online el cliente debe pagar en Mis pedidos antes de continuar.'}</span>
+        ${typeof isOfflineRequest === 'function' && isOfflineRequest(req)
+          ? `<button type="button" class="btn btn-ghost" onclick="setSolicitudPago(${id},'credito');closeSolicitudDetail()">Dar crédito</button>`
+          : ''}
       </div>` : ''}`;
     const pdfBtn = document.getElementById('sol-detail-pdf');
     if (pdfBtn) pdfBtn.onclick = () => openSolicitudPdf(id);
   } catch (_) {
     showSolicitudDetailModal(false);
-    alert('Error de red al cargar la solicitud.');
+    notifyErr('Error de red al cargar la solicitud.');
   }
 }
 

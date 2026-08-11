@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop, "001-*", "feature/**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    env:
+      PYTHONPATH: backend:.
+      MONGO_URI: mongodb://127.0.0.1:27017
+      MONGO_DB: globtrade_dw_test
+      FLASK_SECRET_KEY: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Smoke tests
+        run: pytest tests/test_smoke.py -q --tb=short

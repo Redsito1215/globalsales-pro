@@ -1,36 +1,20 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import time
-from collections import defaultdict
-
 from flask import Blueprint, jsonify, request, session
 
 from auth import roles_service, users as user_store
-from auth.decorators import admin_required, login_required
+from auth.decorators import login_required, permission_required
 from auth.validators import normalize_email, validate_login, validate_profile_update, validate_register
 from shared.audit import log_audit
+from shared.rate_limit import check_rate_limit, clear_attempts, record_attempt
 from shared.roles_registry import ADMIN_ROLE, DEFAULT_REGISTER_ROLE
 
 auth_bp = Blueprint("auth", __name__)
 
-_LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
-_MAX_ATTEMPTS = 8
-_WINDOW_SEC = 900
-
 
 def _client_key() -> str:
     return request.remote_addr or "unknown"
-
-
-def _check_rate_limit() -> str | None:
-    key = _client_key()
-    now = time.time()
-    attempts = [t for t in _LOGIN_ATTEMPTS[key] if now - t < _WINDOW_SEC]
-    _LOGIN_ATTEMPTS[key] = attempts
-    if len(attempts) >= _MAX_ATTEMPTS:
-        return "Demasiados intentos fallidos. Espera unos minutos."
-    return None
 
 
 def _set_session(user: dict) -> None:
@@ -53,6 +37,14 @@ def _access_for_session() -> dict:
 
 @auth_bp.post("/register")
 def register():
+    rate_msg = check_rate_limit(
+        "register", _client_key(), max_attempts=5, window_sec=900
+    )
+    if rate_msg:
+        return jsonify({"status": "error", "message": rate_msg}), 429
+
+    record_attempt("register", _client_key())
+
     data = request.get_json(silent=True) or {}
     email = normalize_email(data.get("email", ""))
     password = data.get("password", "")
@@ -96,7 +88,7 @@ def register():
 
 @auth_bp.post("/login")
 def login():
-    rate_msg = _check_rate_limit()
+    rate_msg = check_rate_limit("login", _client_key(), max_attempts=8, window_sec=900)
     if rate_msg:
         return jsonify({"status": "error", "message": rate_msg}), 429
 
@@ -111,12 +103,12 @@ def login():
 
     doc = user_store.find_by_email(email)
     if not doc or not user_store.verify_password(doc, password):
-        _LOGIN_ATTEMPTS[_client_key()].append(time.time())
+        record_attempt("login", _client_key())
         return jsonify(
             {"status": "error", "message": "Correo o contraseña incorrectos."},
         ), 401
 
-    _LOGIN_ATTEMPTS.pop(_client_key(), None)
+    clear_attempts("login", _client_key())
     _set_session(doc)
     return jsonify(
         {
@@ -235,13 +227,13 @@ def profile_update():
 
 
 @auth_bp.get("/roles")
-@admin_required
+@permission_required("users.manage")
 def roles_list():
     return jsonify({"status": "ok", "roles": roles_service.list_roles()})
 
 
 @auth_bp.post("/roles")
-@admin_required
+@permission_required("users.manage")
 def roles_create():
     body = request.get_json(silent=True) or {}
     try:
@@ -253,7 +245,7 @@ def roles_create():
 
 
 @auth_bp.put("/roles/<slug>")
-@admin_required
+@permission_required("users.manage")
 def roles_update(slug: str):
     body = request.get_json(silent=True) or {}
     try:
@@ -265,37 +257,118 @@ def roles_update(slug: str):
 
 
 @auth_bp.delete("/roles/<slug>")
-@admin_required
+@permission_required("users.manage")
 def roles_delete(slug: str):
     try:
-        roles_service.delete_role(slug)
-        log_audit("delete_role", entity="app_roles", entity_id=slug)
-        return jsonify({"status": "ok", "message": "Rol eliminado."})
+        result = roles_service.disable_role(slug)
+        log_audit(
+            "disable_role",
+            entity="app_roles",
+            entity_id=slug,
+            details=result,
+        )
+        return jsonify(
+            {
+                "status": "ok",
+                "message": (
+                    f"Rol inhabilitado. {result['users_reassigned']} usuario(s) pasaron a "
+                    f"{result['fallback_role']}."
+                ),
+                **result,
+            }
+        )
+    except ValueError as e:
+        return _roles_error(e)
+
+
+@auth_bp.post("/roles/<slug>/inhabilitar")
+@permission_required("users.manage")
+def roles_disable(slug: str):
+    try:
+        result = roles_service.disable_role(slug)
+        log_audit(
+            "disable_role",
+            entity="app_roles",
+            entity_id=slug,
+            details=result,
+        )
+        return jsonify(
+            {
+                "status": "ok",
+                "message": (
+                    f"Rol inhabilitado. {result['users_reassigned']} usuario(s) pasaron a "
+                    f"{result['fallback_role']}."
+                ),
+                **result,
+            }
+        )
+    except ValueError as e:
+        return _roles_error(e)
+
+
+@auth_bp.post("/roles/<slug>/habilitar")
+@permission_required("users.manage")
+def roles_enable(slug: str):
+    try:
+        result = roles_service.enable_role(slug)
+        log_audit(
+            "enable_role",
+            entity="app_roles",
+            entity_id=slug,
+            details=result,
+        )
+        return jsonify(
+            {
+                "status": "ok",
+                "message": (
+                    "Rol habilitado. Vuelve a asignarlo a los usuarios que lo necesiten."
+                ),
+                **result,
+            }
+        )
     except ValueError as e:
         return _roles_error(e)
 
 
 @auth_bp.get("/users")
-@admin_required
+@permission_required("users.manage")
 def users_list():
     limit = min(int(request.args.get("limit", 100)), 200)
     offset = max(int(request.args.get("offset", 0)), 0)
-    data = user_store.list_users(limit=limit, offset=offset)
+    q = (request.args.get("q") or request.args.get("search") or "").strip() or None
+    data = user_store.list_users(limit=limit, offset=offset, q=q)
     assignable = roles_service.assignable_roles()
     return jsonify({"status": "ok", **data, "assignable_roles": assignable})
 
 
 @auth_bp.patch("/users/<user_id>")
-@admin_required
+@permission_required("users.manage")
 def users_patch(user_id: str):
     body = request.get_json(silent=True) or {}
     role = (body.get("role") or "").strip()
     if not role:
         return jsonify({"status": "error", "message": "Indique el rol."}), 400
     try:
-        user = user_store.update_user_role(user_id, role)
+        user = user_store.update_user_role(user_id, role, actor_id=session.get("user_id"))
         log_audit("update_user_role", entity="users", entity_id=user_id, details={"role": role})
         return jsonify({"status": "ok", "user": user})
+    except ValueError as e:
+        return _users_error(e)
+
+
+@auth_bp.post("/users/<user_id>/inhabilitar")
+@permission_required("users.manage")
+def users_deactivate(user_id: str):
+    try:
+        user = user_store.deactivate_user(user_id, actor_id=session.get("user_id"))
+        log_audit("deactivate_user", entity="users", entity_id=user_id, details={"email": user.get("email")})
+        return jsonify(
+            {
+                "status": "ok",
+                "message": f"Cuenta {user.get('email', '')} desactivada.",
+                "user": user,
+            }
+        )
     except ValueError as e:
         return _users_error(e)
 
@@ -308,6 +381,10 @@ def _roles_error(exc: ValueError):
         "not_found": ("Rol no encontrado.", 404),
         "system_role": ("No se puede eliminar un rol del sistema.", 409),
         "role_in_use": ("Hay usuarios con este rol.", 409),
+        "protected_role": ("Este rol no se puede editar ni inhabilitar.", 409),
+        "already_inactive": ("Este rol ya está inhabilitado.", 409),
+        "already_active": ("Este rol ya está activo.", 409),
+        "role_inactive": ("Este rol está inhabilitado.", 409),
         "pages_required": ("Seleccione al menos una página.", 400),
     }
     msg, status = messages.get(code, (code, 400))
@@ -319,7 +396,12 @@ def _users_error(exc: ValueError):
     messages = {
         "invalid_role": ("Rol no válido.", 400),
         "role_not_assignable": ("Este rol no se puede asignar.", 403),
+        "role_inactive": ("Este rol está inhabilitado.", 403),
         "not_found": ("Usuario no encontrado.", 404),
+        "cannot_change_own_role": ("No puedes cambiar tu propio rol.", 409),
+        "cannot_change_last_admin": ("Debe quedar al menos un administrador activo.", 409),
+        "cannot_deactivate_self": ("No puedes desactivar tu propia cuenta.", 409),
+        "last_admin": ("No puedes desactivar al último administrador.", 409),
     }
     msg, status = messages.get(code, (code, 400))
     return jsonify({"status": "error", "message": msg, "code": code}), status
@@ -338,6 +420,12 @@ def _profile_error(exc: ValueError):
 
 @auth_bp.post("/forgot-password")
 def forgot_password():
+    rate_msg = check_rate_limit("forgot", _client_key(), max_attempts=3, window_sec=3600)
+    if rate_msg:
+        return jsonify({"status": "error", "message": rate_msg}), 429
+
+    record_attempt("forgot", _client_key())
+
     body = request.get_json(silent=True) or {}
     email = normalize_email(body.get("email", ""))
     if not email:
@@ -355,6 +443,10 @@ def forgot_password():
 
 @auth_bp.post("/reset-password")
 def reset_password_route():
+    rate_msg = check_rate_limit("reset", _client_key(), max_attempts=8, window_sec=900)
+    if rate_msg:
+        return jsonify({"status": "error", "message": rate_msg}), 429
+
     body = request.get_json(silent=True) or {}
     token = (body.get("token") or "").strip()
     new_password = body.get("new_password") or ""
@@ -364,8 +456,21 @@ def reset_password_route():
     try:
         user = password_reset.reset_password(token, new_password, password_confirm)
     except ValueError as e:
+        record_attempt("reset", _client_key())
         return _reset_error(e)
+    clear_attempts("reset", _client_key())
     return jsonify({"status": "ok", "message": "Contraseña restablecida. Ya puedes iniciar sesión.", "user": user})
+
+
+@auth_bp.get("/notifications/pulse")
+@login_required
+def notifications_pulse():
+    from shared.notifications import pulse_for_email
+
+    email = session.get("email") or ""
+    after = int(request.args.get("after", 0) or 0)
+    data = pulse_for_email(email, after_id=after)
+    return jsonify({"status": "ok", **data})
 
 
 @auth_bp.get("/notifications")

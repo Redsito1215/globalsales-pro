@@ -33,7 +33,8 @@ def listar_mensajes():
         return jsonify({"status": "error", "message": "No puedes ver este hilo."}), 403
     if _is_staff() and not thread:
         return jsonify({"status": "error", "message": "Indica el hilo del cliente."}), 400
-    data = services.list_thread(thread)
+    after = int(request.args.get("after", 0) or 0)
+    data = services.list_thread(thread, after_id=after)
     return jsonify({"status": "ok", **data})
 
 
@@ -61,6 +62,8 @@ def enviar_mensaje():
         code = str(e)
         if code == "message_required":
             return jsonify({"status": "error", "message": "Escribe un mensaje."}), 400
+        if code == "message_too_long":
+            return jsonify({"status": "error", "message": "El mensaje no puede superar 100 palabras."}), 400
         raise
 
 

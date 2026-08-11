@@ -2,20 +2,23 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any
 
-from pymongo import ASCENDING, MongoClient
+from pymongo import ASCENDING
 from pymongo.errors import DuplicateKeyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from auth import roles_service
-from config.settings import settings
+from shared.roles_registry import ADMIN_ROLE
 
 COLLECTION = "users"
 
 
 def _db():
-    return MongoClient(settings.mongo_uri)[settings.mongo_db]
+    from shared.mongo import get_ops_db
+
+    return get_ops_db()
 
 
 def _col():
@@ -59,7 +62,8 @@ def public_user(doc: dict[str, Any]) -> dict[str, Any]:
 
 def create_user(*, email: str, password: str, name: str, role: str = "cliente") -> dict[str, Any]:
     roles_service.ensure_roles_seed()
-    if not roles_service.role_exists(role):
+    role_doc = roles_service.get_role(role)
+    if not role_doc or role_doc.get("active") is False:
         role = "cliente"
     doc = {
         "email": email,
@@ -80,13 +84,24 @@ def verify_password(doc: dict[str, Any], password: str) -> bool:
     return check_password_hash(doc.get("password_hash", ""), password)
 
 
-def list_users(*, limit: int = 100, offset: int = 0) -> dict[str, Any]:
-    query = {"active": True}
+def count_active_admins() -> int:
+    return _col().count_documents({"active": True, "role": ADMIN_ROLE})
+
+
+def list_users(*, limit: int = 100, offset: int = 0, q: str | None = None) -> dict[str, Any]:
+    query: dict[str, Any] = {"active": True}
+    term = (q or "").strip()
+    if term:
+        rx = re.escape(term)
+        query["$or"] = [
+            {"email": {"$regex": rx, "$options": "i"}},
+            {"name": {"$regex": rx, "$options": "i"}},
+        ]
     total = _col().count_documents(query)
     rows = []
     for doc in _col().find(query).sort("email", 1).skip(offset).limit(limit):
         rows.append(public_user(doc))
-    return {"total": total, "limit": limit, "offset": offset, "users": rows}
+    return {"total": total, "limit": limit, "offset": offset, "users": rows, "query": term or None}
 
 
 def list_emails_by_roles(roles: list[str]) -> list[str]:
@@ -101,19 +116,39 @@ def list_emails_by_roles(roles: list[str]) -> list[str]:
     return emails
 
 
-def update_user_role(user_id: str, role: str) -> dict[str, Any]:
+def update_user_role(user_id: str, role: str, *, actor_id: str | None = None) -> dict[str, Any]:
     roles_service.ensure_roles_seed()
     role_doc = roles_service.get_role(role)
     if not role_doc:
         raise ValueError("invalid_role")
+    if role_doc.get("active") is False:
+        raise ValueError("role_inactive")
     if not role_doc.get("assignable", True):
         raise ValueError("role_not_assignable")
     doc = find_by_id(user_id)
     if not doc:
         raise ValueError("not_found")
+    if actor_id and str(doc["_id"]) == actor_id:
+        raise ValueError("cannot_change_own_role")
+    current_role = doc.get("role")
+    if current_role == ADMIN_ROLE and role != ADMIN_ROLE and count_active_admins() <= 1:
+        raise ValueError("cannot_change_last_admin")
     _col().update_one({"_id": doc["_id"]}, {"$set": {"role": role}})
     updated = find_by_id(user_id)
     return public_user(updated) if updated else {}
+
+
+def deactivate_user(user_id: str, *, actor_id: str | None = None) -> dict[str, Any]:
+    doc = find_by_id(user_id)
+    if not doc:
+        raise ValueError("not_found")
+    if actor_id and str(doc["_id"]) == actor_id:
+        raise ValueError("cannot_deactivate_self")
+    if doc.get("role") == ADMIN_ROLE and count_active_admins() <= 1:
+        raise ValueError("last_admin")
+    pub = public_user(doc)
+    _col().update_one({"_id": doc["_id"]}, {"$set": {"active": False}})
+    return pub
 
 
 def update_profile(

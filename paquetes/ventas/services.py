@@ -28,6 +28,8 @@ ACTIVE_STATUSES = frozenset({"pendiente", "en_revision", "aprobada", "convertida
 RESTOCK_STATUSES = frozenset({"rechazada", "cancelada"})
 POST_SALE_STATUSES = frozenset({"enviada", "entregada"})
 PAYMENT_STATUSES = frozenset({"pendiente_pago", "pagado", "credito"})
+PAYMENT_METHODS_OFFLINE = frozenset({"tarjeta", "efectivo_tarjeta"})
+PAYMENT_METHODS_ONLINE = frozenset({"tarjeta", "credito", "cuenta_bancaria"})
 RETURN_CONDITIONS = frozenset({"apto", "danado", "mixto"})
 
 
@@ -112,6 +114,7 @@ def list_requests(
         row["lines"] = list(
             db["purchase_request_lines"].find({"request_id": row["request_id"]}, {"_id": 0})
         )
+        _normalize_request_row(row)
     return {"total": total, "limit": limit, "offset": offset, "requests": rows}
 
 
@@ -146,7 +149,97 @@ def list_requests_for_email(email: str, *, limit: int = 50, offset: int = 0) -> 
         row["lines"] = list(
             db["purchase_request_lines"].find({"request_id": rid}, {"_id": 0})
         )
+        _normalize_request_row(row)
     return {"total": total, "limit": limit, "offset": offset, "requests": rows}
+
+
+def _client_email_registered(email: str) -> bool:
+    addr = (email or "").strip()
+    if not addr:
+        return False
+    return bool(
+        get_db()["users"].find_one(
+            {"email": {"$regex": f"^{re.escape(addr)}$", "$options": "i"}},
+            {"_id": 1},
+        )
+    )
+
+
+def _payment_methods_for(req: dict[str, Any]) -> frozenset[str]:
+    ch = req if req.get("channel_id") is not None or req.get("channel_name") else {}
+    if not ch.get("channel_name") and req.get("channel_id"):
+        ch = get_db()["dim_canal"].find_one({"channel_id": req.get("channel_id")}, {"_id": 0}) or ch
+    if _is_offline_channel(ch or req):
+        return PAYMENT_METHODS_OFFLINE
+    return PAYMENT_METHODS_ONLINE
+
+
+def _normalize_payment_method(method: str, req: dict[str, Any]) -> str:
+    m = (method or "").strip().lower()
+    allowed = _payment_methods_for(req)
+    if m not in allowed:
+        raise ValueError("invalid_payment_method")
+    return m
+
+
+def _is_offline_channel(channel_or_req: dict[str, Any] | None) -> bool:
+    """Ventas presenciales (canal Offline) no pasan por envío."""
+    if not channel_or_req:
+        return False
+    name = (channel_or_req.get("channel_name") or channel_or_req.get("name") or "").strip().lower()
+    if name == "offline":
+        return True
+    cid = channel_or_req.get("channel_id")
+    try:
+        return int(cid) == 2
+    except (TypeError, ValueError):
+        return False
+
+
+def _payment_allows_progress(req: dict[str, Any]) -> bool:
+    """Online: solo «pagado» por el cliente. Offline: pagado o crédito comercial."""
+    pay = req.get("payment_status") or "pendiente_pago"
+    if _is_offline_channel(req):
+        return pay in ("pagado", "credito")
+    return pay == "pagado"
+
+
+def platform_order_id(request_id: int) -> str:
+    """ID único de venta generada desde una solicitud de la plataforma."""
+    return f"V-{int(request_id):05d}"
+
+
+def display_order_id(order_id: Any, request_id: Any = None) -> str:
+    """Etiqueta legible; corrige el ID erróneo 1000000000 del histórico CSV."""
+    oid = str(order_id or "").strip()
+    if not oid:
+        return ""
+    if oid == "1000000000" and request_id is not None:
+        try:
+            return platform_order_id(int(request_id))
+        except (TypeError, ValueError):
+            pass
+    return oid
+
+
+def repair_legacy_platform_order_ids(db=None) -> int:
+    """Reasigna pedidos de plataforma que quedaron con order_id=1000000000."""
+    db = db or get_db()
+    fixed = 0
+    for req in db["purchase_requests"].find({"order_id": "1000000000"}, {"request_id": 1}):
+        rid = int(req["request_id"])
+        new_id = platform_order_id(rid)
+        db["purchase_requests"].update_one({"request_id": rid}, {"$set": {"order_id": new_id}})
+        db["sales_records"].update_many({"request_id": rid}, {"$set": {"order_id": new_id}})
+        fixed += 1
+    return fixed
+
+
+def _normalize_request_row(row: dict[str, Any]) -> None:
+    if row.get("order_id"):
+        row["order_id"] = display_order_id(row["order_id"], row.get("request_id"))
+    email = (row.get("client_email") or "").strip()
+    row["client_user_registered"] = _client_email_registered(email) if email else False
 
 
 def get_request(request_id: int) -> dict[str, Any] | None:
@@ -167,6 +260,10 @@ def get_request(request_id: int) -> dict[str, Any] | None:
     if email:
         q = {"client_email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}}
         req["client_order_no"] = _client_order_numbers(db["purchase_requests"], q).get(int(request_id), 0)
+    if req.get("order_id"):
+        req["order_id"] = display_order_id(req["order_id"], req.get("request_id"))
+    email = (req.get("client_email") or "").strip()
+    req["client_user_registered"] = _client_email_registered(email) if email else False
     return req
 
 
@@ -254,6 +351,9 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         "discount_code": (data.get("discount_code") or "").strip().upper() or None,
         "discount_amount": round(float(data.get("discount_amount") or 0), 2),
         "subtotal": round(float(data.get("subtotal") or 0), 2),
+        "shipping_cost": round(float(data.get("shipping_cost") or 0), 2),
+        "shipping_destination": (data.get("shipping_destination") or data.get("destination") or "").strip() or None,
+        "shipping_region": (data.get("shipping_region") or "").strip() or None,
         "total": round(float(data.get("total") or 0), 2),
         "stock_lines": stock_lines,
         "stock_restored": False,
@@ -311,10 +411,14 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         doc["line_net"] = round(max(doc["line_gross"] - share, 0.0), 2)
 
     calc_subtotal = round(sum(built_gross), 2)
-    calc_total = round(max(calc_subtotal - discount_amount, 0.0), 2)
+    shipping_cost = round(float(data.get("shipping_cost") or 0), 2)
+    calc_total = round(max(calc_subtotal - discount_amount + shipping_cost, 0.0), 2)
     if not data.get("subtotal"):
         request_doc["subtotal"] = calc_subtotal
         req_col.update_one({"request_id": rid}, {"$set": {"subtotal": calc_subtotal}})
+    if data.get("shipping_cost") is None and shipping_cost:
+        request_doc["shipping_cost"] = shipping_cost
+        req_col.update_one({"request_id": rid}, {"$set": {"shipping_cost": shipping_cost}})
     if not data.get("total"):
         request_doc["total"] = calc_total
         req_col.update_one({"request_id": rid}, {"$set": {"total": calc_total}})
@@ -386,19 +490,25 @@ def update_status(request_id: int, status: str, *, reviewer_email: str | None = 
     if status == "rechazada" and current == "aprobada":
         raise ValueError("cannot_reject_approved")
 
+    offline = _is_offline_channel(req)
+    if status == "enviada" and offline:
+        raise ValueError("offline_no_shipping")
+
     allowed = _STATUS_TRANSITIONS.get(str(current) if current else "", frozenset())
+    if offline and current == "convertida" and status == "entregada":
+        allowed = frozenset({"entregada"})
     if status not in allowed:
         if status == "enviada":
+            if offline:
+                raise ValueError("offline_no_shipping")
             raise ValueError("must_convert_first")
         if status == "entregada":
             raise ValueError("must_ship_first")
         raise ValueError("invalid_transition")
 
-    # Postventa: convertida → enviada → entregada
-    if status == "enviada":
-        pay = req.get("payment_status") or "pendiente_pago"
-        if pay not in ("pagado", "credito"):
-            raise ValueError("payment_required")
+    # Postventa: convertida → enviada → entregada (Offline: convertida → entregada)
+    if status == "enviada" and not _payment_allows_progress(req):
+        raise ValueError("payment_required")
 
     patch: dict[str, Any] = {"status": status, "reviewed_by": reviewer_email}
     if status == "enviada":
@@ -409,7 +519,7 @@ def update_status(request_id: int, status: str, *, reviewer_email: str | None = 
         patch["delivered_at"] = date.today().isoformat()
         if not req.get("shipped_at"):
             patch["shipped_at"] = date.today().isoformat()
-        if not req.get("tracking_number"):
+        if not offline and not req.get("tracking_number"):
             patch["tracking_number"] = f"GT-{int(request_id):06d}"
 
     db["purchase_requests"].update_one({"request_id": int(request_id)}, {"$set": patch})
@@ -441,6 +551,10 @@ def update_payment(
         raise ValueError("not_found")
     if req.get("status") in ("rechazada", "cancelada"):
         raise ValueError("cannot_pay_closed")
+    if payment_status == "credito":
+        ch = db["dim_canal"].find_one({"channel_id": req.get("channel_id")}, {"_id": 0, "name": 1})
+        if not _is_offline_channel(ch or {"channel_id": req.get("channel_id")}):
+            raise ValueError("credit_offline_only")
     patch: dict[str, Any] = {
         "payment_status": payment_status,
         "reviewed_by": reviewer_email,
@@ -484,14 +598,13 @@ def client_pay(
     request_id: int,
     *,
     client_email: str,
-    method: str = "transferencia",
+    method: str = "tarjeta",
 ) -> dict[str, Any]:
     """El cliente confirma el pago de su propia solicitud (demo sin pasarela real)."""
     email = (client_email or "").strip().lower()
     if not email:
         raise ValueError("forbidden")
-    db = get_db()
-    req = db["purchase_requests"].find_one({"request_id": int(request_id)})
+    req = get_request(int(request_id))
     if not req:
         raise ValueError("not_found")
     if (req.get("client_email") or "").strip().lower() != email:
@@ -500,13 +613,53 @@ def client_pay(
         raise ValueError("cannot_pay_closed")
     if (req.get("payment_status") or "pendiente_pago") == "pagado":
         raise ValueError("already_paid")
-    method_norm = (method or "transferencia").strip().lower()
-    if method_norm not in ("transferencia", "tarjeta"):
-        method_norm = "transferencia"
+    method_norm = _normalize_payment_method(method, req)
+    if method_norm == "credito":
+        return update_payment(
+            request_id,
+            "credito",
+            reviewer_email=email,
+            payment_method=method_norm,
+        )
     return update_payment(
         request_id,
         "pagado",
         reviewer_email=email,
+        payment_method=method_norm,
+    )
+
+
+def staff_register_payment(
+    request_id: int,
+    *,
+    staff_email: str,
+    method: str,
+) -> dict[str, Any]:
+    """Vendedor/admin registra pago cuando el cliente no puede (offline o correo sin cuenta)."""
+    req = get_request(int(request_id))
+    if not req:
+        raise ValueError("not_found")
+    if req.get("status") in ("rechazada", "cancelada", "devuelta"):
+        raise ValueError("cannot_pay_closed")
+    if (req.get("payment_status") or "pendiente_pago") == "pagado":
+        raise ValueError("already_paid")
+    offline = _is_offline_channel(req)
+    registered = bool(req.get("client_user_registered"))
+    if not offline and registered:
+        raise ValueError("client_must_pay")
+    method_norm = _normalize_payment_method(method, req)
+    reviewer = (staff_email or "").strip()
+    if method_norm == "credito":
+        return update_payment(
+            request_id,
+            "credito",
+            reviewer_email=reviewer,
+            payment_method=method_norm,
+        )
+    return update_payment(
+        request_id,
+        "pagado",
+        reviewer_email=reviewer,
         payment_method=method_norm,
     )
 
@@ -533,9 +686,7 @@ def convert_to_sale(
     if not can_bypass and req.get("status") != "aprobada":
         raise ValueError("approval_required")
 
-    # No convertir a venta hasta que el cliente pague o se registre crédito
-    pay = req.get("payment_status") or "pendiente_pago"
-    if pay not in ("pagado", "credito"):
+    if not _payment_allows_progress(req):
         raise ValueError("payment_required_before_convert")
 
     country = db["dim_pais"].find_one({"country_id": req["country_id"]}, {"_id": 0})
@@ -563,13 +714,7 @@ def convert_to_sale(
             line["line_net"] = round(max(grosses[i] - float(line.get("discount_alloc") or 0), 0), 2)
 
     col = sales_collection()
-    last = col.find_one({}, {"order_id": 1, "_id": 0}, sort=[("order_id", -1)])
-    try:
-        next_oid = int(str(last["order_id"])) + 1 if last and last.get("order_id") else 1
-    except ValueError:
-        next_oid = col.count_documents({}) + 1
-
-    order_id = str(next_oid)
+    order_id = platform_order_id(int(request_id))
     order_date = date.today().isoformat()
     ship_date = (date.today() + timedelta(days=7)).isoformat()
     payment_status = req.get("payment_status") or "pendiente_pago"
@@ -625,25 +770,42 @@ def convert_to_sale(
 
         finalize_committed(req.get("stock_lines") or [])
 
+    offline = _is_offline_channel(channel)
+    status_patch: dict[str, Any] = {
+        "order_id": order_id,
+        "reviewed_by": admin_email,
+        "stock_committed_closed": True,
+    }
+    if offline:
+        today = date.today().isoformat()
+        status_patch.update(
+            {
+                "status": "entregada",
+                "delivered_at": today,
+                "shipped_at": today,
+                "tracking_number": None,
+            }
+        )
+    else:
+        status_patch["status"] = "convertida"
+
     db["purchase_requests"].update_one(
         {"request_id": int(request_id)},
-        {
-            "$set": {
-                "status": "convertida",
-                "order_id": order_id,
-                "reviewed_by": admin_email,
-                "stock_committed_closed": True,
-            }
-        },
+        {"$set": status_patch},
     )
     log_audit(
         "convert_request",
         entity="purchase_requests",
         entity_id=request_id,
-        details={"order_id": order_id, "lines": inserted, "discount": discount},
+        details={
+            "order_id": order_id,
+            "lines": inserted,
+            "discount": discount,
+            "offline": offline,
+        },
     )
     full = get_request(request_id) or {}
-    _notify_request_status(full, "convertida")
+    _notify_request_status(full, "entregada" if offline else "convertida")
 
     analytics_stale = True
     sync_info: dict[str, Any] = {}
@@ -667,6 +829,8 @@ def convert_to_sale(
         "sales_inserted": inserted,
         "discount_amount": discount,
         "payment_status": payment_status,
+        "offline_sale": offline,
+        "final_status": "entregada" if offline else "convertida",
         "analytics_stale": analytics_stale,
         "analytics_sync": sync_info,
         "data_layer": "landing" if analytics_stale else "estrategico",
@@ -965,7 +1129,14 @@ def create_order(data: dict[str, Any]) -> dict[str, Any]:
     }
     col.insert_one(doc)
     log_audit("create_order", entity="sales_records", entity_id=oid, details=doc)
-    return doc
+    sync_info: dict[str, Any] = {}
+    try:
+        from shared.analytics_sync import sync_order_to_fact
+
+        sync_info = sync_order_to_fact(oid)
+    except Exception as exc:
+        sync_info = {"error": str(exc)}
+    return {**doc, "analytics_sync": sync_info}
 
 
 def update_order(order_id: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -997,6 +1168,12 @@ def update_order(order_id: str, data: dict[str, Any]) -> dict[str, Any]:
 
     col.update_many({"order_id": str(order_id)}, {"$set": patch})
     log_audit("update_order", entity="sales_records", entity_id=order_id, details=patch)
+    try:
+        from shared.analytics_sync import sync_order_to_fact
+
+        sync_order_to_fact(order_id, force=True)
+    except Exception:
+        pass
     row = col.find_one({"order_id": str(order_id)}, {"_id": 0})
     return dict(row) if row else {}
 
@@ -1007,5 +1184,14 @@ def delete_order(order_id: str) -> int:
     if not n:
         raise ValueError("not_found")
     col.delete_many({"order_id": str(order_id)})
+    try:
+        db = get_db()
+        db["fact_ventas"].delete_many({"order_id": str(order_id)})
+        try:
+            db["fact_ventas"].delete_many({"order_id": int(order_id)})
+        except (TypeError, ValueError):
+            pass
+    except Exception:
+        pass
     log_audit("delete_order", entity="sales_records", entity_id=order_id, details={"deleted": n})
     return n

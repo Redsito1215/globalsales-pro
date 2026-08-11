@@ -19,28 +19,63 @@ function notifTypeMeta(type) {
 }
 
 async function refreshNotificationBadge() {
-  const badge = document.getElementById('notif-badge');
-  const navBadge = document.getElementById('notif-nav-badge');
-  const btn = document.getElementById('btn-notifications');
   if (!window._authUser) {
+    const btn = document.getElementById('btn-notifications');
     if (btn) btn.hidden = true;
-    if (navBadge) navBadge.hidden = true;
+    document.getElementById('notif-nav-badge')?.setAttribute('hidden', '');
     return;
   }
-  if (btn) btn.hidden = false;
   try {
-    const r = await fetch(API + '/auth/notifications?limit=1', { credentials: 'same-origin' });
+    const r = await fetch(API + '/auth/notifications/pulse?after=0', { credentials: 'same-origin' });
     const data = await r.json();
     if (!r.ok) return;
     const n = data.unread || 0;
     const text = n > 99 ? '99+' : String(n);
-    [badge, navBadge].forEach(el => {
+    ['notif-badge', 'notif-nav-badge'].forEach(id => {
+      const el = document.getElementById(id);
       if (!el) return;
       el.textContent = text;
       el.hidden = n <= 0;
     });
+    const btn = document.getElementById('btn-notifications');
+    if (btn) btn.hidden = false;
   } catch { /* ignore */ }
 }
+
+function prependNotificationCard(n) {
+  const list = document.getElementById('notificaciones-list');
+  if (!list || !n) return;
+  list.querySelector('.catalog-empty')?.remove();
+  const type = notifTypeFrom(n);
+  const metaT = notifTypeMeta(type);
+  const unread = !n.read;
+  const html = `
+    <article class="notif-card notif-card--${type} ${n.read ? 'notif-card--read' : ''}" data-id="${n.notification_id}">
+      <div class="notif-icon" aria-hidden="true">${metaT.short}</div>
+      <div class="notif-card-main">
+        <div class="notif-tags">
+          <span class="notif-tag">${metaT.label}</span>
+          ${unread ? '<span class="notif-tag">Sin leer</span>' : ''}
+        </div>
+        <div class="notif-card-head">
+          <strong>${n.subject || 'Aviso'}</strong>
+          <span class="notif-date">${(n.created_at || '').slice(0, 16).replace('T', ' ')}</span>
+        </div>
+        <p class="notif-body">${(n.body || '').replace(/\n/g, '<br>')}</p>
+        <div class="notif-actions">${notifActionsHtml(n, type)}</div>
+      </div>
+    </article>`;
+  list.insertAdjacentHTML('afterbegin', html);
+  const meta = document.getElementById('notificaciones-meta');
+  if (meta) {
+    const cards = list.querySelectorAll('.notif-card');
+    const unreadCount = [...cards].filter(c => !c.classList.contains('notif-card--read')).length;
+    meta.textContent = `${unreadCount} sin leer · ${cards.length} en pantalla`;
+  }
+}
+
+window.prependNotificationCard = prependNotificationCard;
+window.notifTypeFrom = notifTypeFrom;
 
 async function loadNotificacionesPage() {
   const list = document.getElementById('notificaciones-list');

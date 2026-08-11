@@ -1,0 +1,38 @@
+# Réplica set local (1 nodo) — overlay sobre docker-compose.yml
+#
+#   docker compose -f docker-compose.yml -f docker-compose.mongo-rs.yml up -d --build
+#
+# Tras el init, la app usa replicaSet=rs0 y lecturas analíticas con secondaryPreferred.
+
+services:
+  mongo:
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+
+  mongo-rs-init:
+    image: mongo:7
+    container_name: globtrade-saas-mongo-rs-init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: >
+      mongosh --host mongo:27017 --quiet --eval
+      "try { rs.status(); print('replica set ya iniciado'); }
+      catch (e) { rs.initiate({_id:'rs0', members:[{_id:0, host:'mongo:27017'}]}); print('replica set rs0 iniciado'); }"
+
+  web:
+    environment:
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_REPLICA_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_REPLICA_SET: rs0
+
+  api:
+    environment:
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_REPLICA_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_REPLICA_SET: rs0
+
+  etl-mongo:
+    environment:
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_REPLICA_SET: rs0

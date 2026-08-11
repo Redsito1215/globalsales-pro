@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from shared.data_layers import analytics_fact, landing_sales, strategic_ready
-from shared.mongo import get_db, sales_collection
+from shared.mongo import get_db, get_read_dw_db, sales_collection
 
 # Caché en memoria (demo)
 _CACHE: dict[str, tuple[float, Any]] = {}
@@ -72,7 +72,7 @@ def _fact_match(
     months: int | None = None,
 ) -> dict[str, Any]:
     """Filtros en IDs de fact_ventas (+ fecha_id)."""
-    db = get_db()
+    db = get_read_dw_db()
     q: dict[str, Any] = {}
     if region:
         r = db["dim_region"].find_one({"name": region}, {"region_id": 1})

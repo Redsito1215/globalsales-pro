@@ -52,17 +52,37 @@ function solicitudDetailBtn(id) {
   return `<button type="button" class="btn btn-ghost btn-ops" onclick="openSolicitudDetail(${id})">Ver</button>`;
 }
 
+function isOfflineRequest(req) {
+  const name = String(req?.channel_name || '').trim().toLowerCase();
+  return name === 'offline' || Number(req?.channel_id) === 2;
+}
+
+function paymentOkForProgress(req) {
+  const pay = req.payment_status || 'pendiente_pago';
+  if (isOfflineRequest(req)) return ['pagado', 'credito'].includes(pay);
+  return pay === 'pagado';
+}
+
 function payButtons(req) {
   if (!hasPermission('ventas.manage')) return '';
   if (['rechazada', 'cancelada'].includes(req.status)) return '';
   const pay = req.payment_status || 'pendiente_pago';
   if (pay === 'pagado') return '';
+  const offline = isOfflineRequest(req);
+  const registered = req.client_user_registered === true;
+  const staffCanRegister = offline || !registered;
   if (pay === 'credito') {
-    return `<span style="font-size:10px;color:var(--muted)">Crédito · espera envío</span>`;
+    if (offline) {
+      return `<span style="font-size:10px;color:var(--muted)">Crédito · venta presencial</span>`;
+    }
+    return `<span style="font-size:10px;color:var(--warn)">Online: cliente debe pagar en Mis pedidos</span>`;
   }
-  return `
-    <span style="font-size:10px;color:var(--muted)">Espera pago del cliente</span>
-    <button type="button" class="btn btn-ghost btn-ops" onclick="setSolicitudPago(${req.request_id},'credito')">Crédito</button>`;
+  if (staffCanRegister) {
+    return `
+      <button type="button" class="btn btn-primary btn-ops btn-sm" onclick="openPagoModal(${req.request_id}, { staff: true })">Registrar pago</button>
+      ${offline ? `<button type="button" class="btn btn-ghost btn-ops btn-sm" onclick="setSolicitudPago(${req.request_id},'credito')">Crédito</button>` : ''}`;
+  }
+  return `<span style="font-size:10px;color:var(--muted)">Espera pago del cliente (Mis pedidos → Pagar)</span>`;
 }
 
 function solicitudActions(req) {
@@ -86,7 +106,14 @@ function solicitudActions(req) {
       <button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'entregada')">Marcar entregada</button>`;
   }
   if (status === 'convertida') {
-    const payOk = ['pagado', 'credito'].includes(req.payment_status);
+    const payOk = paymentOkForProgress(req);
+    if (isOfflineRequest(req)) {
+      return `${detail} ${pay}
+        ${payOk
+          ? `<button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'entregada')">Marcar entregada</button>`
+          : `<span style="font-size:10px;color:var(--muted)">Espera pago del cliente o usa crédito</span>`}
+        <span style="font-size:10px;color:var(--muted)">${req.order_id || 'Venta presencial'}</span>`;
+    }
     return `${detail} ${pay}
       ${payOk
         ? `<button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'enviada')">Marcar enviada</button>`
@@ -97,7 +124,7 @@ function solicitudActions(req) {
     return `${detail} <span style="font-size:10px;color:var(--muted)">Cerrada</span>`;
   }
   if (status === 'aprobada') {
-    const payOk = ['pagado', 'credito'].includes(req.payment_status);
+    const payOk = paymentOkForProgress(req);
     return `${detail} ${pay}
       ${payOk
         ? `<button type="button" class="btn btn-primary btn-ops" onclick="convertirSolicitud(${req.request_id})">Convertir venta</button>`
@@ -108,7 +135,7 @@ function solicitudActions(req) {
     ? `<button type="button" class="btn btn-ghost btn-ops" onclick="setSolicitudEstado(${req.request_id},'en_revision')">Revisar</button>`
     : '';
   const approveBtn = `<button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'aprobada')">Aprobar</button>`;
-  const payOk = ['pagado', 'credito'].includes(req.payment_status);
+  const payOk = paymentOkForProgress(req);
   let convertBtn = `<span style="font-size:10px;color:var(--muted)">Aprueba antes de convertir</span>`;
   if (canConvertWithoutApproval()) {
     convertBtn = payOk
@@ -190,7 +217,7 @@ async function loadSolicitudes() {
     rows.forEach(req => {
       const pay = req.payment_status || 'pendiente_pago';
       if (pay === 'pendiente_pago' && ['aprobada', 'en_revision', 'pendiente'].includes(req.status)) awaitPay++;
-      if (req.status === 'convertida' && ['pagado', 'credito'].includes(pay)) awaitShip++;
+      if (req.status === 'convertida' && paymentOkForProgress(req) && !isOfflineRequest(req)) awaitShip++;
       if (req.status === 'enviada') awaitDeliver++;
     });
     chips.innerHTML = `
@@ -237,14 +264,15 @@ async function setSolicitudEstado(id, status) {
     body: JSON.stringify({ status }),
   });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  notifyOk(status === 'aprobada' ? 'Solicitud aprobada.' : status === 'rechazada' ? 'Solicitud rechazada.' : `Estado actualizado: ${status}.`);
   await loadSolicitudes();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
 }
 
 async function setSolicitudPago(id, payment_status) {
   if (payment_status === 'pagado') {
-    alert('Solo el cliente puede marcar el pedido como pagado (Mis pedidos → Pagar).');
+    notifyWarn('Solo el cliente puede marcar el pedido como pagado (Mis pedidos → Pagar).');
     return;
   }
   const r = await fetch(`${API}/solicitudes/${id}/pago`, {
@@ -254,7 +282,8 @@ async function setSolicitudPago(id, payment_status) {
     body: JSON.stringify({ payment_status }),
   });
   const data = await r.json();
-  if (!r.ok) { alert(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  notifyOk('Estado de pago actualizado.');
   await loadSolicitudes();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
 }
@@ -272,7 +301,7 @@ async function devolverSolicitud(id) {
   try {
     const r = await fetch(`${API}/solicitudes/${id}`, { credentials: 'same-origin' });
     const data = await r.json();
-    if (!r.ok) { alert(data.message || 'No se pudo cargar la solicitud'); return; }
+    if (!r.ok) { notifyErr(data.message || 'No se pudo cargar la solicitud'); return; }
     const req = data.request || {};
     const lines = req.lines || [];
     const stock = req.stock_lines || [];
@@ -296,7 +325,7 @@ async function devolverSolicitud(id) {
       })).filter(l => l.variant_id >= 1 && l.quantity >= 1);
     }
   } catch (e) {
-    alert('Error de red al cargar la solicitud');
+    notifyErr('Error de red al cargar la solicitud');
     return;
   }
   renderDevolverLines();
@@ -368,43 +397,59 @@ async function confirmDevolverSolicitud() {
   const data = await r.json();
   if (!r.ok) {
     if (err) err.textContent = data.message || 'Error';
-    else alert(data.message || 'Error');
+    else notifyErr(data.message || 'Error');
     return;
   }
   closeDevolverModal();
-  alert(data.message || 'Devolución registrada');
+  notifyOk(data.message || 'Devolución registrada');
   await loadSolicitudes();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
 }
 
 async function convertirSolicitud(id) {
-  if (!confirm('¿Convertir esta solicitud en venta (landing sales_records)? El Tablero estratégico se actualiza tras Construir modelo / ELT.')) return;
+  if (typeof opsConfirm !== 'function') {
+    notifyErr('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).');
+    return;
+  }
+  const ok = await opsConfirm({
+    title: 'Convertir solicitud',
+    message: '¿Convertir esta solicitud en venta (landing sales_records)? El Tablero estratégico se actualiza tras Construir modelo / ELT.',
+    confirmLabel: 'Convertir',
+  });
+  if (!ok) return;
   const r = await fetch(`${API}/solicitudes/${id}/convertir`, {
     method: 'POST', credentials: 'same-origin',
   });
   const data = await r.json();
   if (!r.ok) {
-    if (typeof opsToast === 'function') opsToast(data.message || 'Error', 'danger');
-    else alert(data.message || 'Error');
+    notifyErr(data.message || 'Error');
     return;
   }
   const synced = data.analytics_sync && data.analytics_sync.synced;
-  const msg = data.analytics_stale
-    ? `Venta ${data.order_id} en landing. Sync a Tablero pendiente.`
-    : `Venta ${data.order_id} creada${synced ? ` y sincronizada (${synced} hechos)` : ''}.`;
-  if (typeof opsToast === 'function') {
+  if (data.offline_sale) {
+    const msg = data.analytics_stale
+      ? `Venta presencial ${data.order_id} entregada. Sync a Tablero pendiente.`
+      : `Venta presencial ${data.order_id} completada y entregada${synced ? ` (${synced} hechos)` : ''}.`;
     if (data.analytics_stale) {
-      opsToast(msg, 'warn', {
+      notifyWarn(msg, {
         actionLabel: 'Sincronizar ahora',
         action: () => { if (typeof syncStaleAnalytics === 'function') syncStaleAnalytics(); },
       });
     } else {
-      opsToast(msg, 'ok');
+      notifyOk(msg);
     }
-  } else if (data.analytics_stale && confirm(msg + '\n\n¿Sincronizar ahora?')) {
-    if (typeof syncStaleAnalytics === 'function') syncStaleAnalytics();
   } else {
-    alert(msg);
+    const msg = data.analytics_stale
+      ? `Venta ${data.order_id} en landing. Sync a Tablero pendiente.`
+      : `Venta ${data.order_id} creada${synced ? ` y sincronizada (${synced} hechos)` : ''}.`;
+    if (data.analytics_stale) {
+      notifyWarn(msg, {
+        actionLabel: 'Sincronizar ahora',
+        action: () => { if (typeof syncStaleAnalytics === 'function') syncStaleAnalytics(); },
+      });
+    } else {
+      notifyOk(msg);
+    }
   }
   await loadSolicitudes();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();

@@ -49,7 +49,7 @@ Servicios: web `:5001`, API auxiliar `:8001`, Mongo `:27017`.
 
 ## Flujo comercial (demo)
 
-1. Admin: Maestros → Sync catálogo (tienda) / Carga ELT o Construir modelo si el Tablero (fact_ventas) está vacío  
+1. Admin: Maestros → Sync catálogo (tienda) / Carga ELT, Construir modelo, o DAG Airflow `globtrade_strategic_etl` si el Tablero (`fact_ventas`) está vacío  
 2. Cliente: Vitrina → checkout (sesión) → Mis pedidos (pago simulado + tracking)  
 3. Vendedor/Admin: Solicitudes → aprobar → cliente paga (o crédito) → convertir → enviar → entregar  
 4. Devolución: solo pedidos **entregados**; inspección (**apto / dañado / mixto**). Solo lo apto reingresa; dañado = merma.  
@@ -60,9 +60,29 @@ Servicios: web `:5001`, API auxiliar `:8001`, Mongo `:27017`.
 
 - **Operativo**: vitrina, solicitudes, compras, soporte, **Reportes simples (RS-01…12)**  
 - **Landing**: `sales_records` (CSV, generate, post-convertir; Explorar ventas / export)  
-- **Estratégico**: Tablero (Workpanel), **Informes compuestos (RC-01…08)** sobre `fact_ventas` + dims; tras convertir hay sync incremental  
+- **Estratégico**: Tablero (Workpanel), **Informes compuestos (RC-01…08)** sobre `fact_ventas` + dims; tras convertir hay sync incremental. El rebuild programado puede orquestarse con **Airflow** (`globtrade_strategic_etl`).  
 
 Pago y correo son **simulados** (inbox in-app); suficientes para demo académica.
+
+## ETL orquestado por Airflow (capa estratégica)
+
+Alimenta `fact_ventas` + dims para Tablero e **Informes compuestos RC** (sin IA). Estrategia del DAG: **truncate + reload** (no append). El sync incremental post-convertir en la app **convive** y no forma parte del DAG.
+
+Todo va en el **mismo** `docker-compose.yml` (profile `airflow`):
+
+```powershell
+# App + Mongo + Airflow (un solo comando / un solo archivo)
+docker compose --profile airflow up -d --build
+
+# Solo app (sin Airflow), si no lo necesitas ahora:
+# docker compose up -d --build
+```
+
+1. Abre http://localhost:8080 (`admin` / `admin`)
+2. Unpause + Trigger DAG: `globtrade_strategic_etl`
+3. Ver Informes compuestos RC en http://127.0.0.1:5001
+
+Detalle del pipeline: [`etl_proceso/README.md`](etl_proceso/README.md).
 
 ## Tests smoke
 
@@ -76,7 +96,9 @@ $env:PYTHONPATH="C:\proyect6softwa\backend;C:\proyect6softwa"
 
 - `frontend/` — app Flask + SPA estática  
 - `backend/` — auth, config, shared, ETL  
-- `paquetes/` — tablero, analisis, decisiones, ventas, shop, compras, datos, soporte  
+- `etl_proceso/` — wrappers del ETL estratégico (Airflow + CLI)  
+- `airflow/dags/` — DAG `globtrade_strategic_etl`  
+- `paquetes/` — tablero, analisis, decisiones, ventas, shop, compras, datos, soporte, reportes  
 - `specs/` — Spec Kit académico  
 
 ## Puertos
@@ -86,3 +108,4 @@ $env:PYTHONPATH="C:\proyect6softwa\backend;C:\proyect6softwa"
 | Web Flask | 5001 |
 | API FastAPI (health) | 8001 |
 | MongoDB | 27017 |
+| Airflow UI | 8080 |

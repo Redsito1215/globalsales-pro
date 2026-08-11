@@ -77,3 +77,18 @@ Open: http://127.0.0.1:5001
 
 Expected result: web container serves the SPA, Mongo connection points to
 `host.docker.internal:27017`, and the dashboard can read `globtrade_dw`.
+
+## Airflow ETL (capa estratégica / RC)
+
+Orquesta rebuild truncate+reload hacia `fact_ventas` (Informes compuestos RC, sin IA).
+Mismo `docker-compose.yml` del proyecto (profile `airflow`):
+
+```powershell
+cd C:\proyect6softwa
+docker compose --profile airflow up -d --build
+```
+
+1. Open http://localhost:8080 (admin / admin).
+2. Unpause and Trigger DAG `globtrade_strategic_etl`.
+3. Confirm tasks extract → load → transform → validate succeed.
+4. Open Informes compuestos RC in the web app and verify RC-08 / RC-01.

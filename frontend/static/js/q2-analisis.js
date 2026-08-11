@@ -1,14 +1,12 @@
 /* Q2 Análisis — exportación CSV */
 async function exportAnalysis() {
   if (!window._authUser) {
-    if (typeof opsToast === 'function') opsToast('Debes iniciar sesión para exportar.', 'warn');
-    else alert('Debes iniciar sesión para exportar.');
+    notifyWarn('Debes iniciar sesión para exportar.');
     openLoginModal();
     return;
   }
   if (!hasPermission('analysis.export')) {
-    if (typeof opsToast === 'function') opsToast('Tu rol no incluye permiso para exportar CSV.', 'warn');
-    else alert('Tu rol no incluye permiso para exportar CSV.');
+    notifyWarn('Tu rol no incluye permiso para exportar CSV.');
     return;
   }
   const st = document.getElementById('export-status');
@@ -30,8 +28,7 @@ async function exportAnalysis() {
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
     if (st) st.textContent = d.message || 'Error al exportar';
-    if (typeof opsToast === 'function') opsToast(d.message || 'Error al exportar', 'danger');
-    else alert(d.message || 'Error al exportar');
+    notifyErr(d.message || 'Error al exportar');
     return;
   }
   const rows = r.headers.get('X-Export-Rows') || '?';

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from shared.mongo import get_db
+from shared.mongo import get_db, get_ops_db, get_dw_db, mongo_topology
 
 # colección → capa
 LAYER_MAP: dict[str, str] = {
@@ -19,6 +19,7 @@ LAYER_MAP: dict[str, str] = {
     "collections": "operativo",
     "collection_products": "operativo",
     "vendors": "operativo",
+    "warehouses": "operativo",
     "inventory_items": "operativo",
     "inventory_levels": "operativo",
     "inventory_scrapped": "operativo",
@@ -70,8 +71,8 @@ LAYER_LABELS: dict[str, str] = {
 
 
 def ops_db():
-    """Misma DB; acceso tipado como capa operativa (OLTP)."""
-    return get_db()
+    """Base operativa (OLTP + gobernanza)."""
+    return get_ops_db()
 
 
 def landing_sales():
@@ -115,25 +116,26 @@ def _last_build_at(db) -> str | None:
 
 def layers_overview() -> dict[str, Any]:
     """Resumen para meta API / demo académica."""
-    db = get_db()
     by_layer: dict[str, list[dict[str, Any]]] = {k: [] for k in LAYER_LABELS}
     for coll, layer in sorted(LAYER_MAP.items()):
         try:
+            db = get_ops_db() if layer in ("operativo", "gobernanza") else get_dw_db()
             n = db[coll].estimated_document_count()
         except Exception:
             n = 0
         by_layer.setdefault(layer, []).append({"name": coll, "count": int(n)})
 
+    dw = get_dw_db()
     ready = strategic_ready()
     fact_n = 0
     landing_n = 0
     try:
-        fact_n = int(db["fact_ventas"].estimated_document_count())
-        landing_n = int(db["sales_records"].estimated_document_count())
+        fact_n = int(dw["fact_ventas"].estimated_document_count())
+        landing_n = int(dw["sales_records"].estimated_document_count())
     except Exception:
         pass
 
-    last_build = _last_build_at(db)
+    last_build = _last_build_at(get_ops_db())
     lag: dict[str, Any] = {}
     try:
         from shared.analytics_sync import get_strategic_lag
@@ -174,4 +176,5 @@ def layers_overview() -> dict[str, Any]:
             "to": "estrategico.fact_ventas (append o build_model)",
         },
         "message": msg,
+        "topology": mongo_topology(),
     }

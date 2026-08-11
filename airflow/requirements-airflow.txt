@@ -1,0 +1,7 @@
+# Dependencias extra instaladas en la imagen Airflow (_PIP_ADDITIONAL_REQUIREMENTS).
+# No incluyen apache-airflow (ya viene en la imagen oficial).
+pymongo>=4.6
+pandas>=2.0
+pyarrow>=14
+pydantic-settings>=2.0
+python-dotenv>=1.0

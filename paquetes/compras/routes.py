@@ -23,7 +23,8 @@ def _err(exc: ValueError):
         "po_not_sent": ("Envía la OC antes de recibir mercancía.", 409),
         "no_lines": ("La orden no tiene líneas.", 400),
         "nothing_to_receive": ("No hay cantidades pendientes por recibir.", 400),
-        "invalid_stock": ("Cantidad de stock inválida.", 400),
+        "invalid_country": ("País del proveedor no válido.", 400),
+        "invalid_region": ("Continente del proveedor no válido.", 400),
     }
     msg, status = messages.get(code, (code, 400))
     return jsonify({"status": "error", "message": msg, "code": code}), status

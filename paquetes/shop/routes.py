@@ -25,6 +25,14 @@ def shop_products():
     return jsonify({"status": "ok", **data})
 
 
+@shop_bp.get("/products/<int:product_id>")
+def shop_product_detail(product_id: int):
+    row = services.get_product_shop(product_id)
+    if not row:
+        return jsonify({"status": "error", "message": "Producto no encontrado.", "code": "not_found"}), 404
+    return jsonify({"status": "ok", "product": row})
+
+
 @shop_bp.get("/countries")
 def shop_countries():
     from shared.checkout_countries import list_checkout_countries
@@ -50,15 +58,28 @@ def shop_validate_coupon():
         return jsonify({"status": "error", "message": msg, "code": code}), 400
 
 
+@shop_bp.post("/shipping/quote")
+def shop_shipping_quote():
+    body = request.get_json(silent=True) or {}
+    try:
+        data = services.quote_shipping(body)
+        return jsonify(data)
+    except ValueError as e:
+        code = str(e)
+        msg = {
+            "lines_required": "Agrega productos al carrito.",
+            "invalid_country": "Selecciona un país de destino.",
+        }.get(code, code)
+        return jsonify({"status": "error", "message": msg, "code": code}), 400
+
+
 @shop_bp.post("/checkout")
 @login_required
 @permission_required("shop.checkout")
 def shop_checkout():
-    from auth import roles_service
-
     body = request.get_json(silent=True) or {}
     role = session.get("role")
-    assisted = role == "administrador" or roles_service.has_permission(role, "ventas.manage")
+    assisted = (role or "") != "cliente"
     # Cliente: siempre su cuenta. Vendedor/admin: puede pedir para un cliente fijo.
     if assisted:
         client_email = (body.get("client_email") or body.get("email") or session.get("email") or "").strip()
@@ -85,6 +106,8 @@ def shop_checkout():
             "invalid_coupon": "Cupón no válido.",
             "coupon_exhausted": "Este cupón ya no tiene usos disponibles.",
             "client_required": "Inicia sesión para completar la compra.",
+            "destination_required": "Indica el destino de entrega (ciudad, dirección o ruta).",
+            "invalid_quantity": "Cada producto debe tener al menos 1 unidad.",
         }.get(code, code)
         return jsonify({"status": "error", "message": msg, "code": code}), 400
 

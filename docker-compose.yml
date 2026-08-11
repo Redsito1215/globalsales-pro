@@ -1,9 +1,47 @@
 # GLOBTRADE S.A. — C:\proyect6softwa
-# Un solo stack: mongo + web + api
-# Web http://localhost:5001  |  API http://localhost:8001  |  Mongo :27017
-# Uso: docker compose up -d --build
+# Un solo compose: app + (opcional) Airflow ETL
+#
+# Solo app:
+#   docker compose up -d --build
+#
+# App + Airflow (ETL estratégico / informes RC):
+#   docker compose --profile airflow up -d --build
+#
+# Web :5001 | API :8001 | Mongo :27017 | Airflow UI :8080 (admin/admin)
 
 name: globtrade-saas
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.3-python3.12
+  profiles: ["airflow"]
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+    _PIP_ADDITIONAL_REQUIREMENTS: pymongo>=4.6 pandas>=2.0 pyarrow>=14 pydantic-settings>=2.0 python-dotenv>=1.0
+    GLOBTRADE_PROJECT: /opt/airflow/project
+    PYTHONPATH: /opt/airflow/project:/opt/airflow/project/backend
+    MONGO_URI: mongodb://mongo:27017
+    MONGO_DB: globtrade_dw
+    CSV_SOURCE: /opt/airflow/project/data/sales.csv
+    POCKETBASE_COLLECTION: sales_records
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./etl_proceso:/opt/airflow/project/etl_proceso
+    - ./backend:/opt/airflow/project/backend
+    - ./paquetes:/opt/airflow/project/paquetes
+    - ./data:/opt/airflow/project/data
+    - ./frontend/static/uploads:/opt/airflow/project/frontend/static/uploads
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    mongo:
+      condition: service_healthy
+    airflow-postgres:
+      condition: service_healthy
 
 services:
   mongo:
@@ -31,6 +69,9 @@ services:
       PYTHONPATH: /app/backend:/app
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: globtrade_dw
+      MONGO_OPS_DB: ${MONGO_OPS_DB:-}
+      MONGO_REPLICA_URI: ${MONGO_REPLICA_URI:-}
+      MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-}
       API_PORT: "8000"
       CSV_SOURCE: /app/data/sales.csv
     volumes:
@@ -57,8 +98,12 @@ services:
       PYTHONPATH: /app/backend:/app
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: globtrade_dw
+      MONGO_OPS_DB: ${MONGO_OPS_DB:-}
+      MONGO_REPLICA_URI: ${MONGO_REPLICA_URI:-}
+      MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-}
       WEB_PORT: "5000"
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-globtrade-docker-change-me}
+      FLASK_DEBUG: "1"
     volumes:
       - ./data:/app/data
       - ./frontend/app.py:/app/frontend/app.py:ro
@@ -89,7 +134,82 @@ services:
       mongo:
         condition: service_healthy
 
+  # ── Airflow (profile: airflow) — ETL estratégico para RC / Tablero ──
+  airflow-postgres:
+    image: postgres:15
+    profiles: ["airflow"]
+    container_name: globtrade-saas-airflow-pg
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: globtrade-saas-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username "${_AIRFLOW_WWW_USER_USERNAME:-admin}" \
+          --password "${_AIRFLOW_WWW_USER_PASSWORD:-admin}" \
+          --firstname Glob \
+          --lastname Trade \
+          --role Admin \
+          --email admin@globtrade.local || true
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-admin}
+    user: "0:0"
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: globtrade-saas-airflow-web
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 8
+      start_period: 90s
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: globtrade-saas-airflow-scheduler
+    command: scheduler
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
 volumes:
   mongo_data:
     external: true
     name: globtrade_mongo_data
+  airflow_pgdata:
+    name: globtrade_airflow_pgdata

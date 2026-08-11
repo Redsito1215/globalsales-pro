@@ -1,0 +1,263 @@
+/* Admin UI — roles, auditoría, tablas operativas */
+#page-roles-admin .page-hero,
+#page-audit .page-hero,
+#page-datos .page-hero {
+  padding-bottom: 0.15rem;
+}
+
+.admin-page-meta {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.admin-page-meta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.table-box--admin .table-scroll table {
+  min-width: 640px;
+}
+
+.table-box--admin td code,
+.table-box--admin th code {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.12rem 0.38rem;
+  border-radius: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.table-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.admin-role-note {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.badge {
+  border: 1px solid transparent;
+  letter-spacing: 0.04em;
+}
+
+.badge--muted {
+  background: color-mix(in srgb, var(--muted) 14%, var(--surface));
+  color: var(--muted);
+  border-color: color-mix(in srgb, var(--muted) 22%, var(--border));
+}
+
+.badge--neutral {
+  background: color-mix(in srgb, var(--accent2) 12%, var(--surface));
+  color: var(--accent2);
+  border-color: color-mix(in srgb, var(--accent2) 24%, var(--border));
+}
+
+.badge--system {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+}
+
+.table-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-sm);
+}
+
+.table-pager-info {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.audit-action {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.audit-cell-mono {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.audit-cell-user {
+  font-size: 0.8125rem;
+}
+
+.audit-cell-id {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role-user-email {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+
+.role-user-select {
+  width: auto;
+  max-width: 100%;
+  min-width: 11rem;
+  font-size: 0.8125rem;
+  padding: 0.4rem 2rem 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--text);
+}
+
+.modal-card--admin {
+  max-width: 34rem;
+  max-height: min(90vh, 720px);
+  overflow: auto;
+}
+
+.modal-checklist {
+  max-height: 10rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  background: var(--surface2);
+}
+
+.modal-checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  margin: 0.28rem 0;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.modal-checklist input {
+  margin-top: 0.15rem;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+#ops-confirm-modal .modal-card {
+  max-width: 26rem;
+}
+
+#ops-confirm-modal .ops-confirm-actions {
+  margin-top: 0.25rem;
+}
+
+#ops-confirm-modal .ops-confirm-actions .btn {
+  flex: 1 1 auto;
+  min-width: 7rem;
+}
+
+#ops-prompt-modal .modal-card {
+  max-width: 26rem;
+}
+
+#ops-prompt-modal .ops-confirm-actions {
+  margin-top: 0.25rem;
+}
+
+#ops-prompt-modal .ops-confirm-actions .btn {
+  flex: 1 1 auto;
+  min-width: 7rem;
+}
+
+.table-header--split {
+  align-items: flex-start;
+}
+
+.table-header--split .table-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+#page-roles-admin .page-body,
+#page-audit .page-body,
+#page-datos .page-body {
+  gap: 1.15rem;
+}
+
+.table-box--admin + .table-box--admin {
+  margin-top: 0.15rem;
+}
+
+.table-box--admin .table-pager {
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-lg, 12px) var(--radius-lg, 12px);
+  box-shadow: none;
+  margin: 0;
+}
+
+.modal-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.modal-check input {
+  margin: 0;
+}
+
+.table-actions .btn-sm,
+.table-actions .btn-ops {
+  white-space: nowrap;
+}
+
+.master-thumb {
+  display: block;
+  max-height: 2.5rem;
+  margin-top: 0.25rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.master-actions {
+  white-space: nowrap;
+}
+
+.master-actions .btn {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.master-note {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.table-header--split .dash-records-meta {
+  margin: 0;
+}

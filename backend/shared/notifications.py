@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from shared.mongo import get_db
+from shared.mongo import get_collection
 
 COLLECTION = "user_notifications"
 
 
 def _col():
-    return get_db()[COLLECTION]
+    return get_collection(COLLECTION)
 
 
 def _next_id() -> int:
@@ -60,6 +60,32 @@ def list_for_email(email: str, *, limit: int = 50, unread_only: bool = False) ->
         .limit(min(limit, 200))
     )
     return {"total": total, "unread": unread, "notifications": rows}
+
+
+def pulse_for_email(email: str, *, after_id: int = 0) -> dict[str, Any]:
+    """Devuelve contador y notificaciones nuevas desde after_id (para polling en vivo)."""
+    email = (email or "").strip().lower()
+    if not email:
+        return {"unread": 0, "latest_id": 0, "new": []}
+    unread = _col().count_documents({"recipient_email": email, "read": False})
+    latest_row = _col().find_one(
+        {"recipient_email": email},
+        {"notification_id": 1},
+        sort=[("notification_id", -1)],
+    )
+    latest_id = int(latest_row["notification_id"]) if latest_row else 0
+    after = max(int(after_id or 0), 0)
+    new_rows: list[dict[str, Any]] = []
+    if after > 0 and latest_id > after:
+        new_rows = list(
+            _col().find(
+                {"recipient_email": email, "notification_id": {"$gt": after}},
+                {"_id": 0},
+            )
+            .sort("notification_id", 1)
+            .limit(20)
+        )
+    return {"unread": unread, "latest_id": latest_id, "new": new_rows}
 
 
 def mark_read(notification_id: int, email: str) -> bool:

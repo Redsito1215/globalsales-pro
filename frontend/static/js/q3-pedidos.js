@@ -1,7 +1,6 @@
 /* Q3 — CRUD pedidos históricos (admin) */
 function toast(msg, type) {
-  if (typeof opsToast === 'function') opsToast(msg, type || 'info');
-  else alert(msg);
+  notify(msg, type || 'info');
 }
 
 async function loadPedidosAdmin() {
@@ -68,7 +67,17 @@ async function createPedidoAdmin() {
 }
 
 async function deletePedido(orderId) {
-  if (!confirm('¿Eliminar pedido ' + orderId + '?')) return;
+  if (typeof opsConfirm !== 'function') {
+    toast('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).', 'danger');
+    return;
+  }
+  const ok = await opsConfirm({
+    title: 'Eliminar pedido',
+    message: `¿Eliminar pedido ${orderId}?`,
+    confirmLabel: 'Eliminar',
+    danger: true,
+  });
+  if (!ok) return;
   const r = await fetch(API + '/sales/orders/' + encodeURIComponent(orderId), {
     method: 'DELETE', credentials: 'same-origin',
   });

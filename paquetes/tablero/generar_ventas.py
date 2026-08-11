@@ -19,13 +19,29 @@ def _rand_id() -> str:
 
 
 def _next_order_id_start(col) -> int:
-    row = col.find_one({}, {"order_id": 1, "_id": 0}, sort=[("order_id", -1)])
-    if not row or row.get("order_id") is None:
-        return 1
+    """Máximo order_id NUMÉRICO (no lexicográfico) de sales_records + 1."""
     try:
-        return int(str(row["order_id"]).strip()) + 1
-    except ValueError:
-        return col.count_documents({}) + 1
+        doc = next(
+            col.aggregate(
+                [
+                    {
+                        "$group": {
+                            "_id": None,
+                            "max": {
+                                "$max": {
+                                    "$convert": {"input": "$order_id", "to": "long", "onError": 0, "onNull": 0}
+                                }
+                            },
+                        }
+                    }
+                ]
+            )
+        )
+    except Exception:
+        doc = None
+    if doc and doc.get("max"):
+        return int(doc["max"]) + 1
+    return col.count_documents({}) + 1
 
 
 def _load_catalogs_from_dims(db) -> dict | None:
@@ -222,6 +238,15 @@ def generate_sales(count: int, *, year: int | None = None) -> dict:
         inserted += len(batch)
 
     out = {"inserted": inserted, "total_after": col.count_documents({})}
+    try:
+        from shared.analytics_sync import sync_orders_bulk
+
+        res = sync_orders_bulk(range(order_start, order_start + count))
+        out["synced_to_fact"] = int(res.get("synced_orders") or 0)
+        out["facts_inserted"] = int(res.get("facts_inserted") or 0)
+        out["fact_ventas"] = col.database["fact_ventas"].count_documents({})
+    except Exception as exc:
+        out["sync_error"] = str(exc)
     if year is not None:
         out["year"] = year
     return out

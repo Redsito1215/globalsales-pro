@@ -6,7 +6,7 @@ from typing import Any
 # Páginas SPA (data-page)
 PAGE_CATALOG: dict[str, dict[str, str]] = {
     "dashboard": {"label": "Tablero", "section": "ops"},
-    "tienda": {"label": "Tienda B2B", "section": "ops"},
+    "tienda": {"label": "Tienda", "section": "ops"},
     "mis-pedidos": {"label": "Mis pedidos", "section": "ops"},
     "ventas": {"label": "Pedidos y ventas", "section": "ops"},
     "compras": {"label": "Compras e inventario", "section": "ops"},
@@ -134,7 +134,7 @@ DEFAULT_ROLES: list[dict[str, Any]] = [
 VENDEDOR_ROLE = "vendedor"
 
 # Visitante sin sesión: solo vitrina pública
-PUBLIC_PAGES: list[str] = ["tienda", "company"]
+PUBLIC_PAGES: list[str] = ["tienda"]
 
 ADMIN_ROLE = "administrador"
 DEFAULT_REGISTER_ROLE = "cliente"

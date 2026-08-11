@@ -8,6 +8,54 @@ from shared.audit import log_audit
 from shared.mongo import get_db
 from shared.notifications import notify_roles
 from shared.roles_registry import ADMIN_ROLE, VENDEDOR_ROLE
+from shared.warehouse import DEFAULT_WAREHOUSE_NAME, warehouse_summary
+
+
+def _enrich_vendor(row: dict[str, Any]) -> dict[str, Any]:
+    db = get_db()
+    if row.get("country_id") and not row.get("country"):
+        pais = db["dim_pais"].find_one({"country_id": int(row["country_id"])}, {"_id": 0, "name": 1, "region_id": 1})
+        if pais:
+            row["country"] = pais.get("name")
+            if not row.get("region_id"):
+                row["region_id"] = pais.get("region_id")
+    rid = row.get("region_id")
+    if rid and not row.get("region_name"):
+        reg = db["dim_region"].find_one({"region_id": int(rid)}, {"_id": 0, "name": 1})
+        if reg:
+            row["region_name"] = reg.get("name")
+    return row
+
+
+def _resolve_vendor_geo(data: dict[str, Any]) -> dict[str, Any]:
+    db = get_db()
+    from shared.checkout_countries import ensure_checkout_countries
+
+    ensure_checkout_countries()
+    country_id = data.get("country_id")
+    region_id = data.get("region_id")
+    country_name = (data.get("country") or "").strip() or None
+
+    if country_id not in (None, ""):
+        pais = db["dim_pais"].find_one({"country_id": int(country_id)}, {"_id": 0})
+        if not pais:
+            raise ValueError("invalid_country")
+        country_name = pais.get("name")
+        region_id = pais.get("region_id")
+
+    region_name = None
+    if region_id not in (None, ""):
+        reg = db["dim_region"].find_one({"region_id": int(region_id)}, {"_id": 0, "name": 1})
+        if not reg:
+            raise ValueError("invalid_region")
+        region_name = reg.get("name")
+
+    return {
+        "country": country_name,
+        "country_id": int(country_id) if country_id not in (None, "") else None,
+        "region_id": int(region_id) if region_id not in (None, "") else None,
+        "region_name": region_name,
+    }
 
 
 def _next_id(col, pk: str) -> int:
@@ -32,7 +80,8 @@ def list_vendors(*, active_only: bool = False) -> list[dict[str, Any]]:
     q: dict[str, Any] = {}
     if active_only:
         q["active"] = True
-    return list(db["vendors"].find(q, {"_id": 0}).sort("vendor_id", 1))
+    rows = list(db["vendors"].find(q, {"_id": 0}).sort("vendor_id", 1))
+    return [_enrich_vendor(row) for row in rows]
 
 
 def upsert_vendor(data: dict[str, Any], vendor_id: int | None = None) -> dict[str, Any]:
@@ -40,10 +89,14 @@ def upsert_vendor(data: dict[str, Any], vendor_id: int | None = None) -> dict[st
     name = (data.get("name") or "").strip()
     if not name:
         raise ValueError("name_required")
+    geo = _resolve_vendor_geo(data)
     doc = {
         "name": name,
         "email": (data.get("email") or "").strip() or None,
-        "country": (data.get("country") or "").strip() or None,
+        "country": geo.get("country"),
+        "country_id": geo.get("country_id"),
+        "region_id": geo.get("region_id"),
+        "region_name": geo.get("region_name"),
         "phone": (data.get("phone") or "").strip() or None,
         "active": bool(data.get("active", True)),
     }
@@ -60,7 +113,7 @@ def upsert_vendor(data: dict[str, Any], vendor_id: int | None = None) -> dict[st
         db["vendors"].update_one({"vendor_id": vid}, {"$set": doc})
         doc["vendor_id"] = vid
         log_audit("update_vendor", entity="vendors", entity_id=vid, details=doc)
-    return doc
+    return _enrich_vendor(doc)
 
 
 def delete_vendor(vendor_id: int) -> None:
@@ -75,6 +128,7 @@ def delete_vendor(vendor_id: int) -> None:
 
 def list_inventory(*, q: str | None = None, low_only: bool = False, threshold: int = 20, limit: int = 100, offset: int = 0) -> dict[str, Any]:
     db = get_db()
+    wh = warehouse_summary()
     query: dict[str, Any] = {}
     if low_only:
         query["inventory_quantity"] = {"$lte": int(threshold)}
@@ -108,9 +162,11 @@ def list_inventory(*, q: str | None = None, low_only: bool = False, threshold: i
                 "cost": float(v.get("cost") or 0),
                 "vendor_id": (prod or {}).get("vendor_id"),
                 "vendor": (vendor or {}).get("name") or "—",
+                "warehouse": wh["name"],
+                "warehouse_id": wh["warehouse_id"],
             }
         )
-    return {"total": total if not term else len(out), "items": out, "threshold": threshold}
+    return {"total": total if not term else len(out), "items": out, "threshold": threshold, "warehouse": wh}
 
 
 def set_stock(variant_id: int, available: int) -> dict[str, Any]:
@@ -177,6 +233,8 @@ def create_purchase_order(data: dict[str, Any]) -> dict[str, Any]:
         "po_id": po_id,
         "vendor_id": vendor_id,
         "status": initial_status,
+        "warehouse_id": warehouse_summary()["warehouse_id"],
+        "warehouse": DEFAULT_WAREHOUSE_NAME,
         "notes": (data.get("notes") or "").strip() or None,
         "created_at": date.today().isoformat(),
         "sent_at": date.today().isoformat() if initial_status == "enviada" else None,

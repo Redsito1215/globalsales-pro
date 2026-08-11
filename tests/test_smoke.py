@@ -84,6 +84,71 @@ def test_roles_catalog_tiene_compras_y_decisiones():
     assert "audit.read" in PERMISSION_CATALOG
 
 
+def test_disable_role_reasigna_usuarios(monkeypatch):
+    from auth import roles_service
+    from shared.roles_registry import ADMIN_ROLE, DEFAULT_REGISTER_ROLE
+
+    class FakeUsers:
+        def __init__(self):
+            self.docs = [{"role": "vendedor", "active": True}, {"role": "vendedor", "active": True}]
+            self.updates = []
+
+        def count_documents(self, q):
+            return sum(1 for d in self.docs if d.get("role") == q.get("role") and d.get("active") is True)
+
+        def update_many(self, q, patch):
+            self.updates.append((q, patch))
+            for d in self.docs:
+                if d.get("role") == q.get("role") and d.get("active") is True:
+                    d["role"] = patch["$set"]["role"]
+
+    class FakeRoles:
+        def update_one(self, q, patch):
+            return None
+
+    fake_users = FakeUsers()
+    fake_roles = FakeRoles()
+    fake_db = {"users": fake_users, "app_roles": fake_roles}
+
+    monkeypatch.setattr(roles_service, "get_role", lambda slug: {
+        "slug": slug,
+        "label": slug,
+        "active": True,
+        "assignable": True,
+    } if slug in (ADMIN_ROLE, "vendedor") else None)
+    monkeypatch.setattr(roles_service, "get_db", lambda: fake_db)
+    monkeypatch.setattr(roles_service, "_col", lambda: fake_roles)
+
+    with pytest.raises(ValueError, match="protected_role"):
+        roles_service.disable_role(ADMIN_ROLE)
+
+    result = roles_service.disable_role("vendedor")
+    assert result["users_reassigned"] == 2
+    assert result["fallback_role"] == DEFAULT_REGISTER_ROLE
+    assert all(d["role"] == DEFAULT_REGISTER_ROLE for d in fake_users.docs)
+
+
+def test_ensure_roles_seed_respeta_rol_inactivo(monkeypatch):
+    from auth import roles_service
+
+    stored = {"slug": "vendedor", "active": False, "assignable": False, "label": "Vendedor comercial"}
+
+    class FakeCol:
+        def find_one(self, q, proj=None):
+            if q.get("slug") == "vendedor":
+                return dict(stored)
+            return None
+
+        def update_one(self, q, patch, upsert=False):
+            if q.get("slug") == "vendedor" and "$set" in patch:
+                stored.update(patch["$set"])
+
+    monkeypatch.setattr(roles_service, "_col", lambda: FakeCol())
+    roles_service.ensure_roles_seed()
+    assert stored["active"] is False
+    assert stored["assignable"] is False
+
+
 def test_app_registra_blueprints_clave():
     from frontend.app import app
 
@@ -158,6 +223,73 @@ def test_audit_log_exige_auth():
     assert r.status_code == 401
 
 
+def test_audit_log_serializa_objectid_en_details():
+    from frontend.app import app
+    from shared.mongo import get_db
+
+    db = get_db()
+    db["audit_log"].insert_one(
+        {
+            "action": "test_audit_json",
+            "entity": "test",
+            "entity_id": "x",
+            "email": "test@example.com",
+            "details": {"_id": "6a16394e477fc25923669a07"},
+            "at": "2026-08-10T00:00:00+00:00",
+        }
+    )
+    # simulate ObjectId in details like legacy rows
+    db["audit_log"].update_one(
+        {"action": "test_audit_json"},
+        {"$set": {"details._id": __import__("bson").ObjectId("6a16394e477fc25923669a07")}},
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = "6a16394e477fc25923669a07"
+        sess["email"] = "test@example.com"
+        sess["role"] = "administrador"
+    r = client.get("/api/audit_log?limit=200")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["status"] == "ok"
+    assert data["limit"] == 100
+    assert any(e.get("action") == "test_audit_json" for e in data.get("entries", []))
+    db["audit_log"].delete_many({"action": "test_audit_json"})
+
+
+def test_audit_log_filtro_rol_y_paginacion():
+    from paquetes.datos.services import list_audit_log
+
+    out = list_audit_log(limit=500, offset=0, role="vendedor")
+    assert out["limit"] == 100
+    assert out.get("role") == "vendedor"
+    assert isinstance(out.get("roles"), list)
+
+
+def test_enable_role_reactiva(monkeypatch):
+    from auth import roles_service
+
+    stored = {"slug": "vendedor", "active": False, "assignable": False, "label": "Vendedor"}
+
+    class FakeCol:
+        def find_one(self, q, proj=None):
+            if q.get("slug") == "vendedor":
+                return dict(stored)
+            return None
+
+        def update_one(self, q, patch):
+            if q.get("slug") == "vendedor":
+                stored.update(patch["$set"])
+
+    monkeypatch.setattr(roles_service, "_col", lambda: FakeCol())
+    monkeypatch.setattr(roles_service, "get_role", lambda slug: dict(stored) if slug == "vendedor" else None)
+
+    result = roles_service.enable_role("vendedor")
+    assert result["slug"] == "vendedor"
+    assert stored["active"] is True
+    assert stored["assignable"] is True
+
+
 def test_sales_order_detail_exige_auth():
     from frontend.app import app
 
@@ -226,6 +358,188 @@ def test_update_status_bloquea_devuelta_directa():
     with pytest.raises(ValueError, match="use_dedicated_endpoint"):
         update_status(1, "devuelta", reviewer_email="x@y.com")
 
+
+def test_offline_channel_sin_envio():
+    from paquetes.ventas.services import (
+        _is_offline_channel,
+        _payment_allows_progress,
+        display_order_id,
+        platform_order_id,
+    )
+
+    assert _is_offline_channel({"name": "Offline"})
+    assert _is_offline_channel({"channel_name": "Offline", "channel_id": 2})
+    assert not _is_offline_channel({"name": "Online"})
+    assert not _is_offline_channel(None)
+    assert _payment_allows_progress({"channel_name": "Online", "payment_status": "pagado"})
+    assert not _payment_allows_progress({"channel_name": "Online", "payment_status": "credito"})
+    assert _payment_allows_progress({"channel_name": "Offline", "payment_status": "credito"})
+    assert platform_order_id(8) == "V-00008"
+    assert display_order_id("1000000000", 8) == "V-00008"
+    assert display_order_id("V-00011", 11) == "V-00011"
+
+
+def test_repair_legacy_platform_order_ids():
+    from paquetes.ventas.services import platform_order_id, repair_legacy_platform_order_ids
+
+    pr_docs = [
+        {"request_id": 3, "order_id": "1000000000"},
+        {"request_id": 7, "order_id": "1000000000"},
+        {"request_id": 9, "order_id": "V-00009"},
+    ]
+    sr_docs = [
+        {"request_id": 3, "order_id": "1000000000"},
+        {"request_id": 7, "order_id": "1000000000"},
+        {"request_id": 9, "order_id": "V-00009"},
+    ]
+
+    class PRCol:
+        def find(self, q, proj=None):
+            if q.get("order_id") == "1000000000":
+                return [dict(d) for d in pr_docs if d["order_id"] == "1000000000"]
+            return []
+
+        def update_one(self, q, patch):
+            for d in pr_docs:
+                if d["request_id"] == q["request_id"]:
+                    d.update(patch["$set"])
+
+    class SRCol:
+        def update_many(self, q, patch):
+            n = 0
+            for d in sr_docs:
+                if d.get("request_id") == q["request_id"]:
+                    d["order_id"] = patch["$set"]["order_id"]
+                    n += 1
+
+            class Result:
+                modified_count = n
+
+            return Result()
+
+    class FakeDB:
+        def __getitem__(self, name):
+            if name == "purchase_requests":
+                return PRCol()
+            if name == "sales_records":
+                return SRCol()
+            raise KeyError(name)
+
+    fixed = repair_legacy_platform_order_ids(FakeDB())
+    assert fixed == 2
+    assert pr_docs[0]["order_id"] == platform_order_id(3)
+    assert pr_docs[1]["order_id"] == platform_order_id(7)
+    assert pr_docs[2]["order_id"] == "V-00009"
+    assert sr_docs[0]["order_id"] == platform_order_id(3)
+    assert sr_docs[1]["order_id"] == platform_order_id(7)
+
+
+def test_pulse_for_email_detecta_nuevas():
+    from shared.notifications import notify_user, pulse_for_email, _col
+
+    email = "pulse-smoke@globtrade.test"
+    _col().delete_many({"recipient_email": email})
+    try:
+        n1 = notify_user(recipient_email=email, subject="Primera", body="A")
+        seed = pulse_for_email(email, after_id=0)
+        assert seed["latest_id"] == n1["notification_id"]
+        assert seed["new"] == []
+        assert seed["unread"] >= 1
+
+        notify_user(recipient_email=email, subject="Segunda", body="B")
+        pulse = pulse_for_email(email, after_id=seed["latest_id"])
+        assert len(pulse["new"]) == 1
+        assert pulse["new"][0]["subject"] == "Segunda"
+        assert pulse["latest_id"] > seed["latest_id"]
+    finally:
+        _col().delete_many({"recipient_email": email})
+
+
+def test_notifications_pulse_endpoint_exige_auth():
+    from frontend.app import app
+
+    client = app.test_client()
+    assert client.get("/api/auth/notifications/pulse?after=0").status_code == 401
+
+
+def test_notifications_pulse_endpoint_ok():
+    from frontend.app import app
+    from shared.notifications import _col, notify_user
+
+    email = "pulse-endpoint@globtrade.test"
+    _col().delete_many({"recipient_email": email})
+    try:
+        notify_user(recipient_email=email, subject="Hola", body="Mundo")
+        client = app.test_client()
+        with client.session_transaction() as sess:
+            sess["user_id"] = "pulse-user-1"
+            sess["email"] = email
+            sess["role"] = "cliente"
+        r = client.get("/api/auth/notifications/pulse?after=0")
+        assert r.status_code == 200
+        data = r.get_json() or {}
+        assert data.get("status") == "ok"
+        assert "latest_id" in data
+        assert "unread" in data
+        assert data.get("new") == []
+
+        r2 = client.get(f"/api/auth/notifications/pulse?after={data['latest_id']}")
+        assert r2.status_code == 200
+        assert (r2.get_json() or {}).get("new") == []
+    finally:
+        _col().delete_many({"recipient_email": email})
+
+
+def test_soporte_mensajes_after_id():
+    from paquetes.soporte.services import list_thread, post_message, _col
+
+    thread = "after-id-smoke@globtrade.test"
+    _col().delete_many({"thread_email": thread})
+    try:
+        m1 = post_message(
+            author_email=thread,
+            author_name="Cliente",
+            text="Hola",
+            thread_email=thread,
+            staff=False,
+        )
+        full = list_thread(thread, after_id=0)
+        assert len(full["messages"]) >= 1
+        assert full["latest_id"] >= m1["message_id"]
+
+        m2 = post_message(
+            author_email="staff@globtrade.com",
+            author_name="Staff",
+            text="Respuesta",
+            thread_email=thread,
+            staff=True,
+        )
+        delta = list_thread(thread, after_id=m1["message_id"])
+        assert len(delta["messages"]) == 1
+        assert delta["messages"][0]["message_id"] == m2["message_id"]
+    finally:
+        _col().delete_many({"thread_email": thread})
+
+
+def test_bodega_general_unica():
+    from shared.warehouse import DEFAULT_WAREHOUSE_NAME, warehouse_summary
+
+    wh = warehouse_summary()
+    assert wh["name"] == DEFAULT_WAREHOUSE_NAME
+    assert wh["warehouse_id"] == 1
+
+
+def test_shop_product_specs_derivados():
+    from paquetes.shop.services import _derive_product_specs
+
+    specs = _derive_product_specs(
+        {"product_id": 81, "line": 1, "name": "Orange Juice"},
+        "Beverages",
+        "Bebidas y líquidos",
+    )
+    assert specs["weight_kg"] > 0
+    assert "Bebidas" in specs["main_function"]
+    assert "description" in specs
 
 def test_vendedor_tiene_compras_manage():
     from shared.roles_registry import DEFAULT_ROLES
@@ -496,6 +810,219 @@ def test_compuestos_endpoint_exige_auth():
     app.secret_key = "test"
     app.register_blueprint(reportes_bp)
     client = app.test_client()
+    assert client.get("/api/compuestos").status_code == 401
+    assert client.get("/api/compuestos/RC-01").status_code == 401
     assert client.get("/api/reportes/compuestos").status_code == 401
     assert client.get("/api/reportes/compuestos/RC-01").status_code == 401
+    assert client.get("/api/reportes/RS-01/pdf").status_code == 401
+    assert client.get("/api/compuestos/RC-01/pdf").status_code == 401
+
+
+def test_report_pdf_genera_bytes():
+    from paquetes.reportes.pdf_export import generate_report_pdf
+
+    pdf = generate_report_pdf(
+        report_id="RS-01",
+        title="Solicitudes pendientes",
+        subtitle="Prueba",
+        columns=["request_id", "client_name", "total"],
+        rows=[{"request_id": 1, "client_name": "Ana", "total": 99.5}],
+        total=1,
+    )
+    assert pdf[:4] == b"%PDF"
+
+
+def test_invoice_pdf_genera_bytes():
+    from paquetes.soporte.services import generate_invoice_pdf
+
+    pdf = generate_invoice_pdf(
+        {
+            "request_id": 1,
+            "created_at": "2026-08-10T12:00:00+00:00",
+            "client_name": "Cliente Demo",
+            "client_email": "demo@example.com",
+            "total": 10.0,
+            "lines": [
+                {
+                    "product_name": "Producto",
+                    "quantity": 1,
+                    "unit_price": 10.0,
+                    "line_gross": 10.0,
+                }
+            ],
+        }
+    )
+    assert pdf[:4] == b"%PDF"
+    assert len(pdf) > 800
+
+
+def test_retail_prices_rango_realista():
+    from shared.mongo import get_db
+    from shared.retail_pricing import patch_dim_producto_prices, price_summary
+
+    db = get_db()
+    patch_dim_producto_prices(db)
+    s = price_summary(db)
+    assert s["count"] >= 100
+    assert s["max"] <= 35.0
+    assert s["min"] >= 1.5
+
+
+def test_shipping_quote_online():
+    from shared.mongo import get_db
+    from shared.shipping_rates import shipping_quote
+
+    db = get_db()
+    variant = db.product_variants.find_one({}, {"variant_id": 1})
+    assert variant
+    q = shipping_quote(db, country_id=1, lines=[{"variant_id": variant["variant_id"], "quantity": 1}])
+    assert q["shipping_cost"] > 0
+    assert q["region_name"]
+
+
+def test_etl_proceso_pipeline_tiene_cuatro_pasos():
+    from etl_proceso.pipeline import STEPS
+
+    ids = [name for name, _ in STEPS]
+    assert ids == [
+        "extract_csv_to_parquet",
+        "load_landing_truncate",
+        "transform_star_rebuild",
+        "validate_strategic_layer",
+    ]
+
+
+def test_airflow_dag_file_exists():
+    from pathlib import Path
+
+    dag = Path(__file__).resolve().parents[1] / "airflow" / "dags" / "globtrade_strategic_etl.py"
+    assert dag.is_file()
+    text = dag.read_text(encoding="utf-8")
+    assert 'dag_id="globtrade_strategic_etl"' in text
+    assert "extract_csv_to_parquet" in text
+    assert "validate_strategic_layer" in text
+
+
+def test_rate_limit_bloquea_tras_max_intentos():
+    from shared import rate_limit as rl
+
+    rl.reset_all()
+    key = "test-ip"
+    for _ in range(3):
+        assert rl.check_rate_limit("login", key, max_attempts=3, window_sec=60) is None
+        rl.record_attempt("login", key)
+    msg = rl.check_rate_limit("login", key, max_attempts=3, window_sec=60)
+    assert msg
+    rl.clear_attempts("login", key)
+    assert rl.check_rate_limit("login", key, max_attempts=3, window_sec=60) is None
+
+
+def test_security_headers_en_respuestas():
+    from frontend.app import app
+
+    client = app.test_client()
+    r = client.get("/")
+    assert r.headers.get("X-Content-Type-Options") == "nosniff"
+    assert r.headers.get("X-Frame-Options") == "SAMEORIGIN"
+    assert r.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+
+
+def test_users_manage_exige_permiso():
+    from frontend.app import app
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = "vendedor-1"
+        sess["email"] = "v@globtrade.test"
+        sess["role"] = "vendedor"
+    assert client.get("/api/auth/users").status_code == 403
+
+
+def test_update_user_role_protege_ultimo_admin(monkeypatch):
+    from bson import ObjectId
+
+    from auth import users as user_store
+    from shared.roles_registry import ADMIN_ROLE
+
+    oid = ObjectId()
+
+    class FakeCol:
+        def __init__(self):
+            self.docs = [
+                {
+                    "_id": oid,
+                    "email": "a@t.com",
+                    "name": "Admin",
+                    "role": ADMIN_ROLE,
+                    "active": True,
+                }
+            ]
+
+        def count_documents(self, q):
+            if q.get("role") == ADMIN_ROLE and q.get("active") is True:
+                return 1
+            return 0
+
+        def find_one(self, q, proj=None):
+            if q.get("_id") == oid and q.get("active") is True:
+                return dict(self.docs[0])
+            return None
+
+        def update_one(self, q, patch):
+            pass
+
+    monkeypatch.setattr(user_store, "_col", lambda: FakeCol())
+    monkeypatch.setattr(user_store.roles_service, "get_role", lambda slug: {
+        "slug": slug,
+        "active": True,
+        "assignable": True,
+    })
+    monkeypatch.setattr(user_store.roles_service, "ensure_roles_seed", lambda: None)
+
+    uid = str(oid)
+    with pytest.raises(ValueError, match="cannot_change_last_admin"):
+        user_store.update_user_role(uid, "cliente", actor_id=str(ObjectId()))
+
+    with pytest.raises(ValueError, match="cannot_change_own_role"):
+        user_store.update_user_role(uid, "cliente", actor_id=uid)
+
+
+def test_mongo_collection_routing(monkeypatch):
+    from shared import mongo as m
+    from shared.db_routing import is_ops_collection
+
+    assert is_ops_collection("users") is True
+    assert is_ops_collection("fact_ventas") is False
+
+    class FakeDB:
+        def __init__(self, name):
+            self.name = name
+
+        def __getitem__(self, key):
+            return f"{self.name}:{key}"
+
+    class FakeClient:
+        def __init__(self):
+            self.dbs = {}
+
+        def __getitem__(self, name):
+            if name not in self.dbs:
+                self.dbs[name] = FakeDB(name)
+            return self.dbs[name]
+
+        def close(self):
+            pass
+
+    client = FakeClient()
+    monkeypatch.setattr(m, "_client", client)
+    monkeypatch.setattr(m, "_read_client", None)
+    monkeypatch.setattr(m.settings, "mongo_db", "globtrade_dw")
+    monkeypatch.setattr(m.settings, "mongo_ops_db", "globtrade_ops")
+
+    assert m.split_enabled() is True
+    assert m.get_collection("users") == "globtrade_ops:users"
+    assert m.get_collection("fact_ventas") == "globtrade_dw:fact_ventas"
+    routed = m.get_db()
+    assert routed["purchase_requests"] == "globtrade_ops:purchase_requests"
+    assert routed["dim_region"] == "globtrade_dw:dim_region"
 

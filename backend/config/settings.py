@@ -15,6 +15,9 @@ class Settings(BaseSettings):
 
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db: str = "globtrade_dw"
+    mongo_ops_db: str | None = None
+    mongo_replica_uri: str | None = None
+    mongo_replica_set: str | None = None
 
     api_host: str = "0.0.0.0"
     api_port: int = 8001

@@ -64,6 +64,17 @@
   gap: 1rem;
 }
 
+.catalog-meta,
+.dash-records-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.dash-records-meta {
+  font-family: var(--mono);
+}
+
 .page-panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -88,23 +99,6 @@
   margin-bottom: 1rem;
   box-shadow: var(--shadow-sm, 0 1px 0 rgba(0, 0, 0, 0.05));
 }
-
-.chart-box,
-.table-box,
-.dash-panel,
-.load-box,
-.schema-card,
-.info-block,
-.problem-card {
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: var(--shadow-sm, 0 1px 0 rgba(0, 0, 0, 0.05));
-}
-
-.table-box {
-  border-radius: var(--radius-lg, 16px);
-  overflow: hidden;
-}
-
 
 .filter-group {
   display: flex;
@@ -138,18 +132,28 @@
   min-width: 9rem;
 }
 
-.dash-filters select,
-.dash-filters input {
-  background: var(--input-bg);
-  border-color: var(--input-border);
+.filter-group--wide {
+  flex: 2 1 220px;
+  max-width: 340px;
 }
 
-.page-tabs .btn,
-.page-tabs .tab-btn,
-.page-tabs .ventas-tab-btn,
-.page-tabs .compras-tab-btn {
-  min-height: 2.25rem;
-  padding: 0.45rem 1rem;
+.filter-group--actions-row {
+  flex: 2 1 100%;
+  max-width: none;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-group--actions-row .btn {
+  min-width: auto;
+}
+
+.dash-filters select,
+.dash-filters input {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
 }
 
 .page-tabs {
@@ -167,10 +171,11 @@
 .page-tabs .tab-btn,
 .page-tabs .ventas-tab-btn,
 .page-tabs .compras-tab-btn {
+  min-height: 2.25rem;
+  padding: 0.45rem 1rem;
   border-radius: 8px;
   border: none;
   background: transparent;
-  padding: 0.5rem 1rem;
   font-size: 0.8125rem;
 }
 
@@ -191,12 +196,13 @@
 .schema-card,
 .info-block,
 .problem-card {
-  border-radius: 12px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-sm, 0 1px 0 rgba(0, 0, 0, 0.05));
 }
 
 .table-box {
-  border-radius: 12px;
+  border-radius: var(--radius-lg, 16px);
+  overflow: hidden;
 }
 
 .table-header {

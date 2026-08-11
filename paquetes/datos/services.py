@@ -13,7 +13,7 @@ from typing import Any
 from config.settings import ROOT, settings
 from shared.audit import log_audit
 from shared.master_registry import EDITABLE_MASTERS, MASTER_TABLES, get_master
-from shared.mongo import get_db
+from shared.mongo import get_db, json_safe
 from shared.shopify_registry import SHOPIFY_TABLES
 
 ALLOWED_IMAGE_EXT = frozenset({".jpg", ".jpeg", ".png", ".webp"})
@@ -25,6 +25,26 @@ def _table_meta(name: str) -> dict[str, Any] | None:
     if name in SHOPIFY_TABLES:
         return SHOPIFY_TABLES[name]
     return None
+
+
+def list_editable_masters() -> list[dict[str, Any]]:
+    """Tablas maestras dim_* editables desde Datos Q4 (sin comercio ni dims generadas por ELT)."""
+    db = get_db()
+    out: list[dict[str, Any]] = []
+    for name in EDITABLE_MASTERS:
+        meta = MASTER_TABLES[name]
+        out.append(
+            {
+                "name": name,
+                "label": meta["label"],
+                "group": "maestros",
+                "layer": "dw",
+                "editable": True,
+                "pk": meta["pk"],
+                "count": db[name].count_documents({}),
+            }
+        )
+    return out
 
 
 def list_tables() -> list[dict[str, Any]]:
@@ -112,6 +132,48 @@ def get_row(name: str, row_id: str) -> dict[str, Any] | None:
     return get_db()[name].find_one({pk: key}, {"_id": 0})
 
 
+def _validate_master_row(name: str, doc: dict[str, Any], *, partial: bool = False) -> None:
+    int_positive = {"category_id", "region_id", "country_id", "channel_id", "line", "sla_days", "product_id"}
+    float_positive = {"unit_price", "unit_cost"}
+    for field in int_positive:
+        if field not in doc:
+            if partial:
+                continue
+            if name == "dim_producto" and field == "product_id":
+                continue
+            if name == "dim_cliente" and field in ("country_id", "channel_id") and doc.get(field) is None:
+                continue
+            continue
+        val = doc.get(field)
+        if val is None or val == "":
+            if partial:
+                continue
+            raise ValueError("invalid_field")
+        try:
+            n = int(val)
+        except (TypeError, ValueError):
+            raise ValueError("invalid_field")
+        if n < 1:
+            raise ValueError("invalid_field")
+    for field in float_positive:
+        if field not in doc:
+            continue
+        val = doc.get(field)
+        if val is None or val == "":
+            if partial:
+                continue
+            raise ValueError("invalid_field")
+        try:
+            n = float(val)
+        except (TypeError, ValueError):
+            raise ValueError("invalid_field")
+        if n <= 0:
+            raise ValueError("invalid_field")
+    name_val = doc.get("name")
+    if name_val is not None and not str(name_val).strip():
+        raise ValueError("invalid_field")
+
+
 def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
     if name not in EDITABLE_MASTERS:
         raise ValueError("read_only")
@@ -124,6 +186,7 @@ def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
         doc[pk] = _next_id(col, pk)
     else:
         doc[pk] = int(data[pk]) if str(data[pk]).isdigit() else data[pk]
+    _validate_master_row(name, doc)
     if col.find_one({pk: doc[pk]}):
         raise ValueError("duplicate_pk")
     if name == "dim_producto":
@@ -156,6 +219,7 @@ def update_row(name: str, row_id: str, data: dict[str, Any]) -> dict[str, Any]:
     if not existing:
         raise ValueError("not_found")
     patch = {k: data[k] for k in meta["fields"] if k in data and k != pk}
+    _validate_master_row(name, patch, partial=True)
     if name == "dim_producto" and ("unit_price" in patch or "unit_cost" in patch):
         up = float(patch.get("unit_price", existing.get("unit_price") or 0))
         uc = float(patch.get("unit_cost", existing.get("unit_cost") or 0))
@@ -294,8 +358,32 @@ def get_elt_status() -> dict[str, Any]:
     }
 
 
-def list_audit_log(*, limit: int = 50, offset: int = 0) -> dict[str, Any]:
+def list_audit_log(
+    *,
+    limit: int = 100,
+    offset: int = 0,
+    role: str | None = None,
+) -> dict[str, Any]:
     col = get_db()["audit_log"]
-    total = col.count_documents({})
-    rows = list(col.find({}, {"_id": 0}).sort("at", -1).skip(offset).limit(limit))
-    return {"total": total, "limit": limit, "offset": offset, "entries": rows}
+    page_size = min(max(int(limit or 100), 1), 100)
+    page_offset = max(int(offset or 0), 0)
+    query: dict[str, Any] = {}
+    role_filter = (role or "").strip()
+    if role_filter:
+        query["role"] = role_filter
+    total = col.count_documents(query)
+    rows = list(
+        col.find(query, {"_id": 0})
+        .sort("at", -1)
+        .skip(page_offset)
+        .limit(page_size)
+    )
+    roles = sorted({str(r).strip() for r in col.distinct("role") if r and str(r).strip()})
+    return {
+        "total": total,
+        "limit": page_size,
+        "offset": page_offset,
+        "role": role_filter or None,
+        "roles": roles,
+        "entries": [json_safe(row) for row in rows],
+    }

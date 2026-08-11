@@ -131,7 +131,7 @@
         openModal('modal-login');
         return false;
       }
-      alert('Solo administradores pueden realizar esta acción.');
+      notifyWarn('Solo administradores pueden realizar esta acción.');
       return false;
     }
     if (!currentUser) {
@@ -163,7 +163,7 @@
     currentUser = data.user;
     updateTopbar();
     closeAllModals();
-    alert(data.message || 'Cuenta creada. ¡Bienvenido!');
+    notifyOk(data.message || 'Cuenta creada. ¡Bienvenido!');
   }
 
   async function login() {
