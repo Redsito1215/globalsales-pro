@@ -39,6 +39,16 @@ $env:CSV_SOURCE="C:\proyect6softwa\data\sales.csv"
 .\.venv\Scripts\python.exe -m etl_proceso.pipeline
 ```
 
+### Dataset completo (~1.5M) antes de Airflow
+
+Si `data/sales.csv` no existe o es el demo de 100k, exporta desde Mongo:
+
+```powershell
+docker compose run --rm -v "${PWD}\scripts:/app/scripts" web python scripts/export_sales_dataset.py
+```
+
+Luego **Trigger DAG** `globtrade_strategic_etl` en http://localhost:8080.
+
 ## Airflow
 
 Un solo compose (`docker-compose.yml`), profile `airflow`:

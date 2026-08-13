@@ -89,7 +89,7 @@ async function loadNotificacionesPage() {
   const r = await fetch(API + '/auth/notifications?limit=50', { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
-    list.innerHTML = `<p class="catalog-empty">${data.message || 'Error'}</p>`;
+    list.innerHTML = `<p class="catalog-empty">${data.message || 'Error al procesar'}</p>`;
     return;
   }
   if (meta) meta.textContent = `${data.unread || 0} sin leer · ${data.total || 0} total`;

@@ -139,7 +139,7 @@ def shop_adjust_stock(variant_id: int):
     try:
         available = int(body.get("available") if "available" in body else body.get("inventory_quantity"))
     except (TypeError, ValueError):
-        return jsonify({"status": "error", "message": "Indica available (entero).", "code": "invalid_stock"}), 400
+        return jsonify({"status": "error", "message": "Indica las existencias disponibles (número entero).", "code": "invalid_stock"}), 400
     try:
         row = services.adjust_variant_stock(variant_id, available)
         return jsonify({"status": "ok", "variant": row})

@@ -86,6 +86,26 @@
   color: var(--muted);
 }
 
+.table-pager-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.table-pager-size {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.table-pager-select {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+}
+
 .audit-action {
   font-size: 0.75rem;
   font-weight: 600;
@@ -260,4 +280,61 @@
 
 .table-header--split .dash-records-meta {
   margin: 0;
+}
+
+.company-admin-panel {
+  margin-bottom: 1.5rem;
+}
+
+.company-admin-grid {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 1.25rem 1.5rem;
+  align-items: start;
+}
+
+.company-admin-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  text-align: center;
+}
+
+.company-logo-preview {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  padding: 0.5rem;
+}
+
+.company-logo-upload {
+  cursor: pointer;
+}
+
+.company-admin-fields .fg-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.company-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 860px) {
+  .company-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .company-admin-fields .fg-row {
+    grid-template-columns: 1fr;
+  }
 }

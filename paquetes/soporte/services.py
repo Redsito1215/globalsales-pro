@@ -294,6 +294,39 @@ def _label_column_width(
     return min(width, cap)
 
 
+def _draw_company_brand(c, x: float, y: float, profile: dict[str, Any]) -> None:
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.utils import ImageReader
+
+    from shared.company_profile import static_path_from_url
+
+    name = _pdf_text(profile.get("legal_name") or profile.get("name") or "GLOBTRADE")
+    tagline = _pdf_text(profile.get("tagline") or "")
+    text_x = x
+    logo_path = static_path_from_url(profile.get("logo_url"))
+    if logo_path and logo_path.is_file():
+        try:
+            ir = ImageReader(str(logo_path))
+            iw, ih = ir.getSize()
+            max_side = 1.15 * cm
+            scale = min(max_side / max(iw, 1), max_side / max(ih, 1))
+            lw, lh = iw * scale, ih * scale
+            c.drawImage(ir, x, y - lh * 0.15, width=lw, height=lh, mask="auto")
+            text_x = x + lw + 0.28 * cm
+        except Exception:
+            _draw_logo_mark(c, x, y)
+            return
+
+    c.setFillColor(colors.HexColor("#1a1f4b"))
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(text_x, y, name)
+    if tagline:
+        c.setFont("Helvetica", 7.5)
+        c.setFillColor(colors.HexColor("#64748b"))
+        c.drawString(text_x, y - 11, _fit_text(c, tagline, "Helvetica", 7.5, 5.2 * cm))
+
+
 def _draw_logo_mark(c, x: float, y: float) -> None:
     from reportlab.lib import colors
 
@@ -315,6 +348,9 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     from reportlab.lib.units import cm
     from reportlab.pdfgen import canvas
 
+    from shared.company_profile import get_company_profile
+
+    profile = get_company_profile()
     NAVY = colors.HexColor("#1a1f4b")
     LIGHT = colors.HexColor("#f2f2f2")
     ROW_ALT = colors.HexColor("#f7f7f7")
@@ -342,7 +378,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 22)
     c.drawString(margin_x + 0.45 * cm, y - 1.05 * cm, "FACTURA")
-    _draw_logo_mark(c, w - margin_x - 4.8 * cm, y - 1.05 * cm)
+    _draw_company_brand(c, w - margin_x - 5.2 * cm, y - 1.05 * cm, profile)
     y -= band_h + 0.55 * cm
 
     inv_no = _invoice_number(request)
@@ -405,8 +441,8 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
 
     # ── Line items table ────────────────────────────────────────────────
     cols = [
-        ("Item", 1.0 * cm, "center"),
-        ("Descripcion", 7.4 * cm, "left"),
+        ("Artículo", 1.0 * cm, "center"),
+        ("Descripción", 7.4 * cm, "left"),
         ("Cant.", 1.5 * cm, "center"),
         ("Precio", 2.35 * cm, "right"),
         ("Total", 2.35 * cm, "right"),
@@ -531,7 +567,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     c.setStrokeColor(colors.black)
     c.line(margin_x, footer_y + 0.55 * cm, margin_x + 5.5 * cm, footer_y + 0.55 * cm)
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin_x, footer_y + 0.15 * cm, "Equipo Comercial GLOBTRADE")
+    c.drawString(margin_x, footer_y + 0.15 * cm, _pdf_text(profile.get("invoice_signer") or "Equipo Comercial GLOBTRADE"))
 
     info_x = w - margin_x - 6.8 * cm
     c.setFont("Helvetica-Bold", 9)
@@ -542,7 +578,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     info_lines = [inv_no, f"Solicitud #{request.get('request_id', '—')}"]
     if request.get("order_id"):
         info_lines.append(f"Pedido venta {request.get('order_id')}")
-    info_lines.append("GLOBTRADE S.A. — plataforma comercial")
+    info_lines.append(_pdf_text(profile.get("legal_name") or "GLOBTRADE S.A.") + " — plataforma comercial")
     iy = footer_y + 0.62 * cm
     for line in info_lines:
         c.drawString(info_x, iy, line)
@@ -553,7 +589,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     c.drawCentredString(
         w / 2,
         1.15 * cm,
-        "Documento comercial GLOBTRADE (demo academica). No es factura fiscal.",
+        _pdf_text(profile.get("invoice_footer") or "Documento comercial GLOBTRADE (demo academica). No es factura fiscal."),
     )
 
     c.showPage()

@@ -9,7 +9,7 @@ const REPORT_LABELS = {
   created_at: 'Fecha',
   sku: 'Código',
   product_name: 'Producto',
-  inventory_quantity: 'Stock',
+  inventory_quantity: 'Existencias',
   unit_price: 'Precio',
   unit_cost: 'Costo',
   vendor_name: 'Proveedor',
@@ -53,7 +53,7 @@ const RC_LABELS = {
   monto: 'Monto',
   detalle: 'Detalle',
   unidades_vendidas: 'Unidades vendidas',
-  stock_actual: 'Stock actual',
+  stock_actual: 'Existencias actuales',
   rotacion_aprox: 'Rotación aprox.',
   region: 'Región',
   dias_promedio: 'Días promedio',
@@ -292,7 +292,7 @@ async function loadReporteActual() {
     if (count) count.textContent = `${data.total ?? rows.length} fila(s)`;
     onReportesSelect();
   } catch (e) {
-    body.innerHTML = emptyTableHtml(8, e.message || 'Error');
+    body.innerHTML = emptyTableHtml(8, e.message || 'Error al procesar');
   }
 }
 
@@ -392,7 +392,7 @@ async function loadRcActual() {
     if (count) count.textContent = `${data.total ?? rows.length} fila(s)`;
     onRcSelect();
   } catch (e) {
-    body.innerHTML = emptyTableHtml(8, e.message || 'Error', needsModelCta(id, e.message));
+    body.innerHTML = emptyTableHtml(8, e.message || 'Error al procesar', needsModelCta(id, e.message));
   }
 }
 
@@ -485,6 +485,330 @@ function exportRcCsv() {
   reportNotify('CSV descargado', 'ok');
 }
 
+let reportesAiState = {
+  context: 'simple',
+  scope: 'simple',
+  catalog: { simples: [], compuestos: [], counts: null },
+  lastGenerated: null,
+};
+
+function reportesAiScopeLabel(scope) {
+  return scope === 'compuesto' ? 'Compuesto · estratégico' : 'Simple · operativo';
+}
+
+function updateReportesAiScopeUi() {
+  const scope = reportesAiState.scope;
+  document.querySelectorAll('.reportes-ai-scope-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.scope === scope);
+  });
+  const title = document.getElementById('reportes-ai-title');
+  const sub = document.getElementById('reportes-ai-sub');
+  const genPrompt = document.getElementById('reportes-ai-gen-prompt');
+  if (title) {
+    title.textContent = scope === 'compuesto' ? 'Asistente IA — informes compuestos' : 'Asistente IA — informes simples';
+  }
+  if (sub) {
+    sub.textContent = scope === 'compuesto'
+      ? 'Recomienda y genera análisis estratégicos (RC): ventas agregadas, rankings, márgenes y KPIs.'
+      : 'Recomienda y genera listados operativos (RS): pedidos, stock, soporte y proveedores.';
+  }
+  if (genPrompt) {
+    genPrompt.placeholder = scope === 'compuesto'
+      ? 'Ej.: Ventas por mes y categoría, top productos, margen por categoría…'
+      : 'Ej.: Productos con poco stock, pedidos pendientes de pago, chats sin responder…';
+  }
+  const recPrompt = document.getElementById('reportes-ai-rec-prompt');
+  if (recPrompt) {
+    recPrompt.placeholder = scope === 'compuesto'
+      ? 'Ej.: tendencia de ventas, ranking, rotación de inventario…'
+      : 'Ej.: stock bajo, pagos pendientes, órdenes de compra abiertas…';
+  }
+}
+
+function setReportesAiScope(scope) {
+  reportesAiState.scope = scope === 'compuesto' ? 'compuesto' : 'simple';
+  updateReportesAiScopeUi();
+  loadReportesAiRecommendations();
+}
+
+async function refreshReportesAiCatalog(notifyUser) {
+  const meta = document.getElementById('reportes-ai-catalog-meta');
+  const btn = document.getElementById('reportes-ai-refresh-catalog');
+  if (btn) btn.disabled = true;
+  if (meta) meta.textContent = 'Actualizando catálogo de informes…';
+  try {
+    const [rSimple, rComp] = await Promise.all([
+      fetch(`${reportesApiBase()}/reportes`, { credentials: 'same-origin' }),
+      fetch(`${reportesApiBase()}/compuestos`, { credentials: 'same-origin' }),
+    ]);
+    const dataSimple = await rSimple.json().catch(() => ({}));
+    const dataComp = await rComp.json().catch(() => ({}));
+    if (rSimple.ok && Array.isArray(dataSimple.reports)) {
+      reportesCatalog = dataSimple.reports;
+      const sel = document.getElementById('reportes-select');
+      const prev = sel?.value;
+      fillSelectOptions(sel, reportesCatalog);
+      if (prev && reportesCatalog.some((x) => x.id === prev) && sel) sel.value = prev;
+    }
+    if (rComp.ok && Array.isArray(dataComp.reports)) {
+      rcUsingFallback = false;
+      rcCatalog = dataComp.reports;
+      setRcFallbackBanner(false);
+      const sel = document.getElementById('rc-select');
+      const prev = sel?.value;
+      fillSelectOptions(sel, rcCatalog);
+      if (prev && rcCatalog.some((x) => x.id === prev) && sel) sel.value = prev;
+    }
+    const rCat = await fetch(
+      `${reportesApiBase()}/reportes/ia/catalogo?scope=${encodeURIComponent(reportesAiState.scope)}`,
+      { credentials: 'same-origin' }
+    );
+    const cat = await rCat.json().catch(() => ({}));
+    if (rCat.ok) {
+      reportesAiState.catalog.counts = cat.counts || null;
+      if (meta && cat.counts) {
+        meta.textContent = `Catálogo actualizado: ${cat.counts.simples} simples (RS) · ${cat.counts.compuestos} compuestos (RC) · ${cat.counts.scoped} en este tipo`;
+      }
+    } else if (meta) {
+      meta.textContent = `Catálogo: ${reportesCatalog.length} simples · ${rcCatalog.length} compuestos`;
+    }
+    if (notifyUser) reportNotify('Tipos de informe actualizados', 'ok');
+  } catch (e) {
+    if (meta) meta.textContent = e.message || 'No se pudo actualizar el catálogo';
+    if (notifyUser) reportNotify(e.message || 'Error al actualizar catálogo', 'danger');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function switchReportesAiTab(tab) {
+  document.querySelectorAll('.reportes-ai-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  const rec = document.getElementById('reportes-ai-panel-recomendar');
+  const gen = document.getElementById('reportes-ai-panel-generar');
+  if (rec) rec.hidden = tab !== 'recomendar';
+  if (gen) gen.hidden = tab !== 'generar';
+}
+
+function openReportesAiModal(context) {
+  reportesAiState.context = context === 'compuesto' ? 'compuesto' : 'simple';
+  reportesAiState.scope = reportesAiState.context;
+  const modal = document.getElementById('reportes-ai-modal');
+  if (!modal) return;
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+  updateReportesAiScopeUi();
+  switchReportesAiTab('recomendar');
+  const genResult = document.getElementById('reportes-ai-gen-result');
+  if (genResult) genResult.hidden = true;
+  refreshReportesAiCatalog(false).then(() => loadReportesAiRecommendations());
+}
+
+function closeReportesAiModal() {
+  const modal = document.getElementById('reportes-ai-modal');
+  if (!modal) return;
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function renderReportGridTo(headEl, bodyEl, columns, rows, labels, emptyMsg) {
+  const cols = columns || [];
+  const labelMap = labels || REPORT_LABELS;
+  if (!headEl || !bodyEl) return;
+  headEl.innerHTML = `<tr>${cols.map((c) => `<th>${labelMap[c] || c}</th>`).join('')}</tr>`;
+  if (!rows || !rows.length) {
+    bodyEl.innerHTML = emptyTableHtml(cols.length || 1, emptyMsg || 'Sin datos.');
+    return;
+  }
+  bodyEl.innerHTML = rows
+    .map((row) => {
+      const tds = cols
+        .map((c) => {
+          let v = row[c];
+          if (typeof v === 'boolean') v = v ? 'Sí' : 'No';
+          return `<td>${v == null || v === '' ? '—' : String(v)}</td>`;
+        })
+        .join('');
+      return `<tr>${tds}</tr>`;
+    })
+    .join('');
+}
+
+async function loadReportesAiRecommendations() {
+  const prompt = document.getElementById('reportes-ai-rec-prompt')?.value?.trim() || '';
+  const list = document.getElementById('reportes-ai-rec-list');
+  const engineEl = document.getElementById('reportes-ai-engine');
+  const btn = document.getElementById('reportes-ai-rec-btn');
+  if (!list) return;
+  if (btn) btn.disabled = true;
+  list.innerHTML = '<p class="catalog-meta">Analizando catálogo…</p>';
+  try {
+    const r = await fetch(`${reportesApiBase()}/reportes/ia/recomendar`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt || null,
+        limit: 5,
+        scope: reportesAiState.scope,
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.message || 'No se pudieron obtener recomendaciones.');
+    const engine = data.engine === 'openai' ? 'Motor: OpenAI (opcional)' : 'Motor: local en español';
+    if (engineEl) {
+      const counts = data.catalog_counts;
+      const countTxt = counts ? ` · ${counts.scoped} informes en este tipo` : '';
+      const note = data.engine_note || '';
+      engineEl.textContent = `${engine} · ${reportesAiScopeLabel(reportesAiState.scope)}${countTxt}${note ? ' — ' + note : ''}`;
+    }
+    const recs = data.recommendations || [];
+    if (!recs.length) {
+      list.innerHTML = '<p class="catalog-meta">No hay recomendaciones para esa consulta.</p>';
+      return;
+    }
+    list.innerHTML = recs
+      .map(
+        (rec) => {
+          const tipoBadge = rec.tipo_label || reportesAiScopeLabel(rec.tipo || 'simple');
+          return `<article class="reportes-ai-rec-card">
+          <h4>${rec.report_id} — ${rec.name || ''}</h4>
+          <p>${rec.para_que || rec.reason || ''}</p>
+          <div class="reportes-ai-rec-actions">
+            <span class="reportes-ai-badge reportes-ai-badge--tipo">${tipoBadge}</span>
+            <span class="reportes-ai-badge">${rec.confidence || 'media'}</span>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openAiRecommendedReport('${rec.report_id}', '${rec.tipo || 'simple'}')">Abrir informe</button>
+          </div>
+        </article>`;
+        }
+      )
+      .join('');
+  } catch (e) {
+    list.innerHTML = `<p class="catalog-meta">${e.message || 'Error al recomendar'}</p>`;
+    reportNotify(e.message || 'Error al recomendar', 'danger');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function generateReportesAiCustom() {
+  const prompt = document.getElementById('reportes-ai-gen-prompt')?.value?.trim();
+  const btn = document.getElementById('reportes-ai-gen-btn');
+  const result = document.getElementById('reportes-ai-gen-result');
+  if (!prompt) {
+    reportNotify('Describe el informe que necesitas.', 'warn');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (result) result.hidden = true;
+  reportNotify('Generando informe…', 'info');
+  try {
+    const thr = document.getElementById('reportes-thr')?.value || '20';
+    const r = await fetch(`${reportesApiBase()}/reportes/ia/generar`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        limit: 120,
+        threshold: parseInt(thr, 10) || 20,
+        scope: reportesAiState.scope,
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.message || 'No se pudo generar el informe.');
+    reportesAiState.lastGenerated = data;
+    const narrative = document.getElementById('reportes-ai-gen-narrative');
+    const meta = document.getElementById('reportes-ai-gen-meta');
+    if (narrative) narrative.textContent = data.narrative || '';
+    if (meta) {
+      const tipoTxt = data.tipo_label || reportesAiScopeLabel(data.tipo || reportesAiState.scope);
+      meta.textContent = `${data.report?.name || 'Informe'} · ${tipoTxt} · base ${data.matched_report_id || ''} · ${data.total ?? 0} fila(s) · ${data.engine === 'openai' ? 'IA' : 'local'}`;
+    }
+    const cols = (data.report && data.report.columns) || [];
+    const labels = data.tipo === 'compuesto' ? RC_LABELS : REPORT_LABELS;
+    renderReportGridTo(
+      document.getElementById('reportes-ai-gen-head'),
+      document.getElementById('reportes-ai-gen-body'),
+      cols,
+      data.rows || [],
+      labels,
+      data.message || 'Sin datos para este informe.'
+    );
+    if (result) result.hidden = false;
+    reportNotify('Informe generado', 'ok');
+  } catch (e) {
+    reportNotify(e.message || 'Error al generar', 'danger');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function openAiRecommendedReport(reportId, tipo) {
+  closeReportesAiModal();
+  if (tipo === 'compuesto') {
+    if (typeof showPage === 'function') showPage('reportes-compuestos');
+    const sel = document.getElementById('rc-select');
+    if (sel) {
+      sel.value = reportId;
+      if (typeof onRcSelect === 'function') onRcSelect();
+      if (typeof loadRcActual === 'function') loadRcActual();
+    }
+    return;
+  }
+  if (typeof showPage === 'function') showPage('reportes');
+  const sel = document.getElementById('reportes-select');
+  if (sel) {
+    sel.value = reportId;
+    if (typeof onReportesSelect === 'function') onReportesSelect();
+    if (typeof loadReporteActual === 'function') loadReporteActual();
+  }
+}
+
+function applyReportesAiResult() {
+  const data = reportesAiState.lastGenerated;
+  if (!data) return;
+  closeReportesAiModal();
+  const tipo = data.tipo || (data.report?.tipo === 'compuesto' ? 'compuesto' : 'simple');
+  const rid = data.matched_report_id || data.report?.source_report_id;
+  if (tipo === 'compuesto') {
+    if (typeof showPage === 'function') showPage('reportes-compuestos');
+    const sel = document.getElementById('rc-select');
+    const head = document.getElementById('rc-head');
+    const body = document.getElementById('rc-body');
+    const count = document.getElementById('rc-count');
+    const title = document.getElementById('rc-title');
+    const meta = document.getElementById('rc-meta');
+    if (sel && rid) sel.value = rid;
+    if (title && data.report) title.textContent = data.report.name || title.textContent;
+    if (meta && data.report) setReportMeta(meta, data.report);
+    const cols = data.report?.columns || [];
+    lastRcGrid = { id: rid || '', columns: cols, rows: data.rows || [], labels: RC_LABELS };
+    renderReportGridTo(head, body, cols, data.rows, RC_LABELS, data.message);
+    if (count) count.textContent = `${data.total ?? (data.rows || []).length} fila(s)`;
+    if (typeof onRcSelect === 'function') onRcSelect();
+    return;
+  }
+  if (typeof showPage === 'function') showPage('reportes');
+  const sel = document.getElementById('reportes-select');
+  const head = document.getElementById('reportes-head');
+  const body = document.getElementById('reportes-body');
+  const count = document.getElementById('reportes-count');
+  const title = document.getElementById('reportes-title');
+  const meta = document.getElementById('reportes-meta');
+  if (sel && rid) sel.value = rid;
+  const qInput = document.getElementById('reportes-q');
+  if (qInput && data.search_query) qInput.value = data.search_query;
+  if (title && data.report) title.textContent = data.report.name || title.textContent;
+  if (meta && data.report) setReportMeta(meta, data.report);
+  const cols = data.report?.columns || [];
+  lastReporteGrid = { id: rid || '', columns: cols, rows: data.rows || [], labels: REPORT_LABELS };
+  renderReportGridTo(head, body, cols, data.rows, REPORT_LABELS, data.message);
+  if (count) count.textContent = `${data.total ?? (data.rows || []).length} fila(s)`;
+  if (typeof onReportesSelect === 'function') onReportesSelect();
+}
+
 window.loadReportesPage = loadReportesPage;
 window.onReportesSelect = onReportesSelect;
 window.loadReporteActual = loadReporteActual;
@@ -495,3 +819,12 @@ window.exportReportePdf = exportReportePdf;
 window.exportRcPdf = exportRcPdf;
 window.exportReporteCsv = exportReporteCsv;
 window.exportRcCsv = exportRcCsv;
+window.openReportesAiModal = openReportesAiModal;
+window.closeReportesAiModal = closeReportesAiModal;
+window.switchReportesAiTab = switchReportesAiTab;
+window.loadReportesAiRecommendations = loadReportesAiRecommendations;
+window.generateReportesAiCustom = generateReportesAiCustom;
+window.openAiRecommendedReport = openAiRecommendedReport;
+window.applyReportesAiResult = applyReportesAiResult;
+window.setReportesAiScope = setReportesAiScope;
+window.refreshReportesAiCatalog = refreshReportesAiCatalog;

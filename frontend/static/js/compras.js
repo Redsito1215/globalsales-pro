@@ -199,7 +199,7 @@ function renderComprasChips(invRows, poRows) {
   const sent = (poRows || []).filter(p => p.status === 'enviada' || p.status === 'parcial').length;
   const done = (poRows || []).filter(p => p.status === 'recibida').length;
   chips.innerHTML = `
-    <span class="ops-chip ${low ? 'ops-chip--danger' : ''}"><span>Stock bajo</span><strong>${low}</strong></span>
+    <span class="ops-chip ${low ? 'ops-chip--danger' : ''}"><span>Existencias bajas</span><strong>${low}</strong></span>
     <span class="ops-chip ops-chip--warn"><span>OC borrador</span><strong>${draft}</strong></span>
     <span class="ops-chip"><span>OC en tránsito</span><strong>${sent}</strong></span>
     <span class="ops-chip ops-chip--ok"><span>OC recibidas</span><strong>${done}</strong></span>`;
@@ -232,8 +232,8 @@ async function loadComprasInventario() {
   const data = await r.json();
   if (!r.ok) {
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(8, { title: 'Error', hint: data.message || 'No se pudo cargar inventario' })
-      : `<tr><td colspan="8">${data.message || 'Error'}</td></tr>`;
+      ? opsEmptyRow(8, { title: 'Error al cargar', hint: data.message || 'No se pudo cargar inventario' })
+      : `<tr><td colspan="8">${data.message || 'Error al procesar'}</td></tr>`;
     return;
   }
   renderWarehouseBanner(data.warehouse);
@@ -242,12 +242,12 @@ async function loadComprasInventario() {
   if (!rows.length) {
     body.innerHTML = typeof opsEmptyRow === 'function'
       ? opsEmptyRow(8, {
-          title: 'Sin SKUs',
-          hint: 'Ejecuta Sync catálogo en Maestros para generar variantes e inventario.',
+          title: 'Sin referencias',
+          hint: 'Ejecuta Sincronizar catálogo en Maestros para generar variantes e inventario.',
           ctaLabel: 'Ir a Maestros',
           ctaOnclick: "showPage('datos')",
         })
-      : '<tr><td colspan="8">Sin SKUs. Ejecuta Sync catálogo en Maestros.</td></tr>';
+      : '<tr><td colspan="8">Sin códigos SKU. Ejecuta Sincronizar catálogo en Maestros.</td></tr>';
     return;
   }
   const whName = (data.warehouse && data.warehouse.name) || 'Bodega General';
@@ -255,7 +255,7 @@ async function loadComprasInventario() {
   body.innerHTML = rows.map(row => {
     const qty = Number(row.inventory_quantity || 0);
     const sug = Math.max(thr - qty, 10);
-    const lowBadge = qty <= thr ? '<span class="badge badge--danger">Bajo</span>' : '<span class="badge badge--ok">OK</span>';
+    const lowBadge = qty <= thr ? '<span class="badge badge--danger">Bajo</span>' : '<span class="badge badge--ok">Correcto</span>';
     return `<tr>
       <td>${row.variant_id}</td>
       <td>${row.title}<br><span class="table-sub">${row.sku || ''}</span></td>
@@ -296,8 +296,8 @@ async function saveStock(variantId) {
     body: JSON.stringify({ available: val }),
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
-  toast('Stock actualizado', 'ok');
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
+  toast('Existencias actualizadas', 'ok');
   loadComprasInventario();
 }
 
@@ -308,8 +308,8 @@ async function bumpStock(variantId, delta) {
     body: JSON.stringify({ delta }),
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
-  toast('Stock ajustado (+' + delta + ')', 'ok');
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
+  toast('Existencias ajustadas (+' + delta + ')', 'ok');
   loadComprasInventario();
 }
 
@@ -323,14 +323,14 @@ async function loadComprasProveedores() {
   const data = await r.json();
   if (!r.ok) {
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(6, { title: 'Error', hint: data.message || 'Error' })
-      : `<tr><td colspan="6">${data.message || 'Error'}</td></tr>`;
+      ? opsEmptyRow(6, { title: 'Error al cargar', hint: data.message || 'Error al procesar' })
+      : `<tr><td colspan="6">${data.message || 'Error al procesar'}</td></tr>`;
     return;
   }
   const rows = data.vendors || [];
   if (!rows.length) {
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(6, { title: 'Sin proveedores', hint: 'Crea uno abajo o ejecuta Sync catálogo (conserva proveedores existentes).' })
+      ? opsEmptyRow(6, { title: 'Sin proveedores', hint: 'Crea uno abajo o ejecuta Sincronizar catálogo (conserva proveedores existentes).' })
       : '<tr><td colspan="6">Sin proveedores.</td></tr>';
     return;
   }
@@ -390,7 +390,7 @@ async function saveVendor() {
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
   toast(id ? 'Proveedor actualizado' : 'Proveedor creado', 'ok');
   resetVendorForm();
   loadComprasProveedores();
@@ -406,8 +406,8 @@ async function loadComprasOCs() {
   const data = await r.json();
   if (!r.ok) {
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(6, { title: 'Error', hint: data.message || 'Error' })
-      : `<tr><td colspan="6">${data.message || 'Error'}</td></tr>`;
+      ? opsEmptyRow(6, { title: 'Error al cargar', hint: data.message || 'Error al procesar' })
+      : `<tr><td colspan="6">${data.message || 'Error al procesar'}</td></tr>`;
     return;
   }
   const rows = data.orders || [];
@@ -458,7 +458,7 @@ async function fillPoVariantSelect() {
   const r = await fetch(API + '/compras/inventory?limit=100', { credentials: 'same-origin' });
   const data = await r.json();
   const prev = sel.value;
-  sel.innerHTML = '<option value="">— Variante / SKU —</option>' +
+  sel.innerHTML = '<option value="">— Variante / código —</option>' +
     (data.items || []).map(v => `<option value="${v.variant_id}">${v.sku || v.variant_id} · ${v.title}</option>`).join('');
   if (prev) sel.value = prev;
 }
@@ -478,7 +478,7 @@ async function createPO() {
     body: JSON.stringify({ vendor_id, lines: [{ variant_id, quantity, unit_cost }] }),
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
   toast('OC #' + data.order.po_id + ' creada en borrador', 'ok');
   const hint = document.getElementById('po-prefill-hint');
   if (hint) hint.hidden = true;
@@ -500,7 +500,7 @@ async function sendPO(id) {
     method: 'POST', credentials: 'same-origin',
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
   toast(data.message || 'OC enviada', 'ok');
   loadComprasOCs();
 }
@@ -601,7 +601,7 @@ async function receivePO(id, linesRaw) {
     body: JSON.stringify(receipts ? { receipts } : {}),
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
   toast(data.message || 'Mercancía recibida', 'ok');
   loadComprasOCs();
   if (comprasTab === 'inventario') loadComprasInventario();
@@ -621,7 +621,7 @@ async function cancelPO(id) {
   if (!ok) return;
   const r = await fetch(`${API}/compras/purchase-orders/${id}/cancel`, { method: 'POST', credentials: 'same-origin' });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
   toast('OC cancelada', 'ok');
   loadComprasOCs();
 }

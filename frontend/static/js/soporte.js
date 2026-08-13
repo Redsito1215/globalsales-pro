@@ -138,7 +138,7 @@ async function loadSoportePage() {
   const r = await fetch(API + '/soporte/mensajes' + q, { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
-    box.innerHTML = `<p class="catalog-empty">${data.message || 'Error'}</p>`;
+    box.innerHTML = `<p class="catalog-empty">${data.message || 'Error al procesar'}</p>`;
     return;
   }
   const msgs = data.messages || [];
@@ -161,7 +161,7 @@ async function loadSoporteInbox() {
   const r = await fetch(API + '/soporte/hilos?limit=40', { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
-    list.innerHTML = `<p class="catalog-empty">${data.message || 'Error'}</p>`;
+    list.innerHTML = `<p class="catalog-empty">${data.message || 'Error al procesar'}</p>`;
     return;
   }
   const threads = data.threads || [];
@@ -212,7 +212,7 @@ async function sendSoporteMessage() {
   });
   const data = await r.json();
   if (!r.ok) {
-    notifyErr(data.message || 'Error');
+    notifyErr(data.message || 'Error al procesar');
     return;
   }
   if (input) input.value = '';

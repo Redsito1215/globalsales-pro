@@ -17,7 +17,7 @@ async function loadPedidosAdmin() {
   if (!r.ok) {
     const data = await r.json().catch(() => ({}));
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(6, { title: 'Error', hint: data.message || 'Error al cargar pedidos' })
+      ? opsEmptyRow(6, { title: 'Error al cargar', hint: data.message || 'Error al cargar pedidos' })
       : `<tr><td colspan="6">${data.message || 'Error al cargar pedidos'}</td></tr>`;
     return;
   }
@@ -61,7 +61,7 @@ async function createPedidoAdmin() {
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
   toast('Pedido creado: ' + data.order.order_id, 'ok');
   await loadPedidosAdmin();
 }
@@ -82,7 +82,7 @@ async function deletePedido(orderId) {
     method: 'DELETE', credentials: 'same-origin',
   });
   const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error', 'danger'); return; }
+  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
   toast('Pedido eliminado', 'ok');
   await loadPedidosAdmin();
 }

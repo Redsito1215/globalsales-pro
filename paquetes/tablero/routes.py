@@ -8,14 +8,26 @@ from paquetes.tablero import catalogo, generar_ventas, queries
 tablero_bp = Blueprint("tablero", __name__, url_prefix="/api")
 
 
+def _normalize_months(raw: str | None) -> int | None:
+    if raw is None or str(raw).strip() == "":
+        return 24
+    try:
+        months = int(raw)
+    except (TypeError, ValueError):
+        return 24
+    if months < 1:
+        return 24
+    return min(months, 999)
+
+
 def _filters_from_request():
-    months = request.args.get("months")
+    months = _normalize_months(request.args.get("months"))
     return {
         "region": request.args.get("region") or None,
         "item_type": request.args.get("item_type") or None,
         "channel": request.args.get("channel") or None,
         "priority": request.args.get("priority") or None,
-        "months": int(months) if months else None,
+        "months": months,
     }
 
 

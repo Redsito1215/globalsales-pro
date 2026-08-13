@@ -284,7 +284,8 @@
       lastStaleSyncAt = Date.now();
       await syncStaleAnalytics({ silent: true });
       if (activePageId() === 'dashboard' && typeof loadDashboard === 'function') {
-        await loadDashboard();
+        if (typeof clearAnalyticsCache === 'function') clearAnalyticsCache();
+        await loadDashboard(true);
       }
     } catch (e) {
       console.debug('[ops-live stale]', e);

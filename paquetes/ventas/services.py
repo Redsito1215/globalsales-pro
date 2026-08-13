@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from auth import roles_service
+from paquetes.tablero import catalogo_nombres as nom
 from shared.audit import log_audit
 from shared.mongo import get_db, sales_collection
 from shared.notifications import notify_roles, notify_user, status_message
@@ -60,6 +61,27 @@ def _next_request_id(col) -> int:
 def _next_line_id(col) -> int:
     row = col.find_one({}, {"line_id": 1, "_id": 0}, sort=[("line_id", -1)])
     return int(row["line_id"]) + 1 if row and row.get("line_id") else 1
+
+
+def _localized_product_name(*, product_id: int | None, fallback: str = "") -> str:
+    if product_id is not None:
+        name = nom.product_display_name_by_id(int(product_id), "")
+        if name:
+            return name
+    return (fallback or "").strip() or (f"Producto {product_id}" if product_id else "Producto")
+
+
+def _localize_request_lines(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for line in lines:
+        row = dict(line)
+        pid = row.get("product_id")
+        row["product_name"] = _localized_product_name(
+            product_id=int(pid) if pid is not None else None,
+            fallback=str(row.get("product_name") or ""),
+        )
+        out.append(row)
+    return out
 
 
 def _maybe_restock(req: dict[str, Any]) -> None:
@@ -236,6 +258,8 @@ def repair_legacy_platform_order_ids(db=None) -> int:
 
 
 def _normalize_request_row(row: dict[str, Any]) -> None:
+    if row.get("lines"):
+        row["lines"] = _localize_request_lines(row["lines"])
     if row.get("order_id"):
         row["order_id"] = display_order_id(row["order_id"], row.get("request_id"))
     email = (row.get("client_email") or "").strip()
@@ -247,8 +271,8 @@ def get_request(request_id: int) -> dict[str, Any] | None:
     req = db["purchase_requests"].find_one({"request_id": int(request_id)}, {"_id": 0})
     if not req:
         return None
-    req["lines"] = list(
-        db["purchase_request_lines"].find({"request_id": int(request_id)}, {"_id": 0})
+    req["lines"] = _localize_request_lines(
+        list(db["purchase_request_lines"].find({"request_id": int(request_id)}, {"_id": 0}))
     )
     country = db["dim_pais"].find_one({"country_id": req.get("country_id")}, {"_id": 0, "name": 1})
     channel = db["dim_canal"].find_one({"channel_id": req.get("channel_id")}, {"_id": 0, "name": 1})
@@ -391,7 +415,10 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
                 "line_id": lid,
                 "request_id": rid,
                 "product_id": pid,
-                "product_name": prod.get("name"),
+                "product_name": _localized_product_name(
+                    product_id=pid,
+                    fallback=str(prod.get("name") or ""),
+                ),
                 "quantity": qty,
                 "unit_price": unit_price,
                 "unit_cost": unit_cost,

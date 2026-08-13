@@ -65,7 +65,7 @@ async function loadRolesList() {
   const r = await fetch(API + '/auth/roles', { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
-    body.innerHTML = `<tr><td colspan="4">${data.message || 'Error'}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4">${data.message || 'Error al procesar'}</td></tr>`;
     if (meta) meta.textContent = '';
     return;
   }
@@ -132,7 +132,7 @@ async function loadUsersList() {
   const r = await fetch(url, { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
-    body.innerHTML = `<tr><td colspan="4">${data.message || 'Error'}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4">${data.message || 'Error al procesar'}</td></tr>`;
     if (meta) meta.textContent = '';
     return;
   }
@@ -230,7 +230,7 @@ async function saveRoleEditor() {
     body: JSON.stringify(editing ? body : { ...body, slug: newSlug }),
   });
   const data = await r.json();
-  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al procesar'); return; }
   closeRoleEditor();
   await loadRolesAdminPage();
   const me = await fetch(API + '/auth/me', { credentials: 'same-origin' }).then(res => res.json()).catch(() => null);
@@ -352,7 +352,7 @@ async function changeUserRole(userId, role) {
     body: JSON.stringify({ role }),
   });
   const data = await r.json();
-  if (!r.ok) { notifyErr(data.message || 'Error'); await loadUsersList(); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al procesar'); await loadUsersList(); return; }
   notifyOk(`Rol actualizado a ${roleLabelBySlug(role)}.`);
   await loadUsersList();
   if (typeof opsLiveRefresh === 'function') opsLiveRefresh();

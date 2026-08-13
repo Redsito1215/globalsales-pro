@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from paquetes.tablero import catalogo_imagenes as imgs
 from paquetes.tablero import catalogo_modelo as modelo
 from paquetes.tablero import catalogo_nombres as nombres
 
@@ -134,7 +135,7 @@ def sync_products_to_mongo() -> dict[str, int]:
                 "units": p["units"],
                 "orders": p["orders"],
                 "revenue": p["revenue"],
-                "image_url": old_images.get(pid),
+                "image_url": imgs.resolve_image_url(pid, p["name"], old_images.get(pid)),
             }
         )
 

@@ -8,6 +8,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Any
 
+from paquetes.tablero import catalogo_nombres as nom
 from shared.audit import log_audit
 from shared.mongo import get_db
 from shared.warehouse import DEFAULT_WAREHOUSE_NAME, ensure_default_warehouse, warehouse_summary
@@ -35,6 +36,50 @@ def _handle(text: str) -> str:
     return s or "item"
 
 
+def _product_image_src(dim: dict[str, Any] | None, product_id: int, title: str = "") -> str | None:
+    """URL de imagen: upload en maestros > archivo local /static/img/products/{id}.jpg."""
+    from paquetes.tablero.catalogo_imagenes import resolve_image_url
+
+    name = (dim or {}).get("name") or title or ""
+    preserved = (dim or {}).get("image_url")
+    return resolve_image_url(int(product_id), name, preserved)
+
+
+def backfill_product_images(db) -> int:
+    """Rellena image_url y product_media desde archivos locales del catálogo."""
+    updated = 0
+    media_missing = 0
+    next_media = _next_id(db["product_media"], "media_id")
+    for p in db["dim_producto"].find({}, {"_id": 0, "product_id": 1, "name": 1, "image_url": 1}):
+        pid = int(p["product_id"])
+        url = _product_image_src(p, pid)
+        if not url:
+            continue
+        if p.get("image_url") != url:
+            db["dim_producto"].update_one(
+                {"product_id": pid},
+                {"$set": {"image_url": url, "image_source": "local_catalog"}},
+            )
+            updated += 1
+        row = db["product_media"].find_one({"product_id": pid}, {"media_id": 1, "src": 1})
+        if not row or row.get("src") != url:
+            if row:
+                db["product_media"].update_one({"product_id": pid}, {"$set": {"src": url, "alt": p.get("name")}})
+            else:
+                db["product_media"].insert_one(
+                    {
+                        "media_id": next_media,
+                        "product_id": pid,
+                        "src": url,
+                        "alt": p.get("name"),
+                        "position": 1,
+                    }
+                )
+                next_media += 1
+            media_missing += 1
+    return updated + media_missing
+
+
 def _cleanup_duplicate_collections(db) -> int:
     """Elimina duplicados legacy por collection_id (de carreras de sync)."""
     removed = 0
@@ -56,10 +101,161 @@ def _next_id(col, pk: str) -> int:
     return int(row[pk]) + 1 if row and row.get(pk) is not None else 1
 
 
+def _master_category_map(db) -> dict[int, dict[str, Any]]:
+    out: dict[int, dict[str, Any]] = {}
+    for cat in db["dim_categoria"].find({}, {"_id": 0}):
+        if cat.get("category_id") is None:
+            continue
+        out[int(cat["category_id"])] = cat
+    return out
+
+
+def _product_counts_by_category(db) -> dict[int, int]:
+    counts: dict[int, int] = {}
+    for row in db["dim_producto"].aggregate(
+        [{"$group": {"_id": "$category_id", "n": {"$sum": 1}}}],
+        allowDiskUse=False,
+    ):
+        if row.get("_id") is None:
+            continue
+        counts[int(row["_id"])] = int(row["n"])
+    return counts
+
+
+def _collection_display_title(category_id: int) -> str:
+    return nom.category_display_name(int(category_id))
+
+
+def _collections_out_of_sync(db) -> bool:
+    masters = _master_category_map(db)
+    ops_ids = {int(r["collection_id"]) for r in db["collections"].find({}, {"collection_id": 1})}
+    if ops_ids != set(masters.keys()):
+        return True
+    for row in db["collections"].find({}, {"collection_id": 1, "title": 1}):
+        cid = int(row["collection_id"])
+        if masters.get(cid) and row.get("title") != _collection_display_title(cid):
+            return True
+    return False
+
+
+def _apply_spanish_shop_labels(db) -> None:
+    """Actualiza títulos de vitrina sin regenerar inventario ni borrar pedidos."""
+    for cat in db["dim_categoria"].find({}, {"category_id": 1}):
+        cid = int(cat["category_id"])
+        title = _collection_display_title(cid)
+        db["collections"].update_many(
+            {"collection_id": cid},
+            {"$set": {"title": title, "handle": _handle(title)}},
+        )
+    for p in db["dim_producto"].find({}, {"product_id": 1, "name": 1, "category_id": 1}):
+        pid = int(p["product_id"])
+        name = nom.product_display_name_by_id(pid, p.get("name", ""))
+        if not name:
+            continue
+        cid = int(p.get("category_id") or 0)
+        cat_label = _collection_display_title(cid) if cid else "General"
+        db["products"].update_one(
+            {"product_id": pid},
+            {"$set": {"title": name, "product_type": cat_label}},
+        )
+        db["product_media"].update_many({"product_id": pid}, {"$set": {"alt": name}})
+
+
+def _catalog_needs_product_sync(db) -> bool:
+    return db["dim_producto"].count_documents({}) != db["products"].count_documents({})
+
+
+def reconcile_collections_with_masters(db) -> dict[str, int]:
+    """Alinea colecciones de vitrina con dim_categoria (elimina huérfanas como categorías borradas)."""
+    masters = _master_category_map(db)
+    master_ids = set(masters.keys())
+    removed = 0
+    for row in list(db["collections"].find({}, {"collection_id": 1, "_id": 1})):
+        cid = int(row["collection_id"])
+        if cid not in master_ids:
+            db["collections"].delete_one({"_id": row["_id"]})
+            db["collection_products"].delete_many({"collection_id": cid})
+            removed += 1
+
+    existing: set[int] = set()
+    for row in db["collections"].find({}, {"collection_id": 1, "_id": 1, "title": 1}):
+        cid = int(row["collection_id"])
+        existing.add(cid)
+        cat = masters[cid]
+        title = _collection_display_title(cid)
+        db["collections"].update_one(
+            {"_id": row["_id"]},
+            {
+                "$set": {
+                    "title": title,
+                    "handle": _handle(title),
+                    "description": cat.get("description", ""),
+                    "published": True,
+                }
+            },
+        )
+
+    added = 0
+    for cid in sorted(master_ids - existing):
+        cat = masters[cid]
+        title = _collection_display_title(cid)
+        db["collections"].insert_one(
+            {
+                "collection_id": cid,
+                "title": title,
+                "handle": _handle(title),
+                "description": cat.get("description", ""),
+                "published": True,
+            }
+        )
+        added += 1
+
+    db["collection_products"].delete_many({})
+    cp_links: list[dict[str, Any]] = []
+    cp_id = 1
+    for cid in sorted(master_ids):
+        pos = 1
+        for prod in db["dim_producto"].find({"category_id": cid}, {"product_id": 1}):
+            cp_links.append(
+                {
+                    "id": cp_id,
+                    "collection_id": cid,
+                    "product_id": int(prod["product_id"]),
+                    "position": pos,
+                }
+            )
+            cp_id += 1
+            pos += 1
+    if cp_links:
+        db["collection_products"].insert_many(cp_links)
+
+    return {
+        "collections_removed": removed,
+        "collections_added": added,
+        "collection_products": len(cp_links),
+    }
+
+
 def ensure_shop_catalog() -> None:
-    """Sincroniza una sola vez si falta catálogo (evita carrera entre /collections y /products)."""
+    """Sincroniza catálogo si falta o si colecciones/productos no coinciden con maestros."""
     db = get_db()
-    if db["collections"].count_documents({}) > 0 and db["products"].count_documents({}) > 0:
+    has_catalog = db["collections"].count_documents({}) > 0 and db["products"].count_documents({}) > 0
+    if has_catalog:
+        needs_reconcile = _collections_out_of_sync(db)
+        needs_products = _catalog_needs_product_sync(db)
+        needs_images = db["product_media"].count_documents({}) < db["dim_producto"].count_documents({})
+        if needs_reconcile or needs_products or needs_images:
+            with _sync_lock:
+                if _collections_out_of_sync(db):
+                    reconcile_collections_with_masters(db)
+                if needs_images:
+                    backfill_product_images(db)
+                if _catalog_needs_product_sync(db):
+                    _sync_from_masters_unlocked()
+                else:
+                    _apply_spanish_shop_labels(db)
+        else:
+            _apply_spanish_shop_labels(db)
         return
     with _sync_lock:
         if db["collections"].count_documents({}) > 0 and db["products"].count_documents({}) > 0:
@@ -98,7 +294,7 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     db["shop_settings"].insert_one(
         {
             "shop_id": 1,
-            "name": "GLOBTRADE Store",
+            "name": "Tienda GLOBTRADE",
             "currency": "USD",
             "country_default": "United States of America",
             "checkout_note": "Gracias por comprar en GLOBTRADE.",
@@ -137,11 +333,12 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     cp_id = 1
     for cat in db["dim_categoria"].find({}, {"_id": 0}).sort("category_id", 1):
         cid = int(cat["category_id"])
+        title = _collection_display_title(cid)
         collections.append(
             {
                 "collection_id": cid,
-                "title": cat.get("name", f"Collection {cid}"),
-                "handle": _handle(cat.get("name", "")),
+                "title": title,
+                "handle": _handle(title),
                 "description": cat.get("description", ""),
                 "published": True,
             }
@@ -167,15 +364,17 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     vid = iid = mid = lid = 1
     for p in db["dim_producto"].find({}, {"_id": 0}).sort("product_id", 1):
         pid = int(p["product_id"])
-        cat = db["dim_categoria"].find_one({"category_id": p.get("category_id")}, {"name": 1})
+        cid = int(p.get("category_id") or 0)
+        cat_label = _collection_display_title(cid) if cid else "General"
+        title = nom.product_display_name_by_id(pid, p.get("name", f"Producto {pid}"))
         products.append(
             {
                 "product_id": pid,
-                "title": p.get("name", f"Product {pid}"),
+                "title": title,
                 "vendor_id": 1,
                 "status": "active",
-                "product_type": cat.get("name") if cat else "General",
-                "tags": cat.get("name") if cat else "",
+                "product_type": cat_label,
+                "tags": cat_label,
             }
         )
         price = float(p.get("unit_price") or 0)
@@ -193,9 +392,15 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
                 "inventory_quantity": qty,
             }
         )
-        if p.get("image_url"):
-            media.append({"media_id": mid, "product_id": pid, "src": p["image_url"], "alt": p.get("name"), "position": 1})
+        img_url = _product_image_src(p, pid, title)
+        if img_url:
+            media.append({"media_id": mid, "product_id": pid, "src": img_url, "alt": title, "position": 1})
             mid += 1
+            if not p.get("image_url"):
+                db["dim_producto"].update_one(
+                    {"product_id": pid},
+                    {"$set": {"image_url": img_url, "image_source": "local_catalog"}},
+                )
         inv_items.append({"inventory_item_id": iid, "variant_id": vid, "sku": f"GT-{pid:05d}", "tracked": True})
         inv_levels.append({"level_id": lid, "inventory_item_id": iid, "location": DEFAULT_WAREHOUSE_NAME, "available": qty, "committed": 0})
         vid += 1
@@ -286,16 +491,20 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
 def list_collections_public() -> list[dict[str, Any]]:
     ensure_shop_catalog()
     db = get_db()
-    if _cleanup_duplicate_collections(db):
-        pass
+    if _cleanup_duplicate_collections(db) or _collections_out_of_sync(db):
+        with _sync_lock:
+            reconcile_collections_with_masters(db)
+    masters = _master_category_map(db)
+    counts = _product_counts_by_category(db)
     seen: set[int] = set()
     rows: list[dict[str, Any]] = []
     for row in db["collections"].find({"published": True}, {"_id": 0}).sort("collection_id", 1):
         cid = int(row["collection_id"])
-        if cid in seen:
+        if cid in seen or cid not in masters:
             continue
         seen.add(cid)
-        row["product_count"] = db["collection_products"].count_documents({"collection_id": cid})
+        row["title"] = _collection_display_title(cid)
+        row["product_count"] = counts.get(cid, 0)
         rows.append(row)
     return rows
 
@@ -339,7 +548,11 @@ def _enrich_shop_products(db, products: list[dict[str, Any]]) -> None:
     }
     media = {
         int(m["product_id"]): m
-        for m in db["product_media"].find({"product_id": {"$in": pids}}, {"_id": 0, "src": 1, "alt": 1})
+        for m in db["product_media"].find(
+            {"product_id": {"$in": pids}},
+            {"_id": 0, "product_id": 1, "src": 1, "alt": 1},
+        )
+        if m.get("product_id") is not None
     }
     dims = {
         int(d["product_id"]): d
@@ -391,14 +604,17 @@ def _enrich_shop_products(db, products: list[dict[str, Any]]) -> None:
         variant = variants.get(pid)
         p["variant"] = variant
         image = media.get(pid)
-        if not image and dim.get("image_url"):
-            image = {"src": dim["image_url"], "alt": dim.get("name")}
+        img_src = _product_image_src(dim, pid, p.get("title", ""))
+        if not image and img_src:
+            image = {"src": img_src, "alt": dim.get("name") or p.get("title")}
         p["image"] = image
 
-        cat = cats.get(int(dim.get("category_id") or 0), {})
-        category_name = cat.get("name") or p.get("product_type") or "General"
+        cid = int(dim.get("category_id") or 0)
+        cat = cats.get(cid, {})
+        category_key = cat.get("name") or (nom.category_name(cid) if cid else p.get("product_type") or "")
+        category_name = _collection_display_title(cid) if cid else (p.get("product_type") or "General")
         category_desc = cat.get("description") or ""
-        specs = _derive_product_specs(dim, category_name, category_desc)
+        specs = _derive_product_specs(dim, category_key, category_desc)
 
         vendor = vendors.get(int(p.get("vendor_id") or 0), {})
         vendor_geo = " · ".join(x for x in [vendor.get("region_name"), vendor.get("country")] if x)
@@ -412,10 +628,15 @@ def _enrich_shop_products(db, products: list[dict[str, Any]]) -> None:
             if price > 0:
                 margin_pct = round((price - cost) / price * 100, 1)
 
-        p["name"] = p.get("title") or dim.get("name")
+        spanish_title = nom.product_display_name_by_id(pid, p.get("title") or dim.get("name") or "")
+        p["title"] = spanish_title
+        p["name"] = spanish_title
+        p["product_type"] = category_name
+        if p.get("image"):
+            p["image"]["alt"] = spanish_title
         p["category_name"] = category_name
         p["category_description"] = category_desc
-        p["collection_title"] = (collection or {}).get("title")
+        p["collection_title"] = _collection_display_title(col_id) if col_id else (collection or {}).get("title")
         p["vendor_name"] = vendor.get("name") or "GLOBTRADE Supply"
         p["vendor_location"] = vendor_geo or None
         p["warehouse"] = wh_name

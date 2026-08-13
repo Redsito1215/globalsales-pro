@@ -9,6 +9,7 @@ let tiendaState = {
   discountAmount: 0,
   shippingCost: 0,
   shippingRegion: '',
+  priceMax: null,
 };
 
 function shopMoney(n) {
@@ -37,65 +38,51 @@ function clampQtyInput(el) {
 }
 
 async function loadTiendaPage() {
-  await loadShopCollections();
-  await loadTiendaProducts();
+  await Promise.all([loadShopCollections(), loadTiendaProducts()]);
   updateShopHighlights();
   renderTiendaCart();
 }
 
 function updateShopHighlights() {
   const products = tiendaState.products || [];
-  const collections = tiendaState.collections || [];
-  const offers = products.filter(p => {
-    const v = p.variant || {};
-    return v.compare_at_price && Number(v.compare_at_price) > Number(v.price || 0);
-  }).length;
-  const inStock = products.filter(p => Number((p.variant || {}).inventory_quantity || 0) > 0).length;
-
-  const prodEl = document.getElementById('shop-highlight-products');
-  const catEl = document.getElementById('shop-highlight-categories');
-  const offEl = document.getElementById('shop-highlight-offers');
-  if (prodEl) prodEl.textContent = products.length ? `${products.length} productos` : '—';
-  if (catEl) catEl.textContent = collections.length ? String(collections.length) : '—';
-  if (offEl) offEl.textContent = offers ? String(offers) : '0';
-
-  const lead = document.getElementById('shop-catalog-lead');
-  if (lead && products.length) {
-    const prices = products.map(p => Number((p.variant || {}).price || 0)).filter(n => n > 0);
-    const minPrice = prices.length ? Math.min(...prices) : null;
-    const sample = products.slice(0, 3).map(p => p.title).filter(Boolean);
-    const intro = sample.length
-      ? `Destacados: ${sample.join(' · ')}.`
-      : 'Elige por categoría y revisa cada ficha antes de comprar.';
-    lead.textContent = minPrice != null
-      ? `${intro} Precios desde ${shopMoney(minPrice)}.`
-      : intro;
-  }
-
-  const trustBar = document.getElementById('shop-trust-bar');
-  if (trustBar && products.length) {
-    const tags = [];
-    collections.slice(0, 3).forEach(c => { if (c.title) tags.push(c.title); });
-    products.filter(p => {
-      const v = p.variant || {};
-      return v.compare_at_price && Number(v.compare_at_price) > Number(v.price || 0);
-    }).slice(0, 2).forEach(p => tags.push(`${p.title} en oferta`));
-    if (inStock > 0) tags.push(`${inStock} listos para pedir`);
-    if (tags.length >= 2) {
-      trustBar.innerHTML = tags.slice(0, 4).map(t => `<span>${t}</span>`).join('');
-    }
-  }
-
-  const meta = document.getElementById('shop-products-meta');
+  const meta = document.getElementById('shop-results-range');
   if (meta && products.length) {
-    meta.textContent = `${products.length} productos · ${inStock} disponibles ahora`;
+    const n = tiendaState.filtered.length;
+    meta.textContent = n
+      ? `Mostrando 1–${n} de ${products.length} resultados`
+      : `0 resultados de ${products.length}`;
   }
+  initShopPriceSlider(products);
+}
+
+function initShopPriceSlider(products) {
+  const slider = document.getElementById('shop-price-max');
+  if (!slider || !products.length) return;
+  const prices = products.map(p => Number((p.variant || {}).price || 0)).filter(n => n > 0);
+  if (!prices.length) return;
+  const max = Math.ceil(Math.max(...prices));
+  slider.min = '0';
+  slider.max = String(max);
+  if (tiendaState.priceMax == null || tiendaState.priceMax > max) {
+    tiendaState.priceMax = max;
+    slider.value = String(max);
+  }
+  onShopPriceSlider();
+}
+
+function onShopPriceSlider() {
+  const slider = document.getElementById('shop-price-max');
+  const label = document.getElementById('shop-price-range-label');
+  if (!slider || !label) return;
+  const max = Number(slider.value || 0);
+  tiendaState.priceMax = max;
+  label.textContent = `Precio: ${shopMoney(0)} — ${shopMoney(max)}`;
 }
 
 async function loadShopCollections() {
   const nav = document.getElementById('shop-collections-nav');
   if (!nav) return;
-  nav.innerHTML = '<button type="button" class="shop-collection-btn">Cargando…</button>';
+  nav.innerHTML = '<button type="button" class="shop-collection-link" disabled>Cargando…</button>';
   try {
     const r = await fetch(API + '/shop/collections');
     const data = await r.json();
@@ -103,7 +90,7 @@ async function loadShopCollections() {
     tiendaState.collections = data.collections || [];
     renderShopCollectionsNav();
   } catch (e) {
-    nav.innerHTML = `<button type="button" class="shop-collection-btn" disabled>Error: ${e.message}</button>`;
+    nav.innerHTML = `<button type="button" class="shop-collection-link" disabled>Error: ${e.message}</button>`;
   }
 }
 
@@ -117,14 +104,31 @@ function renderShopCollectionsNav() {
   const nav = document.getElementById('shop-collections-nav');
   if (!nav) return;
   const allCount = tiendaState.collections.reduce((s, c) => s + (c.product_count || 0), 0);
-  let html = `<button type="button" class="shop-collection-btn ${tiendaState.collectionId == null ? 'active' : ''}" onclick="selectShopCollection(null)">
-    Todos los productos <span class="shop-collection-count">${allCount}</span></button>`;
+  let html = `<button type="button" class="shop-collection-link ${tiendaState.collectionId == null ? 'active' : ''}" onclick="selectShopCollection(null)">
+    Todos <span>(${allCount})</span></button>`;
   html += tiendaState.collections.map(c =>
-    `<button type="button" class="shop-collection-btn ${tiendaState.collectionId === c.collection_id ? 'active' : ''}" onclick="selectShopCollection(${c.collection_id})">
-      ${c.title} <span class="shop-collection-count">${c.product_count || 0}</span></button>`
+    `<button type="button" class="shop-collection-link ${tiendaState.collectionId === c.collection_id ? 'active' : ''}" onclick="selectShopCollection(${c.collection_id})">
+      ${c.title} <span>(${c.product_count || 0})</span></button>`
   ).join('');
   nav.innerHTML = html;
   updateShopBulkActions();
+}
+
+function applyShopFilters() {
+  filterShopProducts();
+}
+
+function sortShopProducts(list) {
+  const mode = document.getElementById('shop-sort')?.value || 'default';
+  const items = list.slice();
+  if (mode === 'price-asc') {
+    items.sort((a, b) => Number((a.variant || {}).price || 0) - Number((b.variant || {}).price || 0));
+  } else if (mode === 'price-desc') {
+    items.sort((a, b) => Number((b.variant || {}).price || 0) - Number((a.variant || {}).price || 0));
+  } else if (mode === 'name-asc') {
+    items.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
+  }
+  return items;
 }
 
 function syncShopBulkQty(value) {
@@ -164,7 +168,7 @@ function updateShopBulkActions() {
 
 async function loadTiendaProducts() {
   const grid = document.getElementById('tienda-grid');
-  const meta = document.getElementById('shop-products-meta');
+  const meta = document.getElementById('shop-results-range');
   if (!grid) return;
   if (meta) meta.textContent = 'Cargando catálogo…';
   grid.innerHTML = '<div class="shop-cart-empty" style="grid-column:1/-1">Cargando productos…</div>';
@@ -196,12 +200,18 @@ async function loadTiendaProducts() {
 function filterShopProducts() {
   const grid = document.getElementById('tienda-grid');
   const term = (document.getElementById('shop-search')?.value || '').trim().toLowerCase();
-  tiendaState.filtered = term
-    ? tiendaState.products.filter(p =>
-        (p.title || '').toLowerCase().includes(term) ||
-        (p.product_type || '').toLowerCase().includes(term) ||
-        String(p.product_id).includes(term))
-    : tiendaState.products.slice();
+  const maxPrice = tiendaState.priceMax;
+  let list = tiendaState.products.slice();
+  if (term) {
+    list = list.filter(p =>
+      (p.title || '').toLowerCase().includes(term) ||
+      (p.product_type || '').toLowerCase().includes(term) ||
+      String(p.product_id).includes(term));
+  }
+  if (maxPrice != null) {
+    list = list.filter(p => Number((p.variant || {}).price || 0) <= maxPrice);
+  }
+  tiendaState.filtered = sortShopProducts(list);
   if (!grid) return;
   if (!tiendaState.filtered.length) {
     grid.innerHTML = typeof opsEmpty === 'function'
@@ -217,35 +227,30 @@ function filterShopProducts() {
     const img = p.image?.src;
     const compare = v.compare_at_price && v.compare_at_price > v.price;
     const vid = v.variant_id || p.product_id;
-    const qty = v.inventory_quantity ?? 0;
-    const avail = Number(qty) > 0
-      ? `<span class="shop-product-avail shop-product-avail--ok">Disponible</span>`
-      : `<span class="shop-product-avail">Agotado</span>`;
     const pid = p.product_id;
     return `
-    <article class="shop-product-card" data-product-id="${pid}">
+    <article class="shop-product-card shop-product-card--classic" data-product-id="${pid}">
       <div class="shop-product-media shop-product-media--clickable" role="button" tabindex="0"
         onclick="event.stopPropagation(); openProductDetail(${pid})" onkeydown="if(event.key==='Enter'){event.preventDefault();openProductDetail(${pid})}">
         ${img ? `<img src="${img}" alt="${p.image?.alt || p.title || ''}">` : '<div class="shop-product-media--empty" aria-hidden="true"></div>'}
-        ${compare ? '<span class="shop-product-badge">Oferta</span>' : ''}
+        ${compare ? '<span class="shop-product-badge shop-product-badge--sale">¡Rebajado!</span>' : ''}
       </div>
-      <div class="shop-product-body">
-        <div class="shop-product-vendor">${p.category_name || p.product_type || 'Catálogo'}</div>
+      <div class="shop-product-body shop-product-body--classic">
         <button type="button" class="shop-product-title shop-product-title--link" onclick="event.stopPropagation(); openProductDetail(${pid})">${p.title}</button>
-        <div class="shop-product-prices">
-          <span class="shop-price">${shopMoney(v.price)}</span>
+        <div class="shop-product-prices shop-product-prices--classic">
           ${compare ? `<span class="shop-compare">${shopMoney(v.compare_at_price)}</span>` : ''}
+          <span class="shop-price">${shopMoney(v.price)}</span>
         </div>
-        <div class="shop-product-meta">${avail}${p.main_function ? ` · ${String(p.main_function).slice(0, 42)}${String(p.main_function).length > 42 ? '…' : ''}` : ''}</div>
-        <div class="shop-product-actions">
-          <input type="number" min="1" step="1" value="1" id="qty-${vid}" onclick="event.stopPropagation()" oninput="clampQtyInput(this)" />
-          <button type="button" class="btn btn-ghost" onclick="event.stopPropagation(); openProductDetail(${pid})">Detalles</button>
-          <button type="button" class="btn btn-primary" onclick="tiendaAddToCart(${vid})">Agregar</button>
+        <button type="button" class="shop-widget-btn shop-product-details-btn" onclick="event.stopPropagation(); openProductDetail(${pid})">Ver detalles</button>
+        <div class="shop-product-actions shop-product-actions--classic">
+          <input type="number" min="1" step="1" value="1" id="qty-${vid}" onclick="event.stopPropagation()" oninput="clampQtyInput(this)" aria-label="Cantidad" />
+          <button type="button" class="shop-widget-btn shop-widget-btn--primary" onclick="tiendaAddToCart(${vid})">Agregar</button>
         </div>
       </div>
     </article>`;
   }).join('');
   updateShopBulkActions();
+  updateShopHighlights();
 }
 
 function tiendaAddProductToCart(prod, qty) {
@@ -407,11 +412,11 @@ function renderProductDetailModal(p) {
     ['Proveedor', `${p.vendor_name || '—'}${vendorLoc}`],
     ['Categoría', p.category_name || p.product_type || '—'],
     ['Colección', p.collection_title || '—'],
-    ['SKU', v.sku || vid],
+    ['Código SKU', v.sku || vid],
     ['Precio unitario', shopMoney(p.unit_price ?? v.price)],
     ['Costo', shopMoney(p.unit_cost ?? v.cost)],
     ['Margen', p.margin_pct != null ? `${Number(p.margin_pct).toFixed(1)}%` : '—'],
-    ['Stock disponible', String(stock)],
+    ['Existencias disponibles', String(stock)],
     ['Bodega', p.warehouse || 'Bodega General'],
     ['Línea catálogo', p.line != null ? String(p.line) : '—'],
   ];

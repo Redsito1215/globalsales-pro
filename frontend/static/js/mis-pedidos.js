@@ -45,11 +45,11 @@ async function loadMisPedidosPage() {
     body.innerHTML = typeof opsEmptyRow === 'function'
       ? opsEmptyRow(7, {
           title: 'Aún no tienes pedidos',
-          hint: 'Explora el catálogo B2B y envía tu primera solicitud.',
-          ctaLabel: 'Ir a Vitrina',
+          hint: 'Explora el catálogo y envía tu primera solicitud.',
+          ctaLabel: 'Ir a la tienda',
           ctaOnclick: "showPage('tienda')",
         })
-      : '<tr><td colspan="7">Aún no tienes pedidos. Compra en la Vitrina B2B.</td></tr>';
+      : '<tr><td colspan="7">Aún no tienes pedidos. Compra en la tienda.</td></tr>';
     return;
   }
   const noMap = {};
@@ -195,7 +195,7 @@ async function cancelarMiSolicitud(id) {
   if (!ok) return;
   const r = await fetch(`${API}/solicitudes/${id}/cancelar`, { method: 'POST', credentials: 'same-origin' });
   const data = await r.json();
-  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al procesar'); return; }
   notifyOk('Solicitud cancelada.');
   loadMisPedidosPage();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();

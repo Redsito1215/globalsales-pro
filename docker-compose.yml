@@ -27,6 +27,7 @@ x-airflow-common: &airflow-common
     PYTHONPATH: /opt/airflow/project:/opt/airflow/project/backend
     MONGO_URI: mongodb://mongo:27017
     MONGO_DB: globtrade_dw
+    MONGO_OPS_DB: globtrade_ops
     CSV_SOURCE: /opt/airflow/project/data/sales.csv
     POCKETBASE_COLLECTION: sales_records
   volumes:
@@ -69,7 +70,7 @@ services:
       PYTHONPATH: /app/backend:/app
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: globtrade_dw
-      MONGO_OPS_DB: ${MONGO_OPS_DB:-}
+      MONGO_OPS_DB: ${MONGO_OPS_DB:-globtrade_ops}
       MONGO_REPLICA_URI: ${MONGO_REPLICA_URI:-}
       MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-}
       API_PORT: "8000"
@@ -98,7 +99,7 @@ services:
       PYTHONPATH: /app/backend:/app
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: globtrade_dw
-      MONGO_OPS_DB: ${MONGO_OPS_DB:-}
+      MONGO_OPS_DB: ${MONGO_OPS_DB:-globtrade_ops}
       MONGO_REPLICA_URI: ${MONGO_REPLICA_URI:-}
       MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-}
       WEB_PORT: "5000"

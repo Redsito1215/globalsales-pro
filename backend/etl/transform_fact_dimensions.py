@@ -190,69 +190,64 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
         tmap[fecha.isoformat()] = i
     db["dim_tiempo"].insert_many(tiempos)
 
-    # ── Hechos y pedidos ──────────────────────────────────────────────
+    # ── Hechos y pedidos (vectorizado + insert por lotes) ─────────────
     db["fact_ventas"].delete_many({})
-    hechos = []
-    order_lines = []
-    orders_map: dict[str, dict] = {}
-    for i, row in enumerate(df.itertuples(), start=1):
-        fecha = row.order_date.date().isoformat() if pd.notna(row.order_date) else None
-        u, up, uc = int(row.units_sold), float(row.unit_price), float(row.unit_cost)
-        oid = str(row.order_id)
-        hechos.append(
-            {
-                "venta_id": i,
-                "order_id": oid,
-                "tiempo_id": tmap.get(fecha),
-                "fecha_id": fecha,
-                "region_id": rmap.get(row.region),
-                "country_id": cmap.get(row.country),
-                "category_id": catmap.get(row.item_type),
-                "channel_id": chmap.get(row.sales_channel),
-                "priority_id": pmap.get(row.order_priority),
-                "client_id": client_lookup.get((row.country, row.sales_channel)),
-                "units_sold": u,
-                "unit_price": up,
-                "unit_cost": uc,
-                "total_revenue": float(row.total_revenue),
-                "total_cost": float(row.total_cost),
-                "total_profit": float(row.total_profit),
-                "line_revenue": round(u * up, 2),
-                "line_cost": round(u * uc, 2),
-                "line_profit": round(u * (up - uc), 2),
-            }
-        )
-        order_lines.append(
-            {
-                "line_id": i,
-                "order_id": int(oid) if oid.isdigit() else oid,
-                "category_id": catmap.get(row.item_type),
-                "units_sold": u,
-                "unit_price": up,
-                "unit_cost": uc,
-                "line_revenue": round(u * up, 2),
-                "line_cost": round(u * uc, 2),
-                "line_profit": round(u * (up - uc), 2),
-            }
-        )
-        if oid not in orders_map:
-            od = row.order_date.date() if pd.notna(row.order_date) else None
-            sd = row.ship_date.date() if pd.notna(row.ship_date) else None
-            orders_map[oid] = {
-                "order_id": int(oid) if oid.isdigit() else oid,
-                "client_id": client_lookup.get((row.country, row.sales_channel)),
-                "country_id": cmap.get(row.country),
-                "channel_id": chmap.get(row.sales_channel),
-                "priority_id": pmap.get(row.order_priority),
-                "order_date": od.isoformat() if od else None,
-                "ship_date": sd.isoformat() if sd else None,
-                "delivery_days": (sd - od).days if od and sd else None,
-                "total_revenue": float(row.total_revenue),
-                "total_cost": float(row.total_cost),
-                "total_profit": float(row.total_profit),
-                "status": "Delivered",
-            }
-    db["fact_ventas"].insert_many(hechos)
+    db["order_lines"].delete_many({})
+    db["orders"].delete_many({})
+
+    work = df.copy()
+    work["venta_id"] = range(1, len(work) + 1)
+    work["order_id"] = work["order_id"].astype(str)
+    work["fecha_id"] = work["order_date"].dt.strftime("%Y-%m-%d")
+    work["tiempo_id"] = work["fecha_id"].map(tmap)
+    work["region_id"] = work["region"].map(rmap)
+    work["country_id"] = work["country"].map(cmap)
+    work["category_id"] = work["item_type"].map(catmap)
+    work["channel_id"] = work["sales_channel"].map(chmap)
+    work["priority_id"] = work["order_priority"].map(pmap)
+    work["client_id"] = work.apply(
+        lambda r: client_lookup.get((r["country"], r["sales_channel"])), axis=1
+    )
+    work["line_revenue"] = (work["units_sold"] * work["unit_price"]).round(2)
+    work["line_cost"] = (work["units_sold"] * work["unit_cost"]).round(2)
+    work["line_profit"] = (work["units_sold"] * (work["unit_price"] - work["unit_cost"])).round(2)
+
+    fact_cols = [
+        "venta_id", "order_id", "tiempo_id", "fecha_id", "region_id", "country_id",
+        "category_id", "channel_id", "priority_id", "client_id", "units_sold",
+        "unit_price", "unit_cost", "total_revenue", "total_cost", "total_profit",
+        "line_revenue", "line_cost", "line_profit",
+    ]
+    work["line_id"] = work["venta_id"]
+    work["order_id_key"] = work["order_id"].map(
+        lambda x: int(x) if str(x).isdigit() else str(x)
+    )
+    work["order_date_str"] = work["order_date"].dt.strftime("%Y-%m-%d")
+    work["ship_date_str"] = work["ship_date"].dt.strftime("%Y-%m-%d")
+    work["delivery_days"] = (work["ship_date"] - work["order_date"]).dt.days
+
+    insert_batch = 25_000
+    total_rows = len(work)
+    for start in range(0, total_rows, insert_batch):
+        chunk = work.iloc[start : start + insert_batch]
+        facts = chunk[fact_cols].to_dict(orient="records")
+        lines = chunk.rename(columns={"order_id_key": "order_id"})[
+            ["line_id", "order_id", "category_id", "units_sold", "unit_price", "unit_cost",
+             "line_revenue", "line_cost", "line_profit"]
+        ].to_dict(orient="records")
+        orders = chunk.rename(columns={"order_id_key": "order_id"})[
+            ["order_id", "client_id", "country_id", "channel_id", "priority_id",
+             "order_date_str", "ship_date_str", "delivery_days",
+             "total_revenue", "total_cost", "total_profit"]
+        ].rename(columns={"order_date_str": "order_date", "ship_date_str": "ship_date"}).to_dict(orient="records")
+        for row in orders:
+            row["status"] = "Delivered"
+        db["fact_ventas"].insert_many(facts, ordered=False)
+        db["order_lines"].insert_many(lines, ordered=False)
+        db["orders"].insert_many(orders, ordered=False)
+        done = min(start + insert_batch, total_rows)
+        if done % 100_000 == 0 or done == total_rows:
+            print(f"  fact_ventas {done:,}/{total_rows:,}")
 
     db["monthly_kpis"].delete_many({})
     df["year"] = df["order_date"].dt.year
@@ -277,11 +272,6 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
         )
     if kpis:
         db["monthly_kpis"].insert_many(kpis)
-
-    db["order_lines"].delete_many({})
-    db["order_lines"].insert_many(order_lines)
-    db["orders"].delete_many({})
-    db["orders"].insert_many(list(orders_map.values()))
 
     print("Espejos SQL (sin products ni product_categories):")
     _mirror(db, "dim_region", "regions")

@@ -92,14 +92,17 @@
         notify(
           n
             ? `Sincronizados ${n} pedido(s) → fact_ventas (${data.facts_inserted || 0} hechos).`
-            : (data.message || 'Nada pendiente de sync.'),
+            : (data.message || 'Nada pendiente de sincronizar.'),
           data.strategic_lagging ? 'warn' : 'ok'
         );
       }
-      if (!silent && typeof loadDashboard === 'function') loadDashboard();
+      if (!silent && typeof loadDashboard === 'function') {
+        if (typeof clearAnalyticsCache === 'function') clearAnalyticsCache();
+        loadDashboard(true);
+      }
       return data;
     } catch (e) {
-      if (!silent) notifyErr(e.message || 'Error de sync');
+      if (!silent) notifyErr(e.message || 'Error al sincronizar');
       return null;
     }
   };

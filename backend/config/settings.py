@@ -27,7 +27,13 @@ class Settings(BaseSettings):
     session_days: int = 7
 
     product_uploads_dir: Path = ROOT / "frontend" / "static" / "uploads" / "products"
+    company_uploads_dir: Path = ROOT / "frontend" / "static" / "uploads" / "company"
+    static_dir: Path = ROOT / "frontend" / "static"
     max_product_image_mb: int = 2
+
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    ai_model: str = "gpt-4o-mini"
 
 
 settings = Settings()

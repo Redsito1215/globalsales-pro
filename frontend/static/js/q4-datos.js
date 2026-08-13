@@ -65,9 +65,61 @@ async function onDatosTableChange() {
         : '<tr><td colspan="8">Elige una tabla maestra.</td></tr>';
     }
     if (meta) meta.textContent = '';
+    const pager = document.getElementById('datos-pager');
+    if (pager) { pager.hidden = true; pager.innerHTML = ''; }
     return;
   }
   await loadMasterRows();
+}
+
+function datosCurrentPage() {
+  return Math.floor(datosState.offset / datosState.limit);
+}
+
+function datosTotalPages() {
+  return Math.max(1, Math.ceil((datosState.total || 0) / datosState.limit));
+}
+
+function datosGoPage(page) {
+  const pages = datosTotalPages();
+  const next = Math.max(0, Math.min(page, pages - 1));
+  datosState.offset = next * datosState.limit;
+  loadMasterRows();
+}
+
+function datosSetPageSize(size) {
+  const n = Math.max(10, Math.min(200, parseInt(size, 10) || 50));
+  datosState.limit = n;
+  datosState.offset = 0;
+  loadMasterRows();
+}
+
+function renderDatosPager() {
+  const pager = document.getElementById('datos-pager');
+  if (!pager) return;
+  const total = datosState.total || 0;
+  const limit = datosState.limit;
+  const offset = datosState.offset;
+  const pages = datosTotalPages();
+  const page = datosCurrentPage();
+  if (!datosState.table || total <= limit) {
+    pager.hidden = true;
+    pager.innerHTML = '';
+    return;
+  }
+  const prevDisabled = page <= 0 ? 'disabled' : '';
+  const nextDisabled = offset + limit >= total ? 'disabled' : '';
+  pager.hidden = false;
+  pager.innerHTML = `
+    <div class="table-pager-group">
+      <label class="table-pager-size" for="datos-page-size">Por página</label>
+      <select id="datos-page-size" class="table-pager-select" onchange="datosSetPageSize(this.value)">
+        ${[25, 50, 100, 200].map(n => `<option value="${n}" ${n === limit ? 'selected' : ''}>${n}</option>`).join('')}
+      </select>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" ${prevDisabled} onclick="datosGoPage(${page - 1})">← Anterior</button>
+    <span class="table-pager-info">Página ${page + 1} de ${pages}</span>
+    <button type="button" class="btn btn-ghost btn-sm" ${nextDisabled} onclick="datosGoPage(${page + 1})">Siguiente →</button>`;
 }
 
 async function loadMasterRows() {
@@ -80,15 +132,30 @@ async function loadMasterRows() {
   const r = await fetch(API + '/master/' + encodeURIComponent(table) + '?' + q, { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
-    body.innerHTML = `<tr><td colspan="8">${data.message || 'Error'}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="8">${data.message || 'Error al procesar'}</td></tr>`;
     notifyErr(data.message || 'Error al cargar registros.');
     return;
   }
   datosState.rows = data.rows || [];
   datosState.total = data.total || 0;
   datosState.editable = data.editable === true;
-  if (meta) meta.textContent = `${data.total} registros · ${data.label}${!datosState.editable ? ' (solo lectura)' : ''}`;
+  const pages = datosTotalPages();
+  if (datosState.total && datosCurrentPage() >= pages) {
+    datosState.offset = Math.max(pages - 1, 0) * datosState.limit;
+    if (datosState.offset !== (data.offset || 0)) {
+      await loadMasterRows();
+      return;
+    }
+  }
+  const from = datosState.total ? datosState.offset + 1 : 0;
+  const to = Math.min(datosState.offset + datosState.rows.length, datosState.total);
+  if (meta) {
+    meta.textContent = datosState.total
+      ? `Mostrando ${from}–${to} de ${datosState.total} · ${data.label}${!datosState.editable ? ' (solo lectura)' : ''}`
+      : `0 registros · ${data.label}${!datosState.editable ? ' (solo lectura)' : ''}`;
+  }
   if (!datosState.rows.length) {
+    renderDatosPager();
     body.innerHTML = typeof opsEmptyRow === 'function'
       ? opsEmptyRow(8, {
           title: 'Sin registros',
@@ -117,6 +184,7 @@ async function loadMasterRows() {
     return `<tr>${keys.map(k => `<td>${formatCell(row[k])}${k === 'name' || k === 'title' ? img : ''}</td>`).join('')}
       <td>${actions}</td></tr>`;
   }).join('');
+  renderDatosPager();
 }
 
 function formatCell(v) {
@@ -253,7 +321,7 @@ async function saveMasterForm() {
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al procesar'); return; }
   if (table === 'dim_producto') {
     const file = document.getElementById('master-image-file');
     const prodId = pk || data.row?.product_id;
@@ -296,7 +364,7 @@ async function deleteMasterRow(pk) {
     method: 'DELETE', credentials: 'same-origin',
   });
   const data = await r.json();
-  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al procesar'); return; }
   notifyOk('Registro eliminado.');
   await loadMasterRows();
   await loadMasterTablesList();
@@ -322,7 +390,7 @@ async function runBuildModel() {
     st.textContent = `✓ fact_ventas: ${data.fact_ventas?.toLocaleString()} · dim_producto: ${data.dim_producto}`;
     notifyOk('Modelo estratégico reconstruido.');
   } else {
-    st.textContent = '✗ ' + (data.message || 'Error');
+    st.textContent = '✗ ' + (data.message || 'Error al procesar');
     notifyErr(data.message || 'Error al reconstruir el modelo');
   }
 }
@@ -337,23 +405,39 @@ async function loadDatosEltPage() {
     ]);
     const d = await r.json();
     const meta = metaR.ok ? await metaR.json() : {};
-    const topo = meta.topology || {};
+    const topo = d.topology || meta.topology || {};
     const c = d.counts || {};
+    const ready = d.strategic_ready ?? meta.strategic_ready;
+    const lagging = d.strategic_lagging ?? meta.strategic_lagging;
+    const msg = d.strategic_message || meta.message || '';
+    const factN = (c.fact_ventas ?? meta.fact_ventas_count ?? 0).toLocaleString('es');
+    const landingN = (c.sales_records ?? meta.sales_records_count ?? 0).toLocaleString('es');
+    const statusCls = ready ? (lagging ? 'elt-status-banner--warn' : 'elt-status-banner--ok') : 'elt-status-banner--empty';
+    const statusTitle = ready
+      ? (lagging ? 'Capa estratégica activa (con retraso de sync)' : 'Capa estratégica lista')
+      : 'Capa estratégica vacía';
     const mongoLine = topo.split_enabled
-      ? `<p><strong>MongoDB:</strong> ops <code>${topo.ops_database || '—'}</code> · DW <code>${topo.dw_database || '—'}</code></p>`
-      : `<p><strong>MongoDB:</strong> ${d.mongo_db || topo.dw_database || '—'}</p>`;
+      ? `<p><strong>Bases Mongo:</strong> operativa <code>${topo.ops_database || '—'}</code> · almacén <code>${topo.dw_database || '—'}</code></p>`
+      : `<p><strong>Base de datos:</strong> ${d.mongo_db || topo.dw_database || '—'}</p>`;
     el.innerHTML = `
+      <div class="elt-status-banner ${statusCls}">
+        <strong>${statusTitle}</strong>
+        <p>${msg || (ready ? 'Tablero e Informes compuestos (RC) pueden consultar fact_ventas.' : 'Ejecuta la carga ELT o el DAG Airflow para poblar fact_ventas.')}</p>
+        ${ready ? '<button type="button" class="btn btn-primary btn-sm" onclick="showPage(\'reportes-compuestos\')">Ver informes compuestos</button>' : ''}
+        ${!ready ? '<button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="goConstruirModelo()">Ir a Construir modelo</button>' : ''}
+      </div>
       ${mongoLine}
       <p><strong>CSV:</strong> ${d.csv_exists ? '✓' : '✗'} ${d.csv_source || ''}</p>
       <p><strong>Parquet:</strong> ${d.parquet_exists ? '✓' : '✗'}</p>
       <p style="font-family:var(--mono);font-size:11px;margin-top:8px">
-        sales_records: ${c.sales_records ?? '—'} · fact_ventas: ${c.fact_ventas ?? '—'} ·
-        dim_producto: ${c.dim_producto ?? '—'} · solicitudes: ${c.purchase_requests ?? '—'}
+        sales_records: ${landingN} · fact_ventas: ${factN} ·
+        dim_producto: ${(c.dim_producto ?? '—').toLocaleString?.('es') ?? c.dim_producto} · solicitudes: ${(c.purchase_requests ?? '—').toLocaleString?.('es') ?? c.purchase_requests}
       </p>
+      ${d.last_build || meta.last_build ? `<p style="font-size:12px"><strong>Último build ELT:</strong> ${d.last_build || meta.last_build}</p>` : ''}
       <p style="margin-top:8px;font-size:12px">
-        Orquestación alternativa: DAG Airflow <code>globtrade_strategic_etl</code>
-        (UI <a href="http://localhost:8080" target="_blank" rel="noopener">localhost:8080</a>) —
-        rebuild truncate+reload para Informes compuestos RC / Tablero.
+        Orquestación: DAG Airflow <code>globtrade_strategic_etl</code>
+        (<a href="http://localhost:8080" target="_blank" rel="noopener">localhost:8080</a>) —
+        rebuild truncate+reload para Tablero e Informes RC.
       </p>`;
   } catch (e) {
     el.textContent = 'Error al consultar estado ELT';
@@ -570,3 +654,5 @@ async function loadAuditPage() {
 
 window.auditGoPage = auditGoPage;
 window.loadAuditPage = loadAuditPage;
+window.datosGoPage = datosGoPage;
+window.datosSetPageSize = datosSetPageSize;

@@ -17,7 +17,7 @@ registrar blueprints, ampliar la SPA estatica y proteger acciones sensibles.
 
 **Primary Dependencies**: Flask, Flask-CORS, PyMongo, python-dotenv, pandas, pyarrow, FastAPI/Uvicorn para API auxiliar
 
-**Storage**: MongoDB `globtrade_dw`, coleccion principal `sales_records`, coleccion de usuarios y colecciones maestras `dim_*`
+**Storage**: MongoDB `globtrade_dw` (DW) + `globtrade_ops` (operativo/gobernanza) en el mismo servidor; enrutamiento automático por colección. Colección landing `sales_records`; hechos `fact_ventas`; dimensiones `dim_*`.
 
 **Testing**: Validacion manual en navegador/API; pruebas Python opcionales si se agrega cobertura enfocada
 
@@ -74,11 +74,16 @@ frontend/
     └── css/              # tema visual
 
 paquetes/
-├── tablero/              # Q1 existente
-├── analisis/             # Q2 pendiente
-├── ventas/               # Q3 pendiente
-├── datos/                # Q4 pendiente
-└── acceso/               # capa de acceso si se decide mover auth desde backend/auth
+├── tablero/              # Q1 tablero
+├── analisis/             # Q2 análisis (tendencias, regiones, productos)
+├── reportes/             # Q2 informes RS/RC + asistente IA
+├── ventas/               # Q3 solicitudes y ventas
+├── shop/                 # Vitrina B2B
+├── compras/              # Inventario y OC
+├── datos/                # Q4 maestros y ELT
+├── decisiones/           # Panel decisiones
+├── soporte/              # Chat y facturas PDF
+└── empresa/              # Perfil empresa (logo factura)
 
 scripts/
 ├── iniciar-web.cmd

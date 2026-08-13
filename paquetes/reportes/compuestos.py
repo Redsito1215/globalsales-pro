@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable
 
+from paquetes.tablero import catalogo_nombres as nom
 from shared.data_layers import analytics_fact, strategic_ready
 from shared.mongo import get_db
 
@@ -78,6 +79,16 @@ COMPLEX_REPORTS: list[dict[str, Any]] = [
 COMPLEX_BY_ID = {r["id"]: r for r in COMPLEX_REPORTS}
 
 
+def _localize_category_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        if "categoria" in item:
+            item["categoria"] = nom.category_label_from_name(item.get("categoria"))
+        out.append(item)
+    return out
+
+
 def list_complex_catalog() -> list[dict[str, Any]]:
     return [
         {
@@ -144,7 +155,7 @@ def rc01(*, limit: int = 200) -> dict[str, Any]:
             }
         },
     ]
-    rows = list(analytics_fact().aggregate(pipe, allowDiskUse=True))
+    rows = _localize_category_rows(list(analytics_fact().aggregate(pipe, allowDiskUse=True)))
     return {"rows": rows, "total": len(rows)}
 
 
@@ -194,7 +205,7 @@ def rc02(*, limit: int = 10) -> dict[str, Any]:
         rows.append(
             {
                 "ranking": i,
-                "categoria": r.get("categoria"),
+                "categoria": nom.category_label_from_name(r.get("categoria")),
                 "pedidos": r.get("pedidos"),
                 "unidades": r.get("unidades"),
                 "ingresos": r.get("ingresos"),
@@ -205,7 +216,7 @@ def rc02(*, limit: int = 10) -> dict[str, Any]:
         rows.append(
             {
                 "ranking": i,
-                "categoria": r.get("categoria"),
+                "categoria": nom.category_label_from_name(r.get("categoria")),
                 "pedidos": r.get("pedidos"),
                 "unidades": r.get("unidades"),
                 "ingresos": r.get("ingresos"),
@@ -254,52 +265,38 @@ def rc03(*, limit: int = 20) -> dict[str, Any]:
 
 def rc04(*, limit: int = 50) -> dict[str, Any]:
     db = get_db()
-    sold: dict[str, float] = {}
+    sold: dict[int, float] = {}
     if strategic_ready():
         for r in analytics_fact().aggregate(
-            [
-                {"$group": {"_id": "$category_id", "u": {"$sum": "$units_sold"}}},
-                {
-                    "$lookup": {
-                        "from": "dim_categoria",
-                        "localField": "_id",
-                        "foreignField": "category_id",
-                        "as": "_cat",
-                    }
-                },
-                {
-                    "$project": {
-                        "categoria": {"$ifNull": [{"$arrayElemAt": ["$_cat.name", 0]}, "—"]},
-                        "u": 1,
-                    }
-                },
-            ],
+            [{"$group": {"_id": "$category_id", "u": {"$sum": "$units_sold"}}}],
             allowDiskUse=True,
         ):
-            sold[r.get("categoria") or "—"] = float(r.get("u") or 0)
+            cid = r.get("_id")
+            if cid is None:
+                continue
+            sold[int(cid)] = float(r.get("u") or 0)
 
-    stock: dict[str, float] = {}
+    stock: dict[int, float] = {}
     for v in db["product_variants"].find({}, {"_id": 0, "product_id": 1, "inventory_quantity": 1}):
         p = db["products"].find_one({"product_id": v.get("product_id")}, {"_id": 0, "product_id": 1})
-        cat = "—"
+        cid = None
         if p:
             link = db["collection_products"].find_one({"product_id": p.get("product_id")}, {"_id": 0})
-            if link:
-                col = db["collections"].find_one(
-                    {"collection_id": link.get("collection_id")}, {"_id": 0, "title": 1}
-                )
-                cat = (col or {}).get("title") or "—"
-        stock[cat] = stock.get(cat, 0) + float(v.get("inventory_quantity") or 0)
+            if link and link.get("collection_id") is not None:
+                cid = int(link["collection_id"])
+        if cid is None:
+            continue
+        stock[cid] = stock.get(cid, 0) + float(v.get("inventory_quantity") or 0)
 
     cats = sorted(set(sold) | set(stock))
     rows = []
-    for c in cats:
-        u = sold.get(c, 0)
-        s = stock.get(c, 0)
+    for cid in cats:
+        u = sold.get(cid, 0)
+        s = stock.get(cid, 0)
         rot = round(u / s, 2) if s else None
         rows.append(
             {
-                "categoria": c,
+                "categoria": nom.category_display_name(cid),
                 "unidades_vendidas": int(u),
                 "stock_actual": int(s),
                 "rotacion_aprox": rot if rot is not None else "Sin stock",
@@ -437,7 +434,7 @@ def rc07(*, limit: int = 200) -> dict[str, Any]:
             }
         },
     ]
-    rows = list(analytics_fact().aggregate(pipe, allowDiskUse=True))
+    rows = _localize_category_rows(list(analytics_fact().aggregate(pipe, allowDiskUse=True)))
     return {"rows": rows, "total": len(rows)}
 
 

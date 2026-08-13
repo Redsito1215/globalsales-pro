@@ -8,7 +8,7 @@
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
-**Status (2026-07-29)**: Checklist cerrado. Entregado: Q1–Q4, acceso/roles, flujo B2B operativo, capas operativo/landing/estratégico, Decisiones, Compras, smoke tests. Fuera de alcance: SMTP real, pasarela de pago, segunda Mongo.
+**Status (2026-08-13)**: Checklist cerrado + extensiones: tienda B2B, split Mongo ops/DW, asistente IA informes, perfil empresa. Fuera de alcance: SMTP real, pasarela de pago.
 
 ## Format: `[ID] [P?] [Story] Description`
 

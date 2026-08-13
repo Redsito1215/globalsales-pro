@@ -174,6 +174,18 @@ def _validate_master_row(name: str, doc: dict[str, Any], *, partial: bool = Fals
         raise ValueError("invalid_field")
 
 
+def _sync_shop_after_master_change(name: str) -> None:
+    """Mantiene vitrina alineada con dim_categoria / dim_producto tras editar maestros."""
+    if name not in ("dim_categoria", "dim_producto", "dim_cliente"):
+        return
+    try:
+        from paquetes.shop import services as shop_services
+
+        shop_services.sync_from_masters(reset_stock=False)
+    except Exception:
+        pass
+
+
 def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
     if name not in EDITABLE_MASTERS:
         raise ValueError("read_only")
@@ -201,6 +213,7 @@ def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
         doc.setdefault("created_at", date.today().isoformat())
     col.insert_one(doc)
     log_audit("create", entity=name, entity_id=doc[pk], details={"pk": doc[pk]})
+    _sync_shop_after_master_change(name)
     return {k: v for k, v in doc.items()}
 
 
@@ -226,6 +239,7 @@ def update_row(name: str, row_id: str, data: dict[str, Any]) -> dict[str, Any]:
         patch["margin_pct"] = round(((up - uc) / up * 100) if up else 0, 2)
     col.update_one({pk: key}, {"$set": patch})
     log_audit("update", entity=name, entity_id=key, details=patch)
+    _sync_shop_after_master_change(name)
     updated = col.find_one({pk: key}, {"_id": 0})
     return dict(updated) if updated else {}
 
@@ -246,6 +260,7 @@ def delete_row(name: str, row_id: str) -> None:
     _check_delete_refs(name, key)
     col.delete_one({pk: key})
     log_audit("delete", entity=name, entity_id=key)
+    _sync_shop_after_master_change(name)
 
 
 def _check_delete_refs(name: str, key: Any) -> None:
@@ -339,6 +354,9 @@ def run_load_dataset(csv_path: str | None = None) -> dict[str, Any]:
 
 
 def get_elt_status() -> dict[str, Any]:
+    from shared.data_layers import layers_overview
+    from shared.mongo import mongo_topology
+
     db = get_db()
     pq = settings.data_parquet_dir / "sales_records.parquet"
     counts = {}
@@ -347,6 +365,7 @@ def get_elt_status() -> dict[str, Any]:
             counts[name] = db[name].count_documents({})
         except Exception:
             counts[name] = 0
+    layers = layers_overview()
     return {
         "mongo_db": settings.mongo_db,
         "mongo_uri": settings.mongo_uri.split("@")[-1],
@@ -355,6 +374,11 @@ def get_elt_status() -> dict[str, Any]:
         "csv_source": str(settings.csv_source),
         "csv_exists": settings.csv_source.exists(),
         "counts": counts,
+        "strategic_ready": layers.get("strategic_ready", False),
+        "strategic_lagging": layers.get("strategic_lagging", False),
+        "strategic_message": layers.get("message"),
+        "last_build": layers.get("last_build"),
+        "topology": mongo_topology(),
     }
 
 

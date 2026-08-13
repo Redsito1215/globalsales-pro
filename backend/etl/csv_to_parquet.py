@@ -17,11 +17,14 @@ def main() -> None:
         print(f"No existe CSV: {src}", file=sys.stderr)
         sys.exit(1)
 
-    df = pd.read_csv(src)
+    df = pd.read_csv(src, low_memory=False)
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     for col in ("order_date", "ship_date"):
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], format="%m/%d/%Y", errors="coerce").dt.strftime("%Y-%m-%d")
+            parsed = pd.to_datetime(df[col], format="%m/%d/%Y", errors="coerce")
+            if parsed.isna().any() and df[col].notna().any():
+                parsed = parsed.fillna(pd.to_datetime(df[col], errors="coerce"))
+            df[col] = parsed.dt.strftime("%Y-%m-%d")
     if "order_id" in df.columns:
         df["order_id"] = df["order_id"].astype(str)
 

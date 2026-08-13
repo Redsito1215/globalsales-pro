@@ -23,6 +23,7 @@ from paquetes.soporte import soporte_bp
 from paquetes.decisiones import decisiones_bp
 from paquetes.compras import compras_bp
 from paquetes.reportes import reportes_bp
+from paquetes.empresa import empresa_bp
 
 static_dir = Path(__file__).parent / "static"
 
@@ -45,6 +46,7 @@ app.register_blueprint(soporte_bp)
 app.register_blueprint(decisiones_bp)
 app.register_blueprint(compras_bp)
 app.register_blueprint(reportes_bp)
+app.register_blueprint(empresa_bp)
 
 import paquetes.tablero.catalogo as _catalogo_mod
 
@@ -73,6 +75,7 @@ def _init_ops_indexes():
 
 def _init_uploads():
     settings.product_uploads_dir.mkdir(parents=True, exist_ok=True)
+    settings.company_uploads_dir.mkdir(parents=True, exist_ok=True)
 
 
 def _init_legacy_order_ids():
@@ -86,10 +89,26 @@ def _init_legacy_order_ids():
         print(f"[ventas] reparación order_id legacy: {e}")
 
 
+def _init_mongo_split():
+    try:
+        from shared.mongo_split import ensure_ops_split_bootstrap
+
+        result = ensure_ops_split_bootstrap()
+        if result.get("auto") and result.get("moved"):
+            print(
+                f"[mongo] split ops/DW: copiados {result['moved']} doc(s) "
+                f"en {result['collections']} colección(es) → {result['ops_database']}"
+            )
+            print("[mongo] opcional: python scripts/migrate_split_mongo.py --drop-source")
+    except Exception as e:
+        print(f"[mongo] bootstrap split ops/DW: {e}")
+
+
 _init_auth()
 _init_ops_indexes()
 _init_uploads()
 _init_legacy_order_ids()
+_init_mongo_split()
 
 
 @app.after_request

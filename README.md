@@ -47,6 +47,30 @@ El **primer usuario** registrado queda como **administrador**.
 
 Servicios: web `:5001`, API auxiliar `:8001`, Mongo `:27017`.
 
+Por defecto Docker usa **dos bases** en el mismo Mongo:
+
+| Base | Contenido |
+|------|-----------|
+| `globtrade_ops` | Tienda, pedidos, compras, usuarios, roles, auditoría |
+| `globtrade_dw` | `sales_records`, `fact_ventas`, dimensiones `dim_*` |
+
+Al arrancar la web, si `globtrade_ops` está vacío y los datos operativos siguen en `globtrade_dw`, se **copian automáticamente** (ver log `[mongo] split ops/DW`). Opcional después:
+
+```powershell
+python scripts/migrate_split_mongo.py --drop-source
+```
+
+Detalle: [`scripts/README-mongo-ha.md`](scripts/README-mongo-ha.md).
+
+## Informes con asistente IA
+
+En **Informes simples** e **Informes compuestos** → botón **Asistente IA**:
+
+- **Motor local** (por defecto): interpreta consultas en español, sin API key.
+- **OpenAI** (opcional): define `OPENAI_API_KEY` en `.env` para textos más contextuales.
+
+Los informes **RS** (simples) y **RC** (compuestos) se eligen por separado en el asistente.
+
 ## Flujo comercial (demo)
 
 1. Admin: Maestros → Sync catálogo (tienda) / Carga ELT, Construir modelo, o DAG Airflow `globtrade_strategic_etl` si el Tablero (`fact_ventas`) está vacío  
@@ -98,7 +122,7 @@ $env:PYTHONPATH="C:\proyect6softwa\backend;C:\proyect6softwa"
 - `backend/` — auth, config, shared, ETL  
 - `etl_proceso/` — wrappers del ETL estratégico (Airflow + CLI)  
 - `airflow/dags/` — DAG `globtrade_strategic_etl`  
-- `paquetes/` — tablero, analisis, decisiones, ventas, shop, compras, datos, soporte, reportes  
+- `paquetes/` — tablero, analisis, decisiones, ventas, shop, compras, datos, soporte, reportes, empresa  
 - `specs/` — Spec Kit académico  
 
 ## Puertos

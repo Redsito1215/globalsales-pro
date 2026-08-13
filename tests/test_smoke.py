@@ -801,6 +801,17 @@ def test_compuestos_rc08_estado_elt():
     assert any("fact_ventas" in str(r.get("indicador")) for r in data["rows"])
 
 
+def test_compuestos_categorias_en_espanol():
+    from paquetes.reportes.compuestos import _localize_category_rows
+    from paquetes.tablero.catalogo_nombres import category_label_from_name
+
+    assert category_label_from_name("Cosmetics") == "Cosméticos"
+    assert category_label_from_name("Beverages") == "Bebidas"
+    assert category_label_from_name("Bebidas") == "Bebidas"
+    rows = _localize_category_rows([{"categoria": "Baby Food", "pedidos": 1}])
+    assert rows[0]["categoria"] == "Alimentos para bebés"
+
+
 def test_compuestos_endpoint_exige_auth():
     from flask import Flask
 
@@ -1025,4 +1036,22 @@ def test_mongo_collection_routing(monkeypatch):
     routed = m.get_db()
     assert routed["purchase_requests"] == "globtrade_ops:purchase_requests"
     assert routed["dim_region"] == "globtrade_dw:dim_region"
+
+
+def test_ai_local_recommends_stock_report():
+    from paquetes.reportes import ai_service
+
+    data = ai_service.recommend_reports(prompt="productos con poco stock para reponer", scope="simple", limit=3)
+    ids = [r["report_id"] for r in data["recommendations"]]
+    assert "RS-03" in ids
+    assert data["engine"] == "local"
+    assert "español" in (data.get("engine_note") or "").lower() or "local" in (data.get("engine_note") or "").lower()
+
+
+def test_ai_catalog_counts():
+    from paquetes.reportes import ai_service
+
+    cat = ai_service.list_ai_catalog(scope="all")
+    assert cat["counts"]["simples"] >= 10
+    assert cat["counts"]["compuestos"] >= 5
 

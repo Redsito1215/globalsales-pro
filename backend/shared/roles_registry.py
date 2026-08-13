@@ -51,6 +51,7 @@ PERMISSION_CATALOG: dict[str, str] = {
     "elt.run": "Ejecutar carga ELT / build modelo",
     "audit.read": "Ver auditoría",
     "users.manage": "Gestionar usuarios y roles",
+    "company.manage": "Editar datos de la empresa y logo en facturas",
 }
 
 DEFAULT_ROLES: list[dict[str, Any]] = [

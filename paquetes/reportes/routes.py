@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, Response, jsonify, request
 
 from auth.decorators import login_required, permission_required
-from paquetes.reportes import compuestos, services
+from paquetes.reportes import ai_service, compuestos, services
 from paquetes.reportes.pdf_export import generate_report_pdf
 
 reportes_bp = Blueprint("reportes", __name__, url_prefix="/api")
@@ -163,3 +163,57 @@ def export_complex_pdf(report_id: str):
 @permission_required("reportes.view")
 def export_complex_pdf_legacy(report_id: str):
     return export_complex_pdf(report_id)
+
+
+@reportes_bp.get("/reportes/ia/catalogo")
+@login_required
+@permission_required("reportes.view")
+def ai_catalog():
+    scope = (request.args.get("scope") or "all").strip()
+    try:
+        data = ai_service.list_ai_catalog(scope=scope)
+        return jsonify({"status": "ok", **data})
+    except Exception:
+        return jsonify({"status": "error", "message": "No se pudo cargar el catálogo de informes."}), 500
+
+
+@reportes_bp.post("/reportes/ia/recomendar")
+@login_required
+@permission_required("reportes.view")
+def ai_recommend():
+    body = request.get_json(silent=True) or {}
+    prompt = (body.get("prompt") or request.args.get("prompt") or "").strip() or None
+    limit = min(int(body.get("limit") or request.args.get("limit") or 5), 8)
+    scope = (body.get("scope") or request.args.get("scope") or "all").strip()
+    try:
+        data = ai_service.recommend_reports(prompt=prompt, limit=limit, scope=scope)
+        return jsonify({"status": "ok", **data})
+    except Exception:
+        return jsonify({"status": "error", "message": "No se pudieron obtener recomendaciones."}), 500
+
+
+@reportes_bp.post("/reportes/ia/generar")
+@login_required
+@permission_required("reportes.view")
+def ai_generate():
+    body = request.get_json(silent=True) or {}
+    prompt = (body.get("prompt") or "").strip()
+    limit = min(int(body.get("limit") or 100), 500)
+    threshold = int(body.get("threshold") or 20)
+    scope = (body.get("scope") or "all").strip()
+    if not prompt:
+        return jsonify({"status": "error", "message": "Describe el informe que necesitas.", "code": "prompt_required"}), 400
+    try:
+        data = ai_service.generate_report_from_prompt(
+            prompt=prompt, limit=limit, threshold=threshold, scope=scope
+        )
+        return jsonify({"status": "ok", **data})
+    except ValueError as e:
+        code = str(e)
+        if code == "prompt_required":
+            return jsonify({"status": "error", "message": "Describe el informe que necesitas.", "code": code}), 400
+        if code == "unknown_report":
+            return jsonify({"status": "error", "message": "No hay un informe del catálogo que encaje.", "code": code}), 404
+        if code == "no_match":
+            return jsonify({"status": "error", "message": "No se encontró un informe compatible.", "code": code}), 404
+        raise

@@ -51,6 +51,10 @@ def ensure_roles_seed() -> None:
             },
             upsert=True,
         )
+    col.update_one(
+        {"slug": ADMIN_ROLE},
+        {"$addToSet": {"permissions": {"$each": list(PERMISSION_CATALOG.keys())}}},
+    )
 
 
 def list_roles() -> list[dict[str, Any]]:

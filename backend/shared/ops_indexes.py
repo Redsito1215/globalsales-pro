@@ -43,7 +43,20 @@ def ensure_ops_indexes() -> dict[str, int]:
         ("fact_ventas", [("region_id", ASCENDING), ("fecha_id", DESCENDING)], {"name": "fact_region_fecha"}),
         ("fact_ventas", [("category_id", ASCENDING), ("fecha_id", DESCENDING)], {"name": "fact_cat_fecha"}),
         ("fact_ventas", [("channel_id", ASCENDING)], {"name": "fact_channel"}),
+        ("fact_ventas", [("channel_id", ASCENDING), ("fecha_id", DESCENDING)], {"name": "fact_channel_fecha"}),
+        ("fact_ventas", [("country_id", ASCENDING), ("fecha_id", DESCENDING)], {"name": "fact_country_fecha"}),
+        ("fact_ventas", [("priority_id", ASCENDING), ("fecha_id", DESCENDING)], {"name": "fact_priority_fecha"}),
         ("fact_ventas", [("venta_id", DESCENDING)], {"name": "fact_venta_id"}),
+        ("dim_region", [("name", ASCENDING)], {"name": "dim_region_name"}),
+        ("dim_categoria", [("name", ASCENDING)], {"name": "dim_categoria_name"}),
+        ("dim_canal", [("name", ASCENDING)], {"name": "dim_canal_name"}),
+        ("dim_prioridad", [("code", ASCENDING)], {"name": "dim_prioridad_code"}),
+        ("dim_pais", [("name", ASCENDING)], {"name": "dim_pais_name"}),
+        ("dim_producto", [("category_id", ASCENDING), ("product_id", ASCENDING)], {"name": "dim_prod_cat"}),
+        ("dim_tiempo", [("fecha_id", ASCENDING)], {"name": "dim_tiempo_fecha"}),
+        ("collection_products", [("collection_id", ASCENDING)], {"name": "cp_collection"}),
+        ("products", [("status", ASCENDING), ("product_id", ASCENDING)], {"name": "prod_status_id"}),
+        ("monthly_kpis", [("year", ASCENDING), ("month", ASCENDING)], {"name": "mkpi_ym"}),
     ]
 
     for coll, keys, opts in specs:

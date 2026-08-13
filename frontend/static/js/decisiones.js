@@ -81,7 +81,7 @@ function renderDecisionesPanel(data) {
         ? `<button type="button" class="btn btn-primary btn-ops" onclick="decRestockPO(${vid},${vendorId},${cost},${sug})">Crear OC</button>`
         : '—'}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="5">${stock.insight || 'Sin SKUs bajos'}</td></tr>`;
+  }).join('') || `<tr><td colspan="5">${stock.insight || 'Sin referencias con existencias bajas'}</td></tr>`;
 
   const funnelMax = Math.max(1, ...(funnel.stages || []).map(s => s.count || 0));
   const funnelBars = (funnel.stages || []).map(s => {
@@ -112,7 +112,7 @@ function renderDecisionesPanel(data) {
       <div class="stat-card"><div class="stat-value">${funnel.total_created ?? 0}</div><div class="stat-label">Solicitudes (${funnel.days || 7}d)</div></div>
       <div class="stat-card"><div class="stat-value">${funnel.conversion_rate != null ? funnel.conversion_rate + '%' : '—'}</div><div class="stat-label">Tasa conversión</div></div>
       <div class="stat-card"><div class="stat-value">${funnel.awaiting_action ?? 0}</div><div class="stat-label">Por gestionar</div></div>
-      <div class="stat-card"><div class="stat-value">${stock.low_count ?? 0}</div><div class="stat-label">SKU stock bajo</div></div>
+      <div class="stat-card"><div class="stat-value">${stock.low_count ?? 0}</div><div class="stat-label">Referencias con existencias bajas</div></div>
     </div>
 
     <div class="dec-alerts">${alertsHtml}</div>
@@ -154,16 +154,16 @@ function renderDecisionesPanel(data) {
 
       <section class="table-box">
         <div class="table-header">
-          <div class="table-title">Stock bajo (≤ ${stock.threshold ?? 20})</div>
-          <span class="dash-records-meta">${stock.low_count || 0} / ${stock.total_skus || 0} SKUs</span>
+          <div class="table-title">Existencias bajas (≤ ${stock.threshold ?? 20})</div>
+          <span class="dash-records-meta">${stock.low_count || 0} / ${stock.total_skus || 0} referencias</span>
         </div>
         <p class="dec-insight">${stock.insight || ''}</p>
         <div class="table-scroll"><table>
-          <thead><tr><th>Producto</th><th>Stock</th><th>Precio</th><th>Costo</th><th></th></tr></thead>
+          <thead><tr><th>Producto</th><th>Existencias</th><th>Precio</th><th>Costo</th><th></th></tr></thead>
           <tbody>${stockRows}</tbody>
         </table></div>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn btn-primary btn-ops" onclick="decGo('compras')">Ir a Compras / Stock</button>
+          <button type="button" class="btn btn-primary btn-ops" onclick="decGo('compras')">Ir a Compras / Existencias</button>
           <button type="button" class="btn btn-ghost btn-ops" onclick="decGoLowStock()">Ver inventario bajo</button>
         </div>
       </section>

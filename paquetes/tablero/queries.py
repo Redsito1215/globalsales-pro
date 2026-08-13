@@ -10,10 +10,58 @@ from typing import Any
 from shared.data_layers import analytics_fact, landing_sales, strategic_ready
 from shared.mongo import get_db, get_read_dw_db, sales_collection
 
-# Caché en memoria (demo)
+# Caché en memoria (demo / tablero)
 _CACHE: dict[str, tuple[float, Any]] = {}
-_CACHE_TTL_SEC = 90.0
+_CACHE_TTL_SEC = 300.0
+_DIM_NAME_CACHE: dict[str, tuple[float, dict[str, int]]] = {}
+_DIM_CACHE_TTL_SEC = 600.0
 _MAX_DATE_CACHE: tuple[float, str | None] | None = None
+_FILTER_ANCHOR_CACHE: tuple[float, str | None] | None = None
+_FACT_HAS_DATA_CACHE: tuple[float, bool] | None = None
+_FACT_GEN_CACHE: tuple[float, int] | None = None
+
+
+def _fact_gen() -> int:
+    """Tamaño aproximado de fact_ventas; invalida caché del tablero al crecer el DW."""
+    global _FACT_GEN_CACHE
+    now = time.monotonic()
+    if _FACT_GEN_CACHE and now - _FACT_GEN_CACHE[0] < 30:
+        return _FACT_GEN_CACHE[1]
+    n = 0
+    try:
+        if strategic_ready():
+            n = int(analytics_fact().estimated_document_count())
+    except Exception:
+        pass
+    _FACT_GEN_CACHE = (now, n)
+    return n
+
+
+def _fact_has_data() -> bool:
+    global _FACT_HAS_DATA_CACHE
+    now = time.monotonic()
+    if _FACT_HAS_DATA_CACHE and now - _FACT_HAS_DATA_CACHE[0] < 60:
+        return _FACT_HAS_DATA_CACHE[1]
+    has = False
+    if strategic_ready():
+        has = analytics_fact().find_one({}, {"_id": 1}) is not None
+    _FACT_HAS_DATA_CACHE = (now, has)
+    return has
+
+
+def _cache_hit_usable(hit: Any) -> bool:
+    if not _fact_has_data():
+        return True
+    if isinstance(hit, list) and len(hit) == 0:
+        return False
+    if isinstance(hit, dict) and hit.get("strategic_ready"):
+        orders = int(hit.get("total_orders") or 0)
+        if orders == 0:
+            return False
+        gen = _fact_gen()
+        if gen > 0 and orders < gen * 0.95:
+            return False
+    return True
 
 
 def _cache_get(key: str) -> Any | None:
@@ -24,23 +72,65 @@ def _cache_get(key: str) -> Any | None:
     if time.monotonic() - ts > _CACHE_TTL_SEC:
         _CACHE.pop(key, None)
         return None
+    if not _cache_hit_usable(val):
+        _CACHE.pop(key, None)
+        return None
     return val
 
 
-def _cache_set(key: str, val: Any) -> Any:
+def _cache_set(key: str, val: Any, *, skip_if_empty: bool = False) -> Any:
+    if skip_if_empty:
+        if isinstance(val, list) and len(val) == 0:
+            return val
+        if isinstance(val, dict) and val.get("strategic_ready") and not val.get("total_orders"):
+            return val
     _CACHE[key] = (time.monotonic(), val)
     return val
 
 
 def _cache_key(name: str, payload: dict[str, Any]) -> str:
-    raw = json.dumps(payload, sort_keys=True, default=str)
+    scoped = {**payload, "_fact_gen": _fact_gen()}
+    raw = json.dumps(scoped, sort_keys=True, default=str)
     return name + ":" + hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
 def clear_query_cache() -> None:
-    global _MAX_DATE_CACHE
+    global _MAX_DATE_CACHE, _FACT_HAS_DATA_CACHE, _FACT_GEN_CACHE, _FILTER_ANCHOR_CACHE
     _CACHE.clear()
+    _DIM_NAME_CACHE.clear()
     _MAX_DATE_CACHE = None
+    _FACT_HAS_DATA_CACHE = None
+    _FACT_GEN_CACHE = None
+    _FILTER_ANCHOR_CACHE = None
+
+
+def _dim_name_to_id(collection: str, id_field: str, name_field: str = "name") -> dict[str, int]:
+    """Mapa nombre→id en caché (evita find_one repetidos por request)."""
+    now = time.monotonic()
+    hit = _DIM_NAME_CACHE.get(collection)
+    if hit and now - hit[0] < _DIM_CACHE_TTL_SEC:
+        return hit[1]
+    db = get_read_dw_db()
+    mapping: dict[str, int] = {}
+    for row in db[collection].find({}, {"_id": 0, id_field: 1, name_field: 1, "code": 1}):
+        rid = row.get(id_field)
+        if rid is None:
+            continue
+        label = str(row.get(name_field) or "").strip()
+        if label:
+            mapping[label] = int(rid)
+        code = row.get("code")
+        if code is not None:
+            mapping[str(code).strip()] = int(rid)
+    _DIM_NAME_CACHE[collection] = (now, mapping)
+    return mapping
+
+
+def _resolve_dim_id(collection: str, id_field: str, value: str | None, *, name_field: str = "name") -> int | None:
+    if not value:
+        return None
+    mapping = _dim_name_to_id(collection, id_field, name_field=name_field)
+    return mapping.get(str(value).strip())
 
 
 def dataset_max_order_date() -> str | None:
@@ -60,8 +150,62 @@ def dataset_max_order_date() -> str | None:
         val = val.strftime("%Y-%m-%d")
     elif val is not None:
         val = str(val)[:10]
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    if val and val > today:
+        val = today
     _MAX_DATE_CACHE = (now, val)
     return val
+
+
+def dataset_filter_anchor_date() -> str | None:
+    """Fin del periodo con más ventas; ancla ventanas 12/24/48 meses (evita fechas futuras espurias)."""
+    global _FILTER_ANCHOR_CACHE
+    now = time.monotonic()
+    if _FILTER_ANCHOR_CACHE and now - _FILTER_ANCHOR_CACHE[0] < 300:
+        return _FILTER_ANCHOR_CACHE[1]
+
+    val = None
+    if strategic_ready():
+        try:
+            rows = list(
+                analytics_fact().aggregate(
+                    [
+                        {"$group": {"_id": {"$substr": ["$fecha_id", 0, 4]}, "n": {"$sum": 1}}},
+                        {"$sort": {"n": -1}},
+                        {"$limit": 1},
+                    ],
+                    allowDiskUse=True,
+                )
+            )
+            if rows and rows[0].get("_id"):
+                year = str(rows[0]["_id"])
+                doc = analytics_fact().find_one(
+                    {"fecha_id": {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}},
+                    {"fecha_id": 1, "_id": 0},
+                    sort=[("fecha_id", -1)],
+                )
+                val = (doc or {}).get("fecha_id")
+        except Exception:
+            val = None
+    if not val:
+        val = dataset_max_order_date()
+    if isinstance(val, datetime):
+        val = val.strftime("%Y-%m-%d")
+    elif val is not None:
+        val = str(val)[:10]
+    _FILTER_ANCHOR_CACHE = (now, val)
+    return val
+
+
+def _months_cutoff(months: int | None) -> str | None:
+    if not months or months >= 999:
+        return None
+    anchor = dataset_filter_anchor_date() or datetime.utcnow().strftime("%Y-%m-%d")
+    try:
+        end = datetime.strptime(anchor[:10], "%Y-%m-%d")
+    except ValueError:
+        end = datetime.utcnow()
+    return (end - timedelta(days=int(months) * 31)).strftime("%Y-%m-%d")
 
 
 def _fact_match(
@@ -75,28 +219,17 @@ def _fact_match(
     db = get_read_dw_db()
     q: dict[str, Any] = {}
     if region:
-        r = db["dim_region"].find_one({"name": region}, {"region_id": 1})
-        q["region_id"] = int(r["region_id"]) if r else -1
+        q["region_id"] = _resolve_dim_id("dim_region", "region_id", region) or -1
     if item_type:
-        c = db["dim_categoria"].find_one({"name": item_type}, {"category_id": 1})
-        q["category_id"] = int(c["category_id"]) if c else -1
+        q["category_id"] = _resolve_dim_id("dim_categoria", "category_id", item_type) or -1
     if channel:
-        ch = db["dim_canal"].find_one({"name": channel}, {"channel_id": 1})
-        q["channel_id"] = int(ch["channel_id"]) if ch else -1
+        q["channel_id"] = _resolve_dim_id("dim_canal", "channel_id", channel) or -1
     if priority:
-        p = db["dim_prioridad"].find_one(
-            {"$or": [{"code": priority}, {"name": priority}]},
-            {"priority_id": 1},
-        )
-        q["priority_id"] = int(p["priority_id"]) if p else -1
+        q["priority_id"] = _resolve_dim_id("dim_prioridad", "priority_id", priority) or -1
     if months and months < 999:
-        anchor = dataset_max_order_date() or datetime.utcnow().strftime("%Y-%m-%d")
-        try:
-            end = datetime.strptime(anchor[:10], "%Y-%m-%d")
-        except ValueError:
-            end = datetime.utcnow()
-        cutoff = (end - timedelta(days=months * 31)).strftime("%Y-%m-%d")
-        q["fecha_id"] = {"$gte": cutoff}
+        cutoff = _months_cutoff(months)
+        if cutoff:
+            q["fecha_id"] = {"$gte": cutoff}
     return q
 
 
@@ -118,13 +251,9 @@ def _landing_match(
     if priority:
         q["order_priority"] = priority
     if months and months < 999:
-        anchor = dataset_max_order_date() or datetime.utcnow().strftime("%Y-%m-%d")
-        try:
-            end = datetime.strptime(anchor[:10], "%Y-%m-%d")
-        except ValueError:
-            end = datetime.utcnow()
-        cutoff = (end - timedelta(days=months * 31)).strftime("%Y-%m-%d")
-        q["order_date"] = {"$gte": cutoff}
+        cutoff = _months_cutoff(months)
+        if cutoff:
+            q["order_date"] = {"$gte": cutoff}
     return q
 
 
@@ -186,15 +315,18 @@ def get_summary(**filters) -> dict[str, Any]:
     rev = float(x.get("r") or 0)
     countries = int(((facet.get("countries") or [{}])[0] or {}).get("n") or 0)
     item_types = int(((facet.get("item_types") or [{}])[0] or {}).get("n") or 0)
+    orders = int(x.get("n") or 0)
+    skip_cache = orders == 0 and strategic_ready()
     lagging = False
     try:
-        from shared.analytics_sync import get_strategic_lag
-
-        lagging = bool(get_strategic_lag().get("strategic_lagging"))
+        doc = get_db()["app_meta"].find_one({"_id": "strategic_sync"}, {"strategic_lagging": 1}) or {}
+        lagging = bool(doc.get("strategic_lagging"))
     except Exception:
         pass
+    months = filters.get("months")
+    cutoff = _months_cutoff(months) if months and int(months or 0) < 999 else None
     result = {
-        "total_orders": int(x.get("n") or 0),
+        "total_orders": orders,
         "total_revenue": round(rev, 2),
         "total_profit": round(float(x.get("p") or 0), 2),
         "total_cost": round(float(x.get("co") or 0), 2),
@@ -202,11 +334,15 @@ def get_summary(**filters) -> dict[str, Any]:
         "countries": countries,
         "item_types": item_types,
         "dataset_max_date": dataset_max_order_date(),
+        "filter_months": int(months) if cutoff else None,
+        "filter_period_start": cutoff,
+        "filter_anchor_date": dataset_filter_anchor_date() if cutoff else None,
+        "historic_total_orders": int(_fact_gen()) if cutoff else orders,
         "strategic_ready": True,
         "strategic_lagging": lagging,
         "data_layer": "estrategico",
     }
-    return _cache_set(key, result)
+    return _cache_set(key, result, skip_if_empty=skip_cache)
 
 
 def revenue_by_region(**filters):
@@ -222,25 +358,25 @@ def revenue_by_region(**filters):
             _prefix(match)
             + [
                 {
-                    "$lookup": {
-                        "from": "dim_region",
-                        "localField": "region_id",
-                        "foreignField": "region_id",
-                        "as": "d",
-                    }
-                },
-                {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
-                {
                     "$group": {
-                        "_id": {"$ifNull": ["$d.name", "Sin región"]},
+                        "_id": "$region_id",
                         "revenue": {"$sum": "$total_revenue"},
                         "profit": {"$sum": "$total_profit"},
                         "orders": {"$sum": 1},
                     }
                 },
                 {
+                    "$lookup": {
+                        "from": "dim_region",
+                        "localField": "_id",
+                        "foreignField": "region_id",
+                        "as": "d",
+                    }
+                },
+                {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
+                {
                     "$project": {
-                        "region": "$_id",
+                        "region": {"$ifNull": ["$d.name", "Sin región"]},
                         "revenue": {"$round": ["$revenue", 2]},
                         "profit": {"$round": ["$profit", 2]},
                         "orders": 1,
@@ -252,7 +388,7 @@ def revenue_by_region(**filters):
             allowDiskUse=True,
         )
     )
-    return _cache_set(key, rows)
+    return _cache_set(key, rows, skip_if_empty=not rows and strategic_ready())
 
 
 def revenue_by_product(**filters):
@@ -268,25 +404,25 @@ def revenue_by_product(**filters):
             _prefix(match)
             + [
                 {
-                    "$lookup": {
-                        "from": "dim_categoria",
-                        "localField": "category_id",
-                        "foreignField": "category_id",
-                        "as": "d",
-                    }
-                },
-                {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
-                {
                     "$group": {
-                        "_id": {"$ifNull": ["$d.name", "Sin categoría"]},
+                        "_id": "$category_id",
                         "units": {"$sum": "$units_sold"},
                         "revenue": {"$sum": "$total_revenue"},
                         "profit": {"$sum": "$total_profit"},
                     }
                 },
                 {
+                    "$lookup": {
+                        "from": "dim_categoria",
+                        "localField": "_id",
+                        "foreignField": "category_id",
+                        "as": "d",
+                    }
+                },
+                {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
+                {
                     "$project": {
-                        "item_type": "$_id",
+                        "item_type": {"$ifNull": ["$d.name", "Sin categoría"]},
                         "units": 1,
                         "revenue": {"$round": ["$revenue", 2]},
                         "profit": {"$round": ["$profit", 2]},
@@ -298,7 +434,7 @@ def revenue_by_product(**filters):
             allowDiskUse=True,
         )
     )
-    return _cache_set(key, rows)
+    return _cache_set(key, rows, skip_if_empty=not rows and strategic_ready())
 
 
 def monthly_trend(last_n: int = 24, **filters):
@@ -342,7 +478,8 @@ def monthly_trend(last_n: int = 24, **filters):
             allowDiskUse=True,
         )
     )
-    return _cache_set(key, list(reversed(rows)))
+    rows = list(reversed(rows))
+    return _cache_set(key, rows, skip_if_empty=not rows and strategic_ready())
 
 
 def channel_breakdown(**filters):
@@ -358,24 +495,24 @@ def channel_breakdown(**filters):
             _prefix(match)
             + [
                 {
+                    "$group": {
+                        "_id": "$channel_id",
+                        "orders": {"$sum": 1},
+                        "revenue": {"$sum": "$total_revenue"},
+                    }
+                },
+                {
                     "$lookup": {
                         "from": "dim_canal",
-                        "localField": "channel_id",
+                        "localField": "_id",
                         "foreignField": "channel_id",
                         "as": "d",
                     }
                 },
                 {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
                 {
-                    "$group": {
-                        "_id": {"$ifNull": ["$d.name", "Sin canal"]},
-                        "orders": {"$sum": 1},
-                        "revenue": {"$sum": "$total_revenue"},
-                    }
-                },
-                {
                     "$project": {
-                        "sales_channel": "$_id",
+                        "sales_channel": {"$ifNull": ["$d.name", "Sin canal"]},
                         "orders": 1,
                         "revenue": {"$round": ["$revenue", 2]},
                         "_id": 0,
@@ -385,7 +522,7 @@ def channel_breakdown(**filters):
             allowDiskUse=True,
         )
     )
-    return _cache_set(key, rows)
+    return _cache_set(key, rows, skip_if_empty=not rows and strategic_ready())
 
 
 def priority_breakdown(**filters):
@@ -401,27 +538,33 @@ def priority_breakdown(**filters):
             _prefix(match)
             + [
                 {
+                    "$group": {
+                        "_id": "$priority_id",
+                        "orders": {"$sum": 1},
+                    }
+                },
+                {
                     "$lookup": {
                         "from": "dim_prioridad",
-                        "localField": "priority_id",
+                        "localField": "_id",
                         "foreignField": "priority_id",
                         "as": "d",
                     }
                 },
                 {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
                 {
-                    "$group": {
-                        "_id": {"$ifNull": ["$d.code", "M"]},
-                        "orders": {"$sum": 1},
+                    "$project": {
+                        "order_priority": {"$ifNull": ["$d.code", "M"]},
+                        "orders": 1,
+                        "_id": 0,
                     }
                 },
-                {"$project": {"order_priority": "$_id", "orders": 1, "_id": 0}},
                 {"$sort": {"order_priority": 1}},
             ],
             allowDiskUse=True,
         )
     )
-    return _cache_set(key, rows)
+    return _cache_set(key, rows, skip_if_empty=not rows and strategic_ready())
 
 
 def top_countries(n: int = 10, **filters):
@@ -437,17 +580,8 @@ def top_countries(n: int = 10, **filters):
             _prefix(match)
             + [
                 {
-                    "$lookup": {
-                        "from": "dim_pais",
-                        "localField": "country_id",
-                        "foreignField": "country_id",
-                        "as": "d",
-                    }
-                },
-                {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
-                {
                     "$group": {
-                        "_id": {"$ifNull": ["$d.name", "Sin país"]},
+                        "_id": "$country_id",
                         "revenue": {"$sum": "$total_revenue"},
                         "orders": {"$sum": 1},
                     }
@@ -455,8 +589,17 @@ def top_countries(n: int = 10, **filters):
                 {"$sort": {"revenue": -1}},
                 {"$limit": n},
                 {
+                    "$lookup": {
+                        "from": "dim_pais",
+                        "localField": "_id",
+                        "foreignField": "country_id",
+                        "as": "d",
+                    }
+                },
+                {"$unwind": {"path": "$d", "preserveNullAndEmptyArrays": True}},
+                {
                     "$project": {
-                        "country": "$_id",
+                        "country": {"$ifNull": ["$d.name", "Sin país"]},
                         "revenue": {"$round": ["$revenue", 2]},
                         "orders": 1,
                         "_id": 0,
@@ -466,7 +609,7 @@ def top_countries(n: int = 10, **filters):
             allowDiskUse=True,
         )
     )
-    return _cache_set(key, rows)
+    return _cache_set(key, rows, skip_if_empty=not rows and strategic_ready())
 
 
 def search_orders(

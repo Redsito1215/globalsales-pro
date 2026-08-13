@@ -75,7 +75,7 @@ function payButtons(req) {
     if (offline) {
       return `<span style="font-size:10px;color:var(--muted)">Crédito · venta presencial</span>`;
     }
-    return `<span style="font-size:10px;color:var(--warn)">Online: cliente debe pagar en Mis pedidos</span>`;
+    return `<span style="font-size:10px;color:var(--warn)">En línea: el cliente debe pagar en Mis pedidos</span>`;
   }
   if (staffCanRegister) {
     return `
@@ -200,7 +200,7 @@ async function loadSolicitudes() {
   const r = await fetch(API + '/solicitudes?' + q, { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
-    body.innerHTML = `<tr><td colspan="8">${data.message || 'Error'}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="8">${data.message || 'Error al procesar'}</td></tr>`;
     return;
   }
   solicitudesState.requests = data.requests || [];
@@ -231,9 +231,9 @@ async function loadSolicitudes() {
       ? opsEmptyRow(8, {
           title: status === 'activas' ? 'Sin pendientes' : 'Sin resultados',
           hint: status === 'activas'
-            ? 'Espera una compra desde la Vitrina o revisa el historial con otro filtro.'
+            ? 'Espera una compra desde la tienda o revisa el historial con otro filtro.'
             : 'Prueba otro estado o limpia la búsqueda.',
-          ctaLabel: 'Ir a Vitrina',
+          ctaLabel: 'Ir a la tienda',
           ctaOnclick: "showPage('tienda')",
         })
       : `<tr><td colspan="8">${status === 'activas' ? 'No hay solicitudes pendientes.' : 'Sin solicitudes con este filtro.'}</td></tr>`;
@@ -264,7 +264,7 @@ async function setSolicitudEstado(id, status) {
     body: JSON.stringify({ status }),
   });
   const data = await r.json();
-  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al procesar'); return; }
   notifyOk(status === 'aprobada' ? 'Solicitud aprobada.' : status === 'rechazada' ? 'Solicitud rechazada.' : `Estado actualizado: ${status}.`);
   await loadSolicitudes();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
@@ -282,7 +282,7 @@ async function setSolicitudPago(id, payment_status) {
     body: JSON.stringify({ payment_status }),
   });
   const data = await r.json();
-  if (!r.ok) { notifyErr(data.message || 'Error'); return; }
+  if (!r.ok) { notifyErr(data.message || 'Error al procesar'); return; }
   notifyOk('Estado de pago actualizado.');
   await loadSolicitudes();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
@@ -396,8 +396,8 @@ async function confirmDevolverSolicitud() {
   });
   const data = await r.json();
   if (!r.ok) {
-    if (err) err.textContent = data.message || 'Error';
-    else notifyErr(data.message || 'Error');
+    if (err) err.textContent = data.message || 'Error al procesar';
+    else notifyErr(data.message || 'Error al procesar');
     return;
   }
   closeDevolverModal();
@@ -413,7 +413,7 @@ async function convertirSolicitud(id) {
   }
   const ok = await opsConfirm({
     title: 'Convertir solicitud',
-    message: '¿Convertir esta solicitud en venta (landing sales_records)? El Tablero estratégico se actualiza tras Construir modelo / ELT.',
+    message: '¿Convertir esta solicitud en venta (registros de aterrizaje)? El tablero estratégico se actualiza tras Construir modelo / carga ELT.',
     confirmLabel: 'Convertir',
   });
   if (!ok) return;
@@ -422,13 +422,13 @@ async function convertirSolicitud(id) {
   });
   const data = await r.json();
   if (!r.ok) {
-    notifyErr(data.message || 'Error');
+    notifyErr(data.message || 'Error al procesar');
     return;
   }
   const synced = data.analytics_sync && data.analytics_sync.synced;
   if (data.offline_sale) {
     const msg = data.analytics_stale
-      ? `Venta presencial ${data.order_id} entregada. Sync a Tablero pendiente.`
+      ? `Venta presencial ${data.order_id} entregada. Sincronización al tablero pendiente.`
       : `Venta presencial ${data.order_id} completada y entregada${synced ? ` (${synced} hechos)` : ''}.`;
     if (data.analytics_stale) {
       notifyWarn(msg, {
@@ -440,7 +440,7 @@ async function convertirSolicitud(id) {
     }
   } else {
     const msg = data.analytics_stale
-      ? `Venta ${data.order_id} en landing. Sync a Tablero pendiente.`
+      ? `Venta ${data.order_id} en capa de aterrizaje. Sincronización al tablero pendiente.`
       : `Venta ${data.order_id} creada${synced ? ` y sincronizada (${synced} hechos)` : ''}.`;
     if (data.analytics_stale) {
       notifyWarn(msg, {

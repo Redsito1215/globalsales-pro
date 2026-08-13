@@ -4,23 +4,27 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>GLOBTRADE S.A. — Plataforma Comercial</title>
+<link rel="icon" type="image/png" href="/static/img/globtrade-logo.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260810v" />
-<link rel="stylesheet" href="/static/css/storefront.css?v=20260810t" />
-<link rel="stylesheet" href="/static/css/page-unified.css?v=20260810t" />
-<link rel="stylesheet" href="/static/css/admin-ui.css?v=20260810t" />
-<link rel="stylesheet" href="/static/css/ux-live.css?v=20260810v" />
-<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260810v" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260813j" />
+<link rel="stylesheet" href="/static/css/storefront.css?v=20260813j" />
+<link rel="stylesheet" href="/static/css/page-unified.css?v=20260813i" />
+<link rel="stylesheet" href="/static/css/admin-ui.css?v=20260813j" />
+<link rel="stylesheet" href="/static/css/ux-live.css?v=20260813i" />
+<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260813i" />
+<link rel="stylesheet" href="/static/css/innovate-ui.css?v=20260813i" />
+<link rel="stylesheet" href="/static/css/globtrade-identity.css?v=20260813j" />
 <script src="/static/js/ops-ui.js?v=20260810v" defer></script>
 <script src="/static/js/ops-live.js?v=20260810q" defer></script>
 <script src="/static/js/auth-nav.js?v=20260810q" defer></script>
-<script src="/static/js/q4-datos.js?v=20260810v" defer></script>
+<script src="/static/js/company-admin.js?v=20260813a" defer></script>
+<script src="/static/js/q4-datos.js?v=20260813b" defer></script>
 <script src="/static/js/q3-ventas.js?v=20260810v" defer></script>
 <script src="/static/js/q3-pedidos.js?v=20260810v" defer></script>
 <script src="/static/js/q2-analisis.js?v=20260810v" defer></script>
-<script src="/static/js/tienda.js?v=20260810v" defer></script>
+<script src="/static/js/tienda.js?v=20260813f" defer></script>
 <script src="/static/js/mis-pedidos.js?v=20260810v" defer></script>
 <script src="/static/js/solicitud-detail.js?v=20260810v" defer></script>
 <script src="/static/js/notificaciones.js?v=20260810v" defer></script>
@@ -28,7 +32,7 @@
 <script src="/static/js/roles-admin.js?v=20260810v" defer></script>
 <script src="/static/js/decisiones.js?v=20260810v" defer></script>
 <script src="/static/js/compras.js?v=20260810v" defer></script>
-<script src="/static/js/reportes.js?v=20260810v" defer></script>
+<script src="/static/js/reportes.js?v=20260813ai3" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 (function(){
@@ -43,7 +47,7 @@
 <body>
 <div id="boot-screen" aria-live="polite">
   <div class="boot-brand">
-    <span class="boot-mark" aria-hidden="true"></span>
+    <span class="boot-mark" aria-hidden="true"><img src="/static/img/globtrade-logo.png" alt="" width="72" height="72" /></span>
     <div class="boot-title">GLOBTRADE</div>
   </div>
   <div class="boot-spinner" aria-hidden="true"></div>
@@ -59,8 +63,8 @@
     </button>
     <div class="logo-text">
       <div class="logo-mark">
-        <span class="logo-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M6 2h8l1 4H5l1-4z" fill="#fff" opacity=".95"/><path d="M5 6h10l-1 11H6L5 6z" fill="#fff"/></svg></span>
-        GLOBTRADE
+        <span class="logo-icon" aria-hidden="true"><img src="/static/img/globtrade-logo.png" alt="" width="32" height="32" class="logo-icon-img" /></span>
+        <span class="logo-wordmark">GLOBTRADE</span>
       </div>
     </div>
   </div>
@@ -236,10 +240,10 @@
     ══════════════════════════════════════════ -->
     <div class="page active" id="page-dashboard">
       <div class="page-shell">
-      <header class="page-hero">
+      <header class="page-hero page-hero--showcase">
         <span class="page-badge">Tablero Q1</span>
-        <h1 class="page-title">Decisiones con datos</h1>
-        <p class="page-lead">Resumen ejecutivo: KPIs, tendencia y desglose por región, canal, prioridad y país.</p>
+        <h1 class="page-title">Explora el comercio global con datos en tiempo real</h1>
+        <p class="page-lead">KPIs, tendencias y desglose por región, canal y producto — una vista ejecutiva diseñada para decidir rápido, no para perderse en tablas.</p>
         <div id="dash-lag-banner" class="dash-lag-banner" hidden></div>
       </header>
 
@@ -254,49 +258,49 @@
               <label for="dash-region">Región</label>
               <select id="dash-region" onchange="applyDashFilters()">
                 <option value="">Todas las regiones</option>
-                <option>Sub-Saharan Africa</option>
-                <option>Europe</option>
-                <option>Asia</option>
-                <option>Middle East and North Africa</option>
-                <option>North America</option>
-                <option>Central America and the Caribbean</option>
-                <option>Australia and Oceania</option>
+                <option value="Sub-Saharan Africa">África subsahariana</option>
+                <option value="Europe">Europa</option>
+                <option value="Asia">Asia</option>
+                <option value="Middle East and North Africa">Oriente Medio y Norte de África</option>
+                <option value="North America">América del Norte</option>
+                <option value="Central America and the Caribbean">Centroamérica y el Caribe</option>
+                <option value="Australia and Oceania">Australia y Oceanía</option>
               </select>
             </div>
             <div class="fg">
               <label for="dash-itemtype">Tipo de producto</label>
               <select id="dash-itemtype" onchange="applyDashFilters()">
                 <option value="">Todos</option>
-                <option>Snacks</option><option>Cosmetics</option><option>Fruits</option>
-                <option>Personal Care</option><option>Household</option><option>Clothes</option>
-                <option>Vegetables</option><option>Office Supplies</option><option>Beverages</option>
-                <option>Meat</option><option>Cereal</option><option>Baby Food</option>
+                <option value="Snacks">Aperitivos</option><option value="Cosmetics">Cosméticos</option><option value="Fruits">Frutas</option>
+                <option value="Personal Care">Cuidado personal</option><option value="Household">Hogar</option><option value="Clothes">Ropa</option>
+                <option value="Vegetables">Verduras</option><option value="Office Supplies">Material de oficina</option><option value="Beverages">Bebidas</option>
+                <option value="Meat">Carnes</option><option value="Cereal">Cereales</option><option value="Baby Food">Alimentos para bebés</option>
               </select>
             </div>
             <div class="fg">
               <label for="dash-channel">Canal de venta</label>
               <select id="dash-channel" onchange="applyDashFilters()">
                 <option value="">Todos</option>
-                <option>Online</option>
-                <option>Offline</option>
+                <option value="Online">En línea</option>
+                <option value="Offline">Presencial</option>
               </select>
             </div>
             <div class="fg">
               <label for="dash-priority">Prioridad</label>
               <select id="dash-priority" onchange="applyDashFilters()">
                 <option value="">Todas</option>
-                <option value="C">C — Critical</option>
-                <option value="H">H — High</option>
-                <option value="M">M — Medium</option>
-                <option value="L">L — Low</option>
+                <option value="C">C — Crítica</option>
+                <option value="H">H — Alta</option>
+                <option value="M">M — Media</option>
+                <option value="L">L — Baja</option>
               </select>
             </div>
             <div class="fg">
               <label for="dash-months">Período</label>
               <select id="dash-months" onchange="applyDashFilters()">
-                <option value="12">Últimos 12 meses del histórico</option>
-                <option value="24">Últimos 24 meses del histórico</option>
-                <option value="48">Últimos 48 meses del histórico</option>
+                <option value="12">Últimos 12 meses</option>
+                <option value="24">Últimos 24 meses</option>
+                <option value="48">Últimos 48 meses</option>
                 <option value="999" selected>Todo el histórico</option>
               </select>
             </div>
@@ -355,12 +359,12 @@
           </section>
 
           <details class="dash-more" id="dash-more-detail">
-            <summary>Ver detalle de pedidos (landing)</summary>
+            <summary>Ver detalle de pedidos (aterrizaje)</summary>
             <section class="dash-section dash-section--table" aria-labelledby="dash-table-title">
               <div class="dash-section-head dash-section-head--row">
                 <div>
                   <h2 id="dash-table-title">Detalle de pedidos</h2>
-                  <p>Filas de <code>sales_records</code> (landing)</p>
+                  <p>Registros de ventas (capa de aterrizaje)</p>
                 </div>
                 <span id="dash-records-count" class="dash-records-meta"></span>
               </div>
@@ -382,7 +386,7 @@
                 <div class="table-scroll">
                   <table>
                     <thead><tr>
-                      <th>Order ID</th>
+                      <th>N.º pedido</th>
                       <th>Región</th>
                       <th>País</th>
                       <th>Producto</th>
@@ -564,27 +568,27 @@
           <label>Categoría</label>
           <select id="f-itemtype">
             <option value="">Todos</option>
-            <option>Snacks</option><option>Cosmetics</option><option>Fruits</option>
-            <option>Personal Care</option><option>Household</option><option>Clothes</option>
-            <option>Vegetables</option><option>Office Supplies</option><option>Beverages</option>
-            <option>Meat</option><option>Cereal</option><option>Baby Food</option>
+            <option value="Snacks">Aperitivos</option><option value="Cosmetics">Cosméticos</option><option value="Fruits">Frutas</option>
+            <option value="Personal Care">Cuidado personal</option><option value="Household">Hogar</option><option value="Clothes">Ropa</option>
+            <option value="Vegetables">Verduras</option><option value="Office Supplies">Material de oficina</option><option value="Beverages">Bebidas</option>
+            <option value="Meat">Carnes</option><option value="Cereal">Cereales</option><option value="Baby Food">Alimentos para bebés</option>
           </select>
         </div>
         <div class="filter-group">
           <label>Canal</label>
           <select id="f-channel">
             <option value="">Todos</option>
-            <option>Online</option><option>Offline</option>
+            <option value="Online">En línea</option><option value="Offline">Presencial</option>
           </select>
         </div>
         <div class="filter-group">
           <label>Prioridad</label>
           <select id="f-priority">
             <option value="">Todas</option>
-            <option value="C">C — Critical</option>
-            <option value="H">H — High</option>
-            <option value="M">M — Medium</option>
-            <option value="L">L — Low</option>
+            <option value="C">C — Crítica</option>
+            <option value="H">H — Alta</option>
+            <option value="M">M — Media</option>
+            <option value="L">L — Baja</option>
           </select>
         </div>
         <div class="filter-group filter-group--action">
@@ -608,7 +612,7 @@
         </div>
         <div class="table-scroll">
           <table><thead><tr>
-            <th>Order ID</th><th>País</th><th>Región</th><th>Producto</th><th>Canal</th>
+            <th>N.º pedido</th><th>País</th><th>Región</th><th>Producto</th><th>Canal</th>
             <th>Prioridad</th><th>Fecha Pedido</th><th>Fecha Envío</th>
             <th>Unidades</th><th>Ingreso</th><th>Utilidad</th>
           </tr></thead><tbody id="body-orders"></tbody></table>
@@ -630,6 +634,48 @@
         <p class="page-lead">Distribución internacional · 185+ países · misión, visión y retos de sistemas y decisiones.</p>
       </header>
       <div class="page-body">
+      <section id="company-admin-panel" class="table-box table-box--admin company-admin-panel" data-require-perm="company.manage" hidden>
+        <div class="dash-section-head" style="margin-bottom:1rem">
+          <h2>Datos de la empresa</h2>
+          <p>Logo, razón social y contacto que aparecen en facturas y documentos comerciales.</p>
+        </div>
+        <div class="company-admin-grid">
+          <div class="company-admin-logo">
+            <img id="company-logo-preview" class="company-logo-preview" src="/static/img/globtrade-logo.png" alt="Logo de la empresa" />
+            <label class="btn btn-ghost btn-sm company-logo-upload">
+              Cambiar logo
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="uploadCompanyLogo(this)" />
+            </label>
+            <p class="admin-page-meta">PNG, JPG o WebP · máx. 2 MB</p>
+          </div>
+          <div class="company-admin-fields">
+            <div class="fg-row">
+              <div class="fg"><label for="company-field-name">Nombre comercial</label><input id="company-field-name" type="text" autocomplete="organization" /></div>
+              <div class="fg"><label for="company-field-legal_name">Razón social</label><input id="company-field-legal_name" type="text" /></div>
+            </div>
+            <div class="fg"><label for="company-field-tagline">Descripción breve</label><input id="company-field-tagline" type="text" placeholder="Ej. Distribución comercial internacional" /></div>
+            <div class="fg-row">
+              <div class="fg"><label for="company-field-address">Dirección</label><input id="company-field-address" type="text" /></div>
+              <div class="fg"><label for="company-field-city">Ciudad</label><input id="company-field-city" type="text" /></div>
+            </div>
+            <div class="fg-row">
+              <div class="fg"><label for="company-field-country">País</label><input id="company-field-country" type="text" /></div>
+              <div class="fg"><label for="company-field-tax_id">NIT / RUC / ID fiscal</label><input id="company-field-tax_id" type="text" /></div>
+            </div>
+            <div class="fg-row">
+              <div class="fg"><label for="company-field-email">Correo</label><input id="company-field-email" type="email" /></div>
+              <div class="fg"><label for="company-field-phone">Teléfono</label><input id="company-field-phone" type="tel" /></div>
+            </div>
+            <div class="fg"><label for="company-field-website">Sitio web</label><input id="company-field-website" type="text" placeholder="www.ejemplo.com" /></div>
+            <div class="fg"><label for="company-field-invoice_signer">Firma en factura</label><input id="company-field-invoice_signer" type="text" placeholder="Equipo Comercial GLOBTRADE" /></div>
+            <div class="fg"><label for="company-field-invoice_footer">Nota al pie de factura</label><textarea id="company-field-invoice_footer" rows="2"></textarea></div>
+            <div class="company-admin-actions">
+              <button type="button" class="btn btn-primary" onclick="saveCompanyProfile()">Guardar datos</button>
+              <span id="company-admin-status" class="admin-page-meta" aria-live="polite"></span>
+            </div>
+          </div>
+        </div>
+      </section>
       <div class="company-grid" style="margin-bottom:20px">
         <div class="info-block">
           <h3>Misión</h3>
@@ -702,7 +748,7 @@
         <div class="problem-card sys">
           <div class="num">04</div>
           <h4>Escalabilidad de la base de datos</h4>
-          <p>MongoDB sin particionamiento ni índices compuestos optimizados responde lentamente con volúmenes superiores a 500K registros.</p>
+          <p>La base de datos sin particionamiento ni índices compuestos optimizados responde lentamente con volúmenes superiores a 500 mil registros.</p>
         </div>
         <div class="problem-card sys">
           <div class="num">05</div>
@@ -712,7 +758,7 @@
         <div class="problem-card sys">
           <div class="num">06</div>
           <h4>Sin capa de caché en reportes</h4>
-          <p>Cada consulta recalcula los KPIs desde cero en MongoDB, sobrecargando el servidor en horas pico y degradando la experiencia de usuario.</p>
+          <p>Cada consulta recalcula los indicadores desde cero en la base de datos, sobrecargando el servidor en horas pico y degradando la experiencia de usuario.</p>
         </div>
         <div class="problem-card sys">
           <div class="num">07</div>
@@ -754,7 +800,7 @@
         </div>
         <div class="problem-card dec">
           <div class="num">03</div>
-          <h4>¿Online u Offline según país?</h4>
+          <h4>¿Canal en línea o presencial según país?</h4>
           <p>No existe análisis segmentado que muestre cuál canal genera mejor margen neto por país, región y tipo de producto simultáneamente.</p>
         </div>
         <div class="problem-card dec">
@@ -770,7 +816,7 @@
         <div class="problem-card dec">
           <div class="num">06</div>
           <h4>¿Qué prioridades de pedido son rentables?</h4>
-          <p>No se ha calculado si el costo operativo de prioridad Critical supera el ingreso diferencial; se acepta sin análisis de rentabilidad por SLA.</p>
+          <p>No se ha calculado si el costo operativo de prioridad crítica supera el ingreso diferencial; se acepta sin análisis de rentabilidad por nivel de servicio.</p>
         </div>
         <div class="problem-card dec">
           <div class="num">07</div>
@@ -843,6 +889,7 @@
               <select id="rc-select" onchange="onRcSelect(); loadRcActual()"></select>
             </div>
             <div class="filter-group filter-group--action">
+              <button type="button" class="btn btn-ghost" id="rc-btn-ai" onclick="openReportesAiModal('compuesto')">Asistente IA</button>
               <button type="button" class="btn btn-primary" id="rc-btn-refresh" onclick="loadRcActual()">Actualizar</button>
               <button type="button" class="btn btn-ghost" id="rc-btn-pdf" onclick="exportRcPdf()">Exportar PDF</button>
               <button type="button" class="btn btn-ghost" id="rc-btn-csv" onclick="exportRcCsv()">Exportar CSV</button>
@@ -890,6 +937,7 @@
               <input id="reportes-thr" type="number" value="20" style="width:80px" />
             </div>
             <div class="filter-group filter-group--action">
+              <button type="button" class="btn btn-ghost" id="reportes-btn-ai" onclick="openReportesAiModal('simple')">Asistente IA</button>
               <button type="button" class="btn btn-primary" id="reportes-btn-refresh" onclick="loadReporteActual()">Actualizar</button>
               <button type="button" class="btn btn-ghost" id="reportes-btn-pdf" onclick="exportReportePdf()">Exportar PDF</button>
               <button type="button" class="btn btn-ghost" id="reportes-btn-csv" onclick="exportReporteCsv()">Exportar CSV</button>
@@ -933,7 +981,7 @@
               <span id="compras-warehouse-meta">Ubicación única · todo el stock se almacena aquí</span>
             </div>
             <div class="filters">
-              <div class="filter-group"><label>Buscar</label><input id="compras-inv-q" type="search" placeholder="SKU o nombre" onkeydown="if(event.key==='Enter')loadComprasInventario()" /></div>
+              <div class="filter-group"><label>Buscar</label><input id="compras-inv-q" type="search" placeholder="Código o nombre" onkeydown="if(event.key==='Enter')loadComprasInventario()" /></div>
               <div class="filter-group filter-input--narrow"><label>Umbral bajo</label><input id="compras-inv-thr" type="number" value="20" /></div>
               <div class="filter-group"><label><input id="compras-inv-low" type="checkbox" onchange="loadComprasInventario()" /> Solo stock bajo</label></div>
               <div class="filter-group filter-group--action"><button type="button" class="btn btn-ghost" onclick="loadComprasInventario()">Actualizar</button></div>
@@ -941,7 +989,7 @@
             <div class="table-box">
               <div class="table-header"><div class="table-title">Inventario por variante</div></div>
               <div class="table-scroll">
-                <table><thead><tr><th>Var.</th><th>Producto</th><th>Bodega</th><th>Proveedor</th><th>Stock</th><th>Precio</th><th>Costo</th><th>Ajuste</th></tr></thead>
+                <table><thead><tr><th>Var.</th><th>Producto</th><th>Bodega</th><th>Proveedor</th><th>Existencias</th><th>Precio</th><th>Costo</th><th>Ajuste</th></tr></thead>
                 <tbody id="compras-inv-body"></tbody></table>
               </div>
             </div>
@@ -952,7 +1000,7 @@
               <input type="hidden" id="vend-id" />
               <div class="filters filters--flat">
                 <div class="filter-group"><label>Nombre</label><input id="vend-name" /></div>
-                <div class="filter-group"><label>Email</label><input id="vend-email" type="email" /></div>
+                <div class="filter-group"><label>Correo</label><input id="vend-email" type="email" /></div>
               </div>
               <div class="vendor-geo-picker">
                 <p class="modal-sub vendor-geo-lead">Ubicación del proveedor — elige continente y país en las tablas.</p>
@@ -984,7 +1032,7 @@
             <div class="table-box">
               <div class="table-header"><div class="table-title">Proveedores</div></div>
               <div class="table-scroll">
-                <table><thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>Continente · País</th><th>Estado</th><th></th></tr></thead>
+                <table><thead><tr><th>ID</th><th>Nombre</th><th>Correo</th><th>Continente · País</th><th>Estado</th><th></th></tr></thead>
                 <tbody id="compras-vend-body"></tbody></table>
               </div>
             </div>
@@ -1037,75 +1085,63 @@
     ══════════════════════════════════════════ -->
     <!-- PAGE: TIENDA (storefront B2B) -->
     <div class="page" id="page-tienda">
-      <div class="shop-storefront">
-        <section class="shop-landing" aria-label="Portada tienda">
-          <div class="shop-landing-visual" aria-hidden="true">
-            <div class="shop-float shop-float--chart">
-              <span class="shop-float-label">En el catálogo</span>
-              <strong id="shop-highlight-products">—</strong>
-            </div>
-            <div class="shop-float shop-float--orders">
-              <span class="shop-float-label">Familias de producto</span>
-              <strong id="shop-highlight-categories">—</strong>
-            </div>
-            <div class="shop-float shop-float--stock">
-              <span class="shop-float-label">Ofertas activas</span>
-              <strong id="shop-highlight-offers">—</strong>
-            </div>
-            <div class="shop-float shop-float--mini">
-              <div class="shop-mini-bars"><span></span><span></span><span></span><span></span><span></span></div>
-            </div>
-          </div>
-          <div class="shop-landing-copy">
-            <span class="shop-edition-pill">Hecho para tu negocio</span>
-            <h1 class="shop-landing-title">Productos que venden,<br><em>en un solo lugar</em></h1>
-            <p class="shop-landing-sub">Explora alimentos, bebidas, cuidado personal y más. Compara precios, revisa cada ficha y pide lo que necesitas hoy.</p>
-            <div class="shop-landing-actions">
-              <button type="button" class="shop-btn shop-btn--white" onclick="document.getElementById('shop-catalog-anchor').scrollIntoView({behavior:'smooth'})">Explorar catálogo</button>
-              <button type="button" class="shop-btn shop-btn--outline" id="shop-hero-orders-btn" hidden onclick="showPage('mis-pedidos', document.querySelector('[data-page=mis-pedidos]'))">Ver mis pedidos</button>
-            </div>
-          </div>
-          <div class="shop-trust-bar" id="shop-trust-bar">
-            <span>Calidad comprobada</span><span>Precios competitivos</span><span>Entrega coordinada</span><span>Compra segura</span>
-          </div>
-        </section>
-
+      <div class="shop-storefront shop-classic">
         <div class="shop-catalog-wrap" id="shop-catalog-anchor">
-        <header class="shop-catalog-head">
-          <span class="page-badge">Tienda B2B</span>
-<h2 class="page-title">Catálogo y compra</h2>
-          <p class="page-lead" id="shop-catalog-lead">Descubre productos por categoría y arma tu pedido en minutos.</p>
-        </header>
-        <div class="shop-layout">
-          <aside class="shop-collections">
-            <div class="shop-collections-title">Colecciones</div>
-            <div id="shop-collections-nav"></div>
+        <div class="shop-layout shop-layout--classic">
+          <aside class="shop-sidebar-classic" aria-label="Filtros de tienda">
+            <div class="shop-widget">
+              <h3 class="shop-widget-title">Filtrar por precio</h3>
+              <div class="shop-price-range">
+                <input type="range" id="shop-price-max" class="shop-price-slider" min="0" max="500" value="500" oninput="onShopPriceSlider()" />
+                <p class="shop-price-range-label" id="shop-price-range-label">Precio: $0 — $500</p>
+                <button type="button" class="shop-widget-btn" onclick="applyShopFilters()">Filtrar</button>
+              </div>
+            </div>
+            <div class="shop-widget">
+              <h3 class="shop-widget-title">Buscar por:</h3>
+              <input type="search" class="shop-widget-input" id="shop-search" placeholder="Buscar productos…" onkeydown="if(event.key==='Enter')applyShopFilters()" />
+              <button type="button" class="shop-widget-btn shop-widget-btn--primary" onclick="applyShopFilters()">Búsqueda</button>
+            </div>
+            <div class="shop-widget">
+              <h3 class="shop-widget-title">Por categorías</h3>
+              <div class="shop-collections-nav-classic" id="shop-collections-nav"></div>
+            </div>
+            <div class="shop-widget shop-widget--promo">
+              <strong>Envío coordinado</strong>
+              <p>Pedidos mayoristas con seguimiento en Mis pedidos.</p>
+            </div>
             <div class="shop-collection-bulk" id="shop-collection-bulk-panel">
-              <p class="shop-collection-bulk-hint" id="shop-collection-bulk-hint">Elige una colección (no «Todos») para pedirla completa.</p>
+              <p class="shop-collection-bulk-hint" id="shop-collection-bulk-hint">Elige una colección para pedirla completa.</p>
               <div class="shop-collection-bulk-actions" id="shop-collection-bulk-actions" hidden>
-                <label for="shop-bulk-qty-side" class="shop-bulk-label">Unidades de cada producto</label>
+                <label for="shop-bulk-qty-side" class="shop-bulk-label">Unidades c/u</label>
                 <div class="shop-collection-bulk-row">
                   <input type="number" id="shop-bulk-qty-side" class="shop-bulk-qty" min="1" value="1" oninput="syncShopBulkQty(this.value); updateShopBulkActions()" />
-                  <button type="button" class="btn btn-primary shop-bulk-btn" id="shop-bulk-btn-side" onclick="tiendaAddCollectionToCart()">Pedir colección completa</button>
+                  <button type="button" class="shop-widget-btn shop-widget-btn--primary" id="shop-bulk-btn-side" onclick="tiendaAddCollectionToCart()">Pedir colección</button>
                 </div>
               </div>
             </div>
           </aside>
-          <section class="shop-products">
-            <div class="shop-toolbar">
-              <span class="shop-toolbar-count" id="shop-products-meta">Cargando…</span>
-              <div class="shop-toolbar-actions">
+          <section class="shop-main-classic">
+            <h1 class="shop-page-title">Tienda</h1>
+            <div class="shop-toolbar-classic">
+              <span class="shop-results-range" id="shop-results-range">Cargando…</span>
+              <div class="shop-toolbar-classic-actions">
                 <div class="shop-bulk-add" id="shop-bulk-add" hidden>
                   <label for="shop-bulk-qty" class="shop-bulk-label">Cant. c/u</label>
                   <input type="number" id="shop-bulk-qty" class="shop-bulk-qty" min="1" value="1" oninput="syncShopBulkQty(this.value); updateShopBulkActions()" />
-                  <button type="button" class="btn btn-primary shop-bulk-btn" id="shop-bulk-btn" onclick="tiendaAddCollectionToCart()">Agregar colección completa</button>
+                  <button type="button" class="shop-widget-btn shop-widget-btn--primary shop-bulk-btn" id="shop-bulk-btn" onclick="tiendaAddCollectionToCart()">Colección completa</button>
                 </div>
-                <input type="search" class="shop-search" id="shop-search" placeholder="Buscar producto…" oninput="filterShopProducts()" />
+                <select id="shop-sort" class="shop-sort-select" onchange="applyShopFilters()" aria-label="Ordenar productos">
+                  <option value="default">Orden predeterminado</option>
+                  <option value="price-asc">Precio: menor a mayor</option>
+                  <option value="price-desc">Precio: mayor a menor</option>
+                  <option value="name-asc">Nombre A–Z</option>
+                </select>
               </div>
             </div>
-            <div class="shop-product-grid" id="tienda-grid"></div>
+            <div class="shop-product-grid shop-product-grid--classic" id="tienda-grid"></div>
           </section>
-          <aside class="shop-cart">
+          <aside class="shop-cart shop-cart--classic">
             <div class="shop-cart-head">
               <h3>Tu carrito</h3>
               <span class="shop-cart-count" id="shop-cart-badge">0</span>
@@ -1118,11 +1154,7 @@
                 <span>Subtotal</span>
                 <strong id="shop-cart-total">$0.00</strong>
               </div>
-              <button type="button" class="btn btn-primary btn-block" onclick="openSolicitudModal()" id="shop-checkout-btn" disabled>Completar pedido</button>
-              <div class="shop-trust" id="shop-cart-trust">
-                <span class="shop-trust-item">✓ Fichas con peso, proveedor y uso</span>
-                <span class="shop-trust-item">✓ Seguimiento en Mis pedidos</span>
-              </div>
+              <button type="button" class="shop-widget-btn shop-widget-btn--primary btn-block" onclick="openSolicitudModal()" id="shop-checkout-btn" disabled>Completar pedido</button>
             </div>
           </aside>
         </div>
@@ -1188,7 +1220,7 @@
             <div class="filter-group"><label>Región</label><input id="np-region" placeholder="Europe" /></div>
             <div class="filter-group"><label>País</label><input id="np-country" placeholder="France" /></div>
             <div class="filter-group"><label>Producto (categoría)</label><input id="np-item" placeholder="Snacks" /></div>
-            <div class="filter-group"><label>Canal</label><input id="np-channel" placeholder="Online" /></div>
+            <div class="filter-group"><label>Canal</label><input id="np-channel" placeholder="En línea" /></div>
             <div class="filter-group"><label>Prioridad</label><input id="np-priority" value="M" style="width:60px" /></div>
             <div class="filter-group"><label>Unidades</label><input id="np-units" type="number" value="10" style="width:80px" /></div>
             <div class="filter-group"><label>Precio</label><input id="np-price" type="number" step="0.01" style="width:90px" /></div>
@@ -1346,7 +1378,7 @@
       <div class="filters">
         <div class="filter-group"><label>Región</label><input id="an-region" placeholder="Opcional" /></div>
         <div class="filter-group"><label>Producto</label><input id="an-itemtype" placeholder="Opcional" /></div>
-        <div class="filter-group"><label>Canal</label><select id="an-channel"><option value="">Todos</option><option>Online</option><option>Offline</option></select></div>
+        <div class="filter-group"><label>Canal</label><select id="an-channel"><option value="">Todos</option><option value="Online">En línea</option><option value="Offline">Presencial</option></select></div>
         <div class="filter-group"><label>Prioridad</label><select id="an-priority"><option value="">Todas</option><option value="C">C</option><option value="H">H</option><option value="M">M</option><option value="L">L</option></select></div>
         <div class="filter-group"><label>Periodo</label>
           <select id="an-months">
@@ -1414,7 +1446,7 @@
       <header class="page-hero">
         <span class="page-badge">Datos Q4</span>
         <h1 class="page-title">Tablas maestras</h1>
-        <p class="page-lead">Edita las dimensiones del data warehouse (regiones, países, categorías, productos, canales, prioridades y clientes). Las tablas de tienda e inventario se sincronizan con <strong>Sync catálogo</strong>; el calendario (<code>dim_tiempo</code>) lo genera el ELT.</p>
+        <p class="page-lead">Edita las dimensiones del almacén de datos (regiones, países, categorías, productos, canales, prioridades y clientes). Las tablas de tienda e inventario se sincronizan con <strong>Sincronizar catálogo</strong>; el calendario (<code>dim_tiempo</code>) lo genera la carga ELT.</p>
       </header>
       <div class="page-body">
       <div class="filters page-panel--filters">
@@ -1426,8 +1458,8 @@
           <button type="button" class="btn btn-primary btn-sm" data-require-perm="masters.write" onclick="openMasterCreate()">+ Nuevo</button>
           <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="syncStaleAnalytics()">Sincronizar fact</button>
           <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="runBuildModel()">Reconstruir modelo</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync()">Sync catálogo</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync(true)" title="Regenera inventario desde maestros">Sync + reset stock</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync()">Sincronizar catálogo</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync(true)" title="Regenera inventario desde maestros">Sincronizar y reiniciar existencias</button>
         </div>
       </div>
       <p id="datos-build-status" class="catalog-meta admin-page-meta"></p>
@@ -1442,6 +1474,7 @@
           <table><thead id="datos-rows-head"><tr><th>Cargando…</th></tr></thead>
           <tbody id="datos-rows-body"></tbody></table>
         </div>
+        <div id="datos-pager" class="table-pager" hidden></div>
       </div>
       </div>
       </div><!-- /page-shell -->
@@ -1505,7 +1538,7 @@ function dashFilterQuery() {
   const itemtype = document.getElementById('dash-itemtype')?.value;
   const channel = document.getElementById('dash-channel')?.value;
   const priority = document.getElementById('dash-priority')?.value;
-  const months = document.getElementById('dash-months')?.value || '24';
+  const months = document.getElementById('dash-months')?.value || '999';
   if (region) p.set('region', region);
   if (itemtype) p.set('item_type', itemtype);
   if (channel) p.set('channel', channel);
@@ -1515,7 +1548,7 @@ function dashFilterQuery() {
 }
 /** Meses para tendencia (mismo filtro del tablero). */
 function trendMonthsParam() {
-  const months = document.getElementById('dash-months')?.value || '24';
+  const months = document.getElementById('dash-months')?.value || '999';
   return 'months=' + encodeURIComponent(months);
 }
 function apiUrl(path) {
@@ -1626,22 +1659,68 @@ setInterval(updateClock,1000); updateClock();
 function setDbStatus(ok, label) {
   const st = document.getElementById('db-status');
   const dot = document.getElementById('db-dot');
-  if (st) st.textContent = label || (ok ? 'MongoDB · OK' : 'Sin conexión');
+  if (st) st.textContent = label || (ok ? 'Base de datos · conectada' : 'Sin conexión');
   if (dot) {
     dot.classList.toggle('db-dot--ok', !!ok);
     dot.classList.toggle('db-dot--err', !ok);
   }
 }
-async function get(path) {
+async function get(path, opts = {}) {
+  const url = opts.url || apiUrl(path);
+  if (!opts.force) {
+    const hit = _apiCacheGet(url);
+    if (hit !== undefined) return hit;
+  }
   try {
-    const r = await fetch(apiUrl(path));
+    const r = await fetch(url);
     if (!r.ok) throw new Error(r.statusText);
     setDbStatus(true);
-    return await r.json();
+    const data = await r.json();
+    _apiCacheSet(url, data);
+    return data;
   } catch(e) {
     setDbStatus(false);
     return null;
   }
+}
+
+const API_CACHE_TTL_MS = 120000;
+const PAGE_LOAD_TTL_MS = 120000;
+const _apiCache = new Map();
+const _pageLoadState = {};
+
+function _apiCacheGet(url) {
+  const hit = _apiCache.get(url);
+  if (!hit || Date.now() - hit.at > API_CACHE_TTL_MS) return undefined;
+  return hit.data;
+}
+function _apiCacheSet(url, data) {
+  _apiCache.set(url, { data, at: Date.now() });
+}
+function clearAnalyticsCache() {
+  _apiCache.clear();
+  Object.keys(_pageLoadState).forEach(k => delete _pageLoadState[k]);
+}
+window.clearAnalyticsCache = clearAnalyticsCache;
+function invalidatePageCache(...ids) {
+  if (!ids.length) Object.keys(_pageLoadState).forEach(k => delete _pageLoadState[k]);
+  else ids.forEach(id => delete _pageLoadState[id]);
+}
+function pageLoadSignature(id) {
+  if (id === 'dashboard') return dashFilterQuery().toString();
+  if (id === 'trends') return String(document.getElementById('trend-months')?.value || 999);
+  if (id === 'regions') return `regions:${countriesLimit}`;
+  return id;
+}
+const ALWAYS_RELOAD_PAGES = new Set(['orders', 'datos', 'ventas', 'compras', 'notificaciones', 'soporte', 'audit', 'load']);
+function shouldSkipPageLoad(id, force) {
+  if (force || ALWAYS_RELOAD_PAGES.has(id)) return false;
+  const prev = _pageLoadState[id];
+  const sig = pageLoadSignature(id);
+  return !!(prev && prev.sig === sig && Date.now() - prev.at < PAGE_LOAD_TTL_MS);
+}
+function markPageLoaded(id) {
+  _pageLoadState[id] = { sig: pageLoadSignature(id), at: Date.now() };
 }
 
 // ── Navigation ──────────────────────────────────────────────────────
@@ -1686,31 +1765,35 @@ function showPage(id, btn) {
   document.getElementById('topbar-title').textContent = titles[id]||id;
   loadPage(id);
 }
-function loadPage(id) {
-  if(id==='dashboard') loadDashboard();
-  else if(id==='catalogo') loadCatalogo();
-  else if(id==='tienda') loadTiendaPage();
-  else if(id==='mis-pedidos') loadMisPedidosPage();
-  else if(id==='notificaciones') loadNotificacionesPage();
-  else if(id==='soporte') loadSoportePage();
+function loadPage(id, opts = {}) {
+  const force = !!(opts && opts.force);
+  if (shouldSkipPageLoad(id, force)) return;
+  if(id==='dashboard') loadDashboard(force);
+  else if(id==='catalogo') { loadCatalogo(); markPageLoaded(id); }
+  else if(id==='tienda') { loadTiendaPage(); markPageLoaded(id); }
+  else if(id==='mis-pedidos') { loadMisPedidosPage(); markPageLoaded(id); }
+  else if(id==='notificaciones') { loadNotificacionesPage(); markPageLoaded(id); }
+  else if(id==='soporte') { loadSoportePage(); markPageLoaded(id); }
   else if(id==='ventas') {
     const tab = document.querySelector('.ventas-tab-btn.active')?.dataset?.tab || 'solicitudes';
     showVentasTab(tab);
+    markPageLoaded(id);
   }
-  else if(id==='datos') loadDatosPage();
-  else if(id==='trends') loadTrends();
-  else if(id==='regions') loadRegions();
-  else if(id==='products') loadProducts();
-  else if(id==='export') loadAnalisisExportPage();
-  else if(id==='decisiones') loadDecisionesPage();
-  else if(id==='compras') loadComprasPage();
-  else if(id==='reportes') loadReportesPage();
-  else if(id==='reportes-compuestos') loadRcPage();
+  else if(id==='datos') { loadDatosPage(); markPageLoaded(id); }
+  else if(id==='trends') loadTrends(force);
+  else if(id==='regions') loadRegions(force);
+  else if(id==='products') loadProducts(force);
+  else if(id==='export') { loadAnalisisExportPage(); markPageLoaded(id); }
+  else if(id==='decisiones') { loadDecisionesPage(); markPageLoaded(id); }
+  else if(id==='compras') { loadComprasPage(); markPageLoaded(id); }
+  else if(id==='reportes') { loadReportesPage(); markPageLoaded(id); }
+  else if(id==='reportes-compuestos') { loadRcPage(); markPageLoaded(id); }
   else if(id==='orders') loadOrders();
-  else if(id==='schema') renderSchema();
-  else if(id==='load') loadDatosEltPage();
-  else if(id==='audit') loadAuditPage();
-  else if(id==='roles-admin') loadRolesAdminPage();
+  else if(id==='schema') { renderSchema(); markPageLoaded(id); }
+  else if(id==='load') { loadDatosEltPage(); markPageLoaded(id); }
+  else if(id==='audit') { loadAuditPage(); markPageLoaded(id); }
+  else if(id==='roles-admin') { loadRolesAdminPage(); markPageLoaded(id); }
+  else if(id==='company') { if (typeof loadCompanyAdmin === 'function') loadCompanyAdmin(); markPageLoaded(id); }
 }
 
 // ── Formatters ──────────────────────────────────────────────────────
@@ -1807,10 +1890,14 @@ function resetDashFilters() {
     if(el) el.value = '';
   });
   document.getElementById('dash-months').value = '999';
-  loadDashboard();
+  invalidatePageCache('dashboard');
+  loadDashboard(true);
 }
 
-function applyDashFilters() { loadDashboard(); }
+function applyDashFilters() {
+  invalidatePageCache('dashboard', 'trends', 'regions', 'products');
+  loadDashboard(true);
+}
 
 function kpiSkeletonHtml(n, compact) {
   const cls = compact ? 'stat-card stat-card--compact stat-skeleton' : 'stat-card stat-skeleton';
@@ -1819,8 +1906,9 @@ function kpiSkeletonHtml(n, compact) {
   ).join('');
 }
 
-async function loadDashboard() {
+async function loadDashboard(force = false) {
   hideBootScreen();
+  if (!force && shouldSkipPageLoad('dashboard', false)) return;
   setChartsLoading(true);
   const kpiEl = document.getElementById('kpi-cards');
   const sec = document.getElementById('kpi-cards-secondary');
@@ -1831,12 +1919,21 @@ async function loadDashboard() {
   }
 
   const { months, region, itemtype, channel, priority } = getDashParams();
-  const s = await get('/summary');
+  const trendUrl = apiUrlTrend();
+  const [s, trend, regions, channels, priorities, countries] = await Promise.all([
+    get('/summary', { force }),
+    get('/trend', { url: trendUrl, force }),
+    get('/regions', { force }),
+    get('/channels', { force }),
+    get('/priorities', { force }),
+    get('/countries?top=10', { force }),
+  ]);
+  markPageLoaded('dashboard');
   if(!s) {
     setChartsLoading(false);
     if (kpiEl) {
       kpiEl.innerHTML =
-        '<div class="stat-card stat-card--wide"><div class="stat-value" style="font-size:0.9rem">Sin conexión</div><div class="stat-label">MongoDB no responde. Verifica el servicio y app.py.</div></div>';
+        '<div class="stat-card stat-card--wide"><div class="stat-value" style="font-size:0.9rem">Sin conexión</div><div class="stat-label">La base de datos no responde. Verifica el servicio web.</div></div>';
     }
     if (sec) { sec.hidden = true; sec.innerHTML = ''; }
     ['chart-trend-dash','chart-regions-dash','chart-channels-dash','chart-priority-dash','chart-countries-dash']
@@ -1849,13 +1946,6 @@ async function loadDashboard() {
     : (s.total_revenue ? (s.total_profit / s.total_revenue) * 100 : null);
   const marginLabel = marginRaw == null || !Number.isFinite(marginRaw) ? '—' : marginRaw.toFixed(1);
   let lagging = !!s.strategic_lagging;
-  try {
-    const mr = await fetch(API + '/meta/data-layers');
-    if (mr.ok) {
-      const meta = await mr.json();
-      lagging = !!meta.strategic_lagging;
-    }
-  } catch (_) { /* ignore */ }
   const lagBanner = document.getElementById('dash-lag-banner');
   if (lagBanner) {
     if (lagging) {
@@ -1924,30 +2014,7 @@ async function loadDashboard() {
     }
   }
 
-  let trend = null;
-  let regions = null;
-  let channels = null;
-  let priorities = null;
-  let countries = null;
-  try {
-    const [trendRes, regionsRes, channelsRes, prioritiesRes, countriesRes] = await Promise.all([
-      fetch(apiUrlTrend()),
-      fetch(apiUrl('/regions')),
-      fetch(apiUrl('/channels')),
-      fetch(apiUrl('/priorities')),
-      fetch(apiUrl('/countries?top=10')),
-    ]);
-    const okAny = [trendRes, regionsRes, channelsRes, prioritiesRes, countriesRes].some(r => r.ok);
-    setDbStatus(okAny);
-    if (trendRes.ok) trend = await trendRes.json();
-    if (regionsRes.ok) regions = await regionsRes.json();
-    if (channelsRes.ok) channels = await channelsRes.json();
-    if (prioritiesRes.ok) priorities = await prioritiesRes.json();
-    if (countriesRes.ok) countries = await countriesRes.json();
-  } catch (e) {
-    setDbStatus(false);
-  }
-
+  setDbStatus(!!(trend || regions || channels || priorities || countries));
   setChartsLoading(false);
   if (trend && trend.length) {
     drawLine('chart-trend-dash', trend.map(r => r.month), trend.map(r => r.revenue), trend.map(r => r.profit));
@@ -2036,9 +2103,14 @@ function showChartEmpty(canvasId, msg) {
 }
 
 // ── Trends ───────────────────────────────────────────────────────────
-async function loadTrends() {
+async function loadTrends(force = false) {
+  if (!force && shouldSkipPageLoad('trends', false)) return;
   const n = document.getElementById('trend-months')?.value || 999;
-  const [trend, prods] = await Promise.all([get('/trend?months='+n), get('/products')]);
+  const [trend, prods] = await Promise.all([
+    get('/trend?months=' + n, { force }),
+    get('/products', { force }),
+  ]);
+  markPageLoaded('trends');
   if (!trend) {
     showChartEmpty('chart-trend', 'Sin conexión o sin datos');
     showChartEmpty('chart-products-bar', 'Sin datos');
@@ -2049,9 +2121,9 @@ async function loadTrends() {
     trend.map(r=>r.month), trend.map(r=>r.revenue), trend.map(r=>r.profit));
   if(prods && prods.length) {
     drawBar('chart-products-bar',
-      prods.map(r=>r.item_type), prods.map(r=>r.revenue), 'Ingresos');
+      prods.map(r => r.item_type), prods.map(r => r.revenue), 'Ingresos');
     drawDoughnut('chart-products-pie',
-      prods.map(r=>r.item_type), prods.map(r=>r.units));
+      prods.map(r => r.item_type), prods.map(r => r.units));
   } else {
     showChartEmpty('chart-products-bar', 'Sin datos de categoría');
     showChartEmpty('chart-products-pie', 'Sin datos de categoría');
@@ -2062,13 +2134,15 @@ async function loadTrends() {
 const COUNTRIES_STEPS = [20, 50, 100, 200];
 let countriesLimit = 20;
 
-async function loadRegions() {
-  const regs = await get('/regions');
+async function loadRegions(force = false) {
+  if (!force && shouldSkipPageLoad('regions', false)) return;
+  const regs = await get('/regions', { force });
+  if (regs && regs.length) markPageLoaded('regions');
   const tbody = document.getElementById('body-regions');
   if (!tbody) return;
   if (!regs || !regs.length) {
     tbody.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(5, { title: regs ? 'Sin datos' : 'Sin conexión', hint: 'Revisa MongoDB o filtros del tablero.' })
+      ? opsEmptyRow(5, { title: regs ? 'Sin datos' : 'Sin conexión', hint: 'Revisa la base de datos o los filtros del tablero.' })
       : `<tr><td colspan="5">${regs ? 'Sin datos' : 'Sin conexión'}</td></tr>`;
   } else {
     tbody.innerHTML = regs.map(r=>{
@@ -2116,8 +2190,10 @@ function expandCountries() {
 }
 
 // ── Products ──────────────────────────────────────────────────────────
-async function loadProducts() {
-  const data = await get('/products');
+async function loadProducts(force = false) {
+  if (!force && shouldSkipPageLoad('products', false)) return;
+  const data = await get('/products', { force });
+  if (data && data.length) markPageLoaded('products');
   const tbody = document.getElementById('body-products');
   if (!tbody) return;
   if (!data || !data.length) {
@@ -2803,7 +2879,7 @@ async function submitForgotPassword() {
     body: JSON.stringify({ email }),
   });
   const data = await r.json();
-  if (!r.ok) { err.textContent = data.message || 'Error'; return; }
+  if (!r.ok) { err.textContent = data.message || 'Error al iniciar sesión'; return; }
   closeForgotModal();
   notifyOk(data.message || 'Revisa tu correo (demo: usa el token de restablecimiento).');
   openResetModal();
@@ -2825,7 +2901,7 @@ async function submitResetPassword() {
     }),
   });
   const data = await r.json();
-  if (!r.ok) { err.textContent = data.message || 'Error'; return; }
+  if (!r.ok) { err.textContent = data.message || 'Error al iniciar sesión'; return; }
   closeResetModal();
   notifyOk(data.message || 'Contraseña actualizada. Ya puedes iniciar sesión.');
   openLoginModal();
@@ -2938,7 +3014,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="modal-backdrop" onclick="closeRegisterModal()"></div>
   <div class="modal-card">
     <h2 id="register-modal-title">Crear cuenta</h2>
-    <p class="modal-sub">Crea una cuenta de cliente B2B para comprar en la vitrina. El primer usuario registrado será administrador.</p>
+    <p class="modal-sub">Crea una cuenta de cliente mayorista para comprar en la tienda. El primer usuario registrado será administrador.</p>
     <form onsubmit="submitRegister(event)">
       <div class="fg">
         <label for="reg-name">Nombre completo</label>
@@ -2984,8 +3060,8 @@ document.addEventListener('DOMContentLoaded', () => {
         Sonido al recibir notificaciones nuevas
       </label>
       <div id="profile-sem1-wrap" class="fg fg--spaced" hidden>
-        <button type="button" class="btn btn-primary btn-block" onclick="window.location.href='/sem1'">SEM1</button>
-        <p class="modal-sub" style="margin-top:6px;margin-bottom:0">Dashboard clásico (misma vista que el puerto 5000), sin otro Docker.</p>
+        <button type="button" class="btn btn-primary btn-block" onclick="window.location.href='/sem1'">Vista clásica</button>
+        <p class="modal-sub" style="margin-top:6px;margin-bottom:0">Tablero clásico (misma vista que el puerto 5000), sin otro contenedor.</p>
       </div>
       <p class="modal-sub" style="margin-top:8px;margin-bottom:4px">Cambiar contraseña (opcional)</p>
       <div class="fg">
@@ -3147,6 +3223,60 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="sol-detail-body"></div>
     <button type="button" class="btn btn-primary btn-block" id="sol-detail-pdf">Descargar PDF / Factura</button>
     <button type="button" class="btn btn-ghost btn-block" onclick="closeSolicitudDetail()">Cerrar</button>
+  </div>
+</div>
+
+<div id="reportes-ai-modal" class="modal" hidden aria-hidden="true">
+  <div class="modal-backdrop" onclick="closeReportesAiModal()"></div>
+  <div class="modal-card modal-card--wide reportes-ai-modal">
+    <div class="reportes-ai-head">
+      <div>
+        <h2 id="reportes-ai-title">Asistente IA de informes</h2>
+        <p class="modal-sub" id="reportes-ai-sub">Recomienda informes del catálogo o genera uno a partir de tu descripción.</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeReportesAiModal()" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="reportes-ai-scope-bar">
+      <span class="reportes-ai-scope-label">Tipo de informe</span>
+      <div class="reportes-ai-scope-pills" role="group" aria-label="Tipo de informe">
+        <button type="button" class="reportes-ai-scope-pill" data-scope="simple" onclick="setReportesAiScope('simple')">Simples (RS)</button>
+        <button type="button" class="reportes-ai-scope-pill" data-scope="compuesto" onclick="setReportesAiScope('compuesto')">Compuestos (RC)</button>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="reportes-ai-refresh-catalog" onclick="refreshReportesAiCatalog(true)">Actualizar tipos</button>
+    </div>
+    <p id="reportes-ai-catalog-meta" class="catalog-meta reportes-ai-catalog-meta"></p>
+    <div class="reportes-ai-tabs" role="tablist">
+      <button type="button" class="reportes-ai-tab active" data-tab="recomendar" onclick="switchReportesAiTab('recomendar')">Recomendaciones</button>
+      <button type="button" class="reportes-ai-tab" data-tab="generar" onclick="switchReportesAiTab('generar')">Crear informe</button>
+    </div>
+    <div id="reportes-ai-panel-recomendar" class="reportes-ai-panel">
+      <label for="reportes-ai-rec-prompt" class="reportes-ai-label">¿Qué necesitas analizar? (opcional)</label>
+      <textarea id="reportes-ai-rec-prompt" class="reportes-ai-input" rows="2" placeholder="Ej.: stock bajo, pagos pendientes, ventas por categoría…"></textarea>
+      <div class="reportes-ai-actions">
+        <button type="button" class="btn btn-primary" id="reportes-ai-rec-btn" onclick="loadReportesAiRecommendations()">Obtener recomendaciones</button>
+      </div>
+      <p id="reportes-ai-engine" class="catalog-meta"></p>
+      <div id="reportes-ai-rec-list" class="reportes-ai-rec-list"></div>
+    </div>
+    <div id="reportes-ai-panel-generar" class="reportes-ai-panel" hidden>
+      <label for="reportes-ai-gen-prompt" class="reportes-ai-label">Describe el informe que quieres</label>
+      <textarea id="reportes-ai-gen-prompt" class="reportes-ai-input" rows="3" placeholder="Ej.: Informe de productos con poco stock para reponer esta semana"></textarea>
+      <div class="reportes-ai-actions">
+        <button type="button" class="btn btn-primary" id="reportes-ai-gen-btn" onclick="generateReportesAiCustom()">Generar informe</button>
+      </div>
+      <div id="reportes-ai-gen-result" class="reportes-ai-gen-result" hidden>
+        <p id="reportes-ai-gen-narrative" class="reportes-ai-narrative"></p>
+        <p id="reportes-ai-gen-meta" class="catalog-meta"></p>
+        <div class="table-scroll reportes-ai-preview">
+          <table>
+            <thead id="reportes-ai-gen-head"><tr><th>—</th></tr></thead>
+            <tbody id="reportes-ai-gen-body"></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="reportes-ai-apply-btn" onclick="applyReportesAiResult()">Abrir en pantalla de informes</button>
+      </div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-block" onclick="closeReportesAiModal()">Cerrar</button>
   </div>
 </div>
 

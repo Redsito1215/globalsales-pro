@@ -1,102 +1,106 @@
 /* ═══════════════════════════════════════════════════════════════
-   TEMA — fuente única (claro / oscuro). Cargar al final.
+   TEMA — fuente única (claro / oscuro). Cargar antes de identity.
    ═══════════════════════════════════════════════════════════════ */
 
 html[data-theme="light"],
 html.theme-light {
   color-scheme: light;
-  --bg: #f3f5f4;
-  --surface: #ffffff;
-  --surface2: #eef1f0;
+  --font: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --font-ui: "Fraunces", "Georgia", serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --radius: 10px;
+  --radius-lg: 12px;
+  --bg: #f4efe4;
+  --surface: #fffcf7;
+  --surface2: #ebe4d6;
   --surface-2: var(--surface2);
-  --border: #dce3e0;
-  --text: #14201c;
-  --muted: #5f6f68;
-  --accent: #008060;
-  --accent-hover: #004c3f;
-  --accent2: #2a6f97;
-  --accent3: #b98900;
-  --danger: #d82c0d;
+  --border: #d4cbb8;
+  --text: #0f1419;
+  --muted: #5c564c;
+  --accent: #1a5c52;
+  --accent-hover: #134a42;
+  --accent2: #2a7a6d;
+  --accent3: #b8922e;
+  --danger: #c44536;
   --info: #2a6f97;
-  --warn: #b98900;
-  --ok: #008060;
-  --topbar-bg: rgba(255, 255, 255, 0.92);
-  --topbar-text: #14201c;
-  --topbar-border: #dce3e0;
-  --topbar-control-bg: #eef1f0;
-  --topbar-control-border: #c5d0cb;
-  --topbar-control-text: #14201c;
-  --input-bg: #ffffff;
-  --input-border: #c5d0cb;
-  --chart-grid: #e5e7eb;
-  --chart-text: #6b7280;
-  --shadow: 0 1px 2px rgba(20, 32, 28, 0.06), 0 8px 24px rgba(20, 32, 28, 0.04);
-  --shadow-sm: 0 1px 2px rgba(20, 32, 28, 0.05);
-  --panel-highlight-bg: rgba(0, 128, 96, 0.07);
-  --panel-highlight-border: rgba(0, 128, 96, 0.2);
-  --bg-glow: radial-gradient(1200px 500px at 12% -10%, rgba(0, 128, 96, 0.09), transparent 55%),
-             radial-gradient(900px 400px at 100% 0%, rgba(42, 111, 151, 0.06), transparent 50%);
-  --shop-sidebar-bg: #ffffff;
-  --shop-sidebar-text: #14201c;
-  --shop-sidebar-muted: #5f6f68;
-  --shop-sidebar-border: #dce3e0;
-  --shop-sidebar-hover: #eef1f0;
-  --shop-sidebar-active-bg: rgba(0, 128, 96, 0.12);
-  --shop-sidebar-active-border: rgba(0, 128, 96, 0.35);
-  --shop-green-light: #e3f1df;
-  --shop-green-dark: #004c3f;
+  --warn: #b8922e;
+  --ok: #1a5c52;
+  --topbar-bg: rgba(255, 252, 247, 0.96);
+  --topbar-text: #0f1419;
+  --topbar-border: #d4cbb8;
+  --topbar-control-bg: #ebe4d6;
+  --topbar-control-border: #d4cbb8;
+  --topbar-control-text: #0f1419;
+  --input-bg: #fffcf7;
+  --input-border: #d4cbb8;
+  --btn-primary-text: #ffffff;
+  --chart-grid: #e5e0d6;
+  --chart-text: #5c564c;
+  --shadow: 0 2px 10px rgba(15, 20, 25, 0.07);
+  --shadow-sm: 0 1px 4px rgba(15, 20, 25, 0.05);
+  --panel-highlight-bg: rgba(26, 92, 82, 0.08);
+  --panel-highlight-border: rgba(26, 92, 82, 0.22);
+  --bg-glow: none;
+  --shop-sidebar-bg: #fffcf7;
+  --shop-sidebar-text: #0f1419;
+  --shop-sidebar-muted: #5c564c;
+  --shop-sidebar-border: #d4cbb8;
+  --shop-sidebar-hover: #ebe4d6;
+  --shop-sidebar-active-bg: rgba(26, 92, 82, 0.1);
+  --shop-sidebar-active-border: rgba(26, 92, 82, 0.35);
+  --shop-green-light: rgba(26, 92, 82, 0.1);
+  --shop-green-dark: #134a42;
 }
 
 html[data-theme="dark"],
 html.theme-dark {
   color-scheme: dark;
-  --bg: #0c1210;
-  --surface: #151c19;
-  --surface2: #1e2824;
+  --bg: #0c1014;
+  --surface: #141a22;
+  --surface2: #1c2430;
   --surface-2: var(--surface2);
-  --border: #2a3832;
-  --text: #e8efeb;
-  --muted: #9aaba3;
-  --accent: #00a47c;
-  --accent-hover: #008060;
-  --accent2: #5ba3c9;
-  --accent3: #f0c14b;
-  --danger: #f87171;
+  --border: #2d3844;
+  --text: #e8e4dc;
+  --muted: #9a9488;
+  --accent: #3d9a8a;
+  --accent-hover: #2f7f72;
+  --accent2: #4db5a4;
+  --accent3: #d4b04a;
+  --danger: #e57373;
   --info: #5ba3c9;
-  --warn: #f0c14b;
-  --ok: #34d399;
-  --topbar-bg: rgba(21, 28, 25, 0.92);
-  --topbar-text: #e8efeb;
-  --topbar-border: #2a3832;
-  --topbar-control-bg: #1e2824;
-  --topbar-control-border: #3a4a43;
-  --topbar-control-text: #e8efeb;
-  --input-bg: #1e2824;
-  --input-border: #3a4a43;
-  --chart-grid: #2a3832;
-  --chart-text: #9aaba3;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.28);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --panel-highlight-bg: rgba(0, 164, 124, 0.14);
-  --panel-highlight-border: rgba(0, 164, 124, 0.32);
-  --bg-glow: radial-gradient(1000px 480px at 8% -8%, rgba(0, 164, 124, 0.16), transparent 55%),
-             radial-gradient(800px 360px at 100% 0%, rgba(42, 111, 151, 0.1), transparent 50%);
-  --shop-sidebar-bg: #101613;
-  --shop-sidebar-text: #e8efeb;
-  --shop-sidebar-muted: #9aaba3;
-  --shop-sidebar-border: rgba(255, 255, 255, 0.08);
-  --shop-sidebar-hover: rgba(255, 255, 255, 0.06);
-  --shop-sidebar-active-bg: rgba(0, 128, 96, 0.28);
-  --shop-sidebar-active-border: rgba(0, 164, 124, 0.35);
-  --shop-green-light: rgba(0, 164, 124, 0.18);
+  --warn: #d4b04a;
+  --ok: #4db5a4;
+  --topbar-bg: rgba(12, 16, 20, 0.96);
+  --topbar-text: #e8e4dc;
+  --topbar-border: #2d3844;
+  --topbar-control-bg: #1c2430;
+  --topbar-control-border: #2d3844;
+  --topbar-control-text: #e8e4dc;
+  --input-bg: #1c2430;
+  --input-border: #2d3844;
+  --btn-primary-text: #ffffff;
+  --chart-grid: #2d3844;
+  --chart-text: #9a9488;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.28);
+  --panel-highlight-bg: rgba(61, 154, 138, 0.12);
+  --panel-highlight-border: rgba(61, 154, 138, 0.28);
+  --bg-glow: none;
+  --shop-sidebar-bg: #141a22;
+  --shop-sidebar-text: #e8e4dc;
+  --shop-sidebar-muted: #9a9488;
+  --shop-sidebar-border: #2d3844;
+  --shop-sidebar-hover: #1c2430;
+  --shop-sidebar-active-bg: rgba(61, 154, 138, 0.16);
+  --shop-sidebar-active-border: rgba(61, 154, 138, 0.4);
+  --shop-green-light: rgba(61, 154, 138, 0.16);
   --shop-green-dark: #6ee7b7;
 }
 
 /* Superficies principales */
 body {
   background-color: var(--bg) !important;
-  background-image: var(--bg-glow) !important;
-  background-attachment: fixed !important;
+  background-image: none !important;
   color: var(--text) !important;
   font-family: var(--font) !important;
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -284,9 +288,9 @@ thead tr,
 
 .page-badge,
 .dash-badge {
-  color: var(--shop-green-dark);
-  background: var(--shop-green-light);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
 }
 
 .stat-card--accent {
