@@ -207,3 +207,138 @@
 - Mark each completed task as `[x]` in this file when implemented.
 - Do not move code back to `C:\vicuna`; that project is only a Mongo/data dependency.
 - Gaps demos restantes (no bloqueantes): pago/correo simulados a propósito; UI dual `/sem1` opcional; presentación oral.
+
+---
+
+## Extensión: ciclo de vida seguro de maestros (2026-08-24)
+
+- [x] T051 [US4] Añadir pruebas de inhabilitación y bloqueo de borrado referencial en `tests/test_smoke.py`
+- [x] T052 [US4] Incorporar estado `active` y referencias protegidas en `backend/shared/master_registry.py` y `paquetes/datos/services.py`
+- [x] T053 [US4] Exponer cambio de estado protegido en `paquetes/datos/routes.py`
+- [x] T054 [US4] Reemplazar eliminación normal por habilitar/inhabilitar y filtro de estado en `frontend/static/js/q4-datos.js` y `frontend/static/index.html`
+- [x] T055 [US4] Preservar estado durante ELT y excluir maestros inactivos de nuevas operaciones en `backend/etl/transform_fact_dimensions.py`, `paquetes/shop/services.py` y `paquetes/ventas/services.py`
+
+## Extensión: catálogos geográficos y operativos fijos (2026-08-24)
+
+- [x] T056 [US4] Probar que Regiones, Países, Canales y Prioridades rechazan altas en `tests/test_smoke.py`
+- [x] T057 [US4] Bloquear creación de catálogos fijos en API y ocultar `+ Nuevo` en Gestión
+
+---
+
+## Programa de fortalecimiento integral (sin movimientos entre bodegas)
+
+### Fase A — Seguridad y consistencia
+
+- [x] T058 Auditar capacidades existentes y excluir explícitamente movimientos entre bodegas
+- [x] T059 Aplicar sesión inactiva configurable y cookies seguras en `frontend/app.py` y `backend/config/settings.py`
+- [x] T060 Sustituir eliminación de proveedores por habilitar/inhabilitar con auditoría
+- [x] T061 Exigir motivo en ajustes críticos de inventario y conservar trazabilidad
+- [x] T062 Validar duplicados y relaciones en maestros, proveedores y catálogos operativos
+
+### Fase B — Contabilidad
+
+- [x] T063 Implementar conciliación pedido-pago-factura-caja y cuentas por cobrar
+- [x] T064 Implementar cierres diarios/mensuales y bloqueo de períodos cerrados
+- [x] T065 Implementar notas de crédito, anulaciones por contrapartida y consecutivos seguros
+- [x] T066 Completar reportes de ingresos, costos, utilidad, impuestos y saldos
+
+### Fase C — Inventario (sin transferencias entre bodegas)
+
+- [x] T067 Implementar kardex inmutable por producto
+- [x] T068 Separar disponible, comprometido, dañado y en tránsito
+- [x] T069 Implementar mínimos, reposición, conteo físico y ajustes autorizados
+
+### Fase D — Pedidos y pagos
+
+- [x] T070 Registrar intentos de pago sin CVV ni PAN completo y bloquear duplicados
+- [x] T071 Completar línea de tiempo, comprobantes y estados de pago/reembolso
+- [x] T072 Integrar cancelaciones/devoluciones con inventario y contabilidad
+
+### Fase E — Gestión comercial
+
+- [x] T073 Implementar vigencia e historial de precios, costos y descuentos
+- [x] T074 Implementar límites de compra, margen mínimo y autorización de excepción
+- [x] T075 Implementar segmentación de clientes, crédito y destacados comerciales
+
+### Fase F — Calidad y recuperación
+
+- [x] T076 Automatizar respaldos verificables y consulta segura de respaldos
+- [x] T077 Implementar salud integral y registro central de errores
+- [x] T078 Completar pruebas por rol, dinero, inventario y concurrencia
+- [x] T079 Ejecutar recorridos integrales y actualizar documentación final
+
+**Exclusión confirmada**: no se implementarán movimientos ni transferencias entre bodegas.
+
+## Programa de mejora posterior por fases
+
+### Fase 1 — Panel visual de gestión comercial
+
+- [x] T080 Añadir navegación y pantalla administrativa comercial en `frontend/static/index.html`
+- [x] T081 Implementar gestión visual de políticas y descuentos en `frontend/static/js/commercial-admin.js`
+- [x] T082 Implementar bandeja de excepciones y condiciones de crédito por cliente
+- [x] T083 Implementar productos destacados e historial de precios/costos
+- [x] T084 Aplicar diseño adaptable y validar regresión completa
+
+### Fase 2 — Seguridad y control de concurrencia
+
+- [x] T085 Implementar reserva atómica de existencias para evitar sobreventa
+- [x] T086 Revertir todas las reservas si el checkout falla parcialmente
+- [x] T087 Hacer seguro el limitador de intentos concurrentes y limitar por IP/cuenta
+- [x] T088 Restringir CORS y exigir secretos seguros en configuración de producción
+- [x] T089 Auditar permisos de escritura y agregar pruebas de seguridad/concurrencia
+
+### Fase 3 — Pruebas comerciales de integración
+
+- [x] T090 Probar límites mínimo/máximo, límite por cliente y margen mínimo
+- [x] T091 Probar autorización, alcance y consumo único de excepciones comerciales
+- [x] T092 Probar cupones vigentes, futuros, vencidos, por segmento y concurrencia de usos
+- [x] T093 Probar crédito habilitado, deshabilitado y excedido
+- [x] T094 Probar compra simultánea y reversión de reservas en recorrido comercial
+- [x] T095 Corregir defectos encontrados, ejecutar regresión y documentar resultados
+
+### Fase 4 — Contabilidad avanzada
+
+- [x] T096 Implementar estado de cuenta consolidado por cliente
+- [x] T097 Implementar antigüedad de cartera y vencimiento de crédito
+- [x] T098 Implementar abonos parciales con saldo y trazabilidad
+- [x] T099 Implementar análisis de margen por producto, cliente, canal y país
+- [x] T100 Integrar controles en la pantalla de caja y validar regresión contable
+
+### Fase 5 — Auditoría administrativa
+
+- [x] T101 Registrar módulo y comparación anterior/nueva con protección de datos sensibles
+- [x] T102 Filtrar auditoría por usuario, rol, módulo, acción y rango de fechas
+- [x] T103 Mostrar el detalle de cambios de cada evento en la interfaz administrativa
+- [x] T104 Exportar el resultado filtrado en CSV compatible con Excel
+- [x] T105 Ejecutar pruebas específicas y regresión completa, y documentar resultados
+
+### Fase 6 — Experiencia de usuario y accesibilidad
+
+- [x] T106 Añadir salto al contenido, foco visible y anuncio de cambios de pantalla
+- [x] T107 Normalizar semántica, foco inicial, retorno de foco y navegación cíclica en modales
+- [x] T108 Vincular etiquetas de formulario y completar nombres accesibles de controles principales
+- [x] T109 Respetar movimiento reducido, alto contraste y navegación adaptable
+- [x] T110 Ejecutar validación de sintaxis, pruebas específicas y regresión completa
+
+### Fase 7 — Documentación y preparación final
+
+- [x] T111 Consolidar instalación, operación, roles, reglas críticas y recuperación
+- [x] T112 Documentar límites de integración y exclusiones sin confundirlos con defectos funcionales
+- [x] T113 Actualizar README, plan de pruebas y textos visibles desfasados
+- [x] T114 Implementar verificación automática y no destructiva de preparación
+- [x] T115 Ejecutar verificación final, regresión y cerrar documentación de entrega
+
+### Fase 8 — Rendimiento del tablero con 2 millones de registros
+
+- [x] T116 Eliminar el escaneo completo usado para calcular la fecha de anclaje
+- [x] T117 Consolidar resumen y gráficos en una única agregación MongoDB
+- [x] T118 Añadir un índice compuesto para los filtros combinados del tablero
+- [x] T119 Reducir seis solicitudes del navegador a una respuesta consolidada
+- [x] T120 Medir carga en frío/caliente y ejecutar la regresión automatizada
+
+### Fase 9 — Airflow seguro para presentación
+
+- [x] T121 Sustituir la carga destructiva desde CSV por inspección de la landing Mongo actual
+- [x] T122 Preservar los 2 millones de registros y sincronizar únicamente pendientes
+- [x] T123 Mantener validación estratégica e índices sin reconstrucción completa en memoria
+- [x] T124 Ejecutar manualmente el DAG y verificar las cuatro tareas en verde

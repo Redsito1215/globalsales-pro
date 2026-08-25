@@ -22,7 +22,7 @@ PAGE_CATALOG: dict[str, dict[str, str]] = {
     "reportes": {"label": "Informes simples", "section": "q2"},
     "export": {"label": "Exportar datos", "section": "q2"},
     "company": {"label": "Empresa", "section": "admin"},
-    "datos": {"label": "Datos maestros", "section": "admin"},
+    "gestion": {"label": "Gestión", "section": "gestion"},
     "schema": {"label": "Modelo de datos", "section": "admin"},
     "load": {"label": "Carga de datos", "section": "admin"},
     "audit": {"label": "Auditoría", "section": "admin"},
@@ -32,6 +32,7 @@ PAGE_CATALOG: dict[str, dict[str, str]] = {
 SECTION_LABELS: dict[str, str] = {
     "ops": "Operacionales",
     "q2": "Estratégicas",
+    "gestion": "Gestión",
     "admin": "Administración",
 }
 

@@ -7,7 +7,7 @@ from auth import roles_service, users as user_store
 from auth.decorators import login_required, permission_required
 from auth.validators import normalize_email, validate_login, validate_profile_update, validate_register
 from shared.audit import log_audit
-from shared.rate_limit import check_rate_limit, clear_attempts, record_attempt
+from shared.rate_limit import check_rate_limit, clear_attempts, consume_attempt, record_attempt
 from shared.roles_registry import ADMIN_ROLE, DEFAULT_REGISTER_ROLE
 
 auth_bp = Blueprint("auth", __name__)
@@ -15,6 +15,11 @@ auth_bp = Blueprint("auth", __name__)
 
 def _client_key() -> str:
     return request.remote_addr or "unknown"
+
+
+def _login_keys(email: str) -> tuple[str, str]:
+    """Limita tanto ataques desde una IP como intentos dirigidos a una cuenta."""
+    return _client_key(), normalize_email(email) or "unknown-account"
 
 
 def _set_session(user: dict) -> None:
@@ -88,14 +93,17 @@ def register():
 
 @auth_bp.post("/login")
 def login():
-    rate_msg = check_rate_limit("login", _client_key(), max_attempts=8, window_sec=900)
-    if rate_msg:
-        return jsonify({"status": "error", "message": rate_msg}), 429
-
     data = request.get_json(silent=True) or {}
     raw = data.get("email") or data.get("username") or ""
     email = normalize_email(raw)
     password = data.get("password", "")
+    ip_key, account_key = _login_keys(email)
+    rate_msg = (
+        consume_attempt("login_ip", ip_key, max_attempts=12, window_sec=900)
+        or consume_attempt("login_account", account_key, max_attempts=8, window_sec=900)
+    )
+    if rate_msg:
+        return jsonify({"status": "error", "message": rate_msg, "code": "rate_limited"}), 429
 
     errors = validate_login(email, password)
     if errors:
@@ -103,12 +111,12 @@ def login():
 
     doc = user_store.find_by_email(email)
     if not doc or not user_store.verify_password(doc, password):
-        record_attempt("login", _client_key())
         return jsonify(
             {"status": "error", "message": "Correo o contraseña incorrectos."},
         ), 401
 
-    clear_attempts("login", _client_key())
+    clear_attempts("login_ip", ip_key)
+    clear_attempts("login_account", account_key)
     _set_session(doc)
     return jsonify(
         {
@@ -418,50 +426,6 @@ def _profile_error(exc: ValueError):
     return jsonify({"status": "error", "message": msg, "code": code}), status
 
 
-@auth_bp.post("/forgot-password")
-def forgot_password():
-    rate_msg = check_rate_limit("forgot", _client_key(), max_attempts=3, window_sec=3600)
-    if rate_msg:
-        return jsonify({"status": "error", "message": rate_msg}), 429
-
-    record_attempt("forgot", _client_key())
-
-    body = request.get_json(silent=True) or {}
-    email = normalize_email(body.get("email", ""))
-    if not email:
-        return jsonify({"status": "error", "message": "Indica tu correo electrónico."}), 400
-    from auth import password_reset
-
-    password_reset.create_reset_token(email)
-    return jsonify(
-        {
-            "status": "ok",
-            "message": "Si el correo existe, recibirás un código en Notificaciones para restablecer tu contraseña.",
-        }
-    )
-
-
-@auth_bp.post("/reset-password")
-def reset_password_route():
-    rate_msg = check_rate_limit("reset", _client_key(), max_attempts=8, window_sec=900)
-    if rate_msg:
-        return jsonify({"status": "error", "message": rate_msg}), 429
-
-    body = request.get_json(silent=True) or {}
-    token = (body.get("token") or "").strip()
-    new_password = body.get("new_password") or ""
-    password_confirm = body.get("password_confirm", body.get("password2", ""))
-    from auth import password_reset
-
-    try:
-        user = password_reset.reset_password(token, new_password, password_confirm)
-    except ValueError as e:
-        record_attempt("reset", _client_key())
-        return _reset_error(e)
-    clear_attempts("reset", _client_key())
-    return jsonify({"status": "ok", "message": "Contraseña restablecida. Ya puedes iniciar sesión.", "user": user})
-
-
 @auth_bp.get("/notifications/pulse")
 @login_required
 def notifications_pulse():
@@ -479,7 +443,13 @@ def notifications_list():
     from shared.notifications import list_for_email
 
     email = session.get("email") or ""
-    data = list_for_email(email, limit=min(int(request.args.get("limit", 50)), 200))
+    data = list_for_email(
+        email, limit=min(int(request.args.get("limit", 50)), 200),
+        offset=max(int(request.args.get("offset", 0)), 0),
+        unread_only=request.args.get("unread", "").lower() in ("1", "true", "yes"),
+        category=(request.args.get("category") or "").strip() or None,
+        q=(request.args.get("q") or "").strip() or None,
+    )
     return jsonify({"status": "ok", **data})
 
 
@@ -503,14 +473,15 @@ def notifications_read_all():
     return jsonify({"status": "ok", "marked": n})
 
 
-def _reset_error(exc: ValueError):
-    code = str(exc)
-    messages = {
-        "token_required": ("Indica el código de recuperación.", 400),
-        "weak_password": ("La contraseña no cumple los requisitos.", 400),
-        "password_mismatch": ("Las contraseñas no coinciden.", 400),
-        "invalid_token": ("Código inválido o ya utilizado.", 400),
-        "expired_token": ("El código expiró. Solicita uno nuevo.", 400),
-    }
-    msg, status = messages.get(code, (code, 400))
-    return jsonify({"status": "error", "message": msg, "code": code}), status
+@auth_bp.post("/notifications/read-category")
+@login_required
+def notifications_read_category():
+    from shared.notifications import mark_category_read
+
+    body = request.get_json(silent=True) or {}
+    try:
+        n = mark_category_read(session.get("email") or "", body.get("category") or "")
+        return jsonify({"status": "ok", "marked": n})
+    except ValueError:
+        return jsonify({"status": "error", "message": "Indica una categoría.", "code": "category_required"}), 400
+

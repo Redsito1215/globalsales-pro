@@ -12,7 +12,7 @@ from typing import Any
 
 from config.settings import ROOT, settings
 from shared.audit import log_audit
-from shared.master_registry import EDITABLE_MASTERS, MASTER_TABLES, get_master
+from shared.master_registry import EDITABLE_MASTERS, MASTER_TABLES, field_label, get_master, master_allows_create
 from shared.mongo import get_db, json_safe
 from shared.shopify_registry import SHOPIFY_TABLES
 
@@ -37,10 +37,13 @@ def list_editable_masters() -> list[dict[str, Any]]:
             {
                 "name": name,
                 "label": meta["label"],
-                "group": "maestros",
+                "description": meta.get("description", ""),
+                "group": "gestion",
                 "layer": "dw",
                 "editable": True,
+                "creatable": master_allows_create(name),
                 "pk": meta["pk"],
+                "fields": meta.get("fields", []),
                 "count": db[name].count_documents({}),
             }
         )
@@ -88,12 +91,21 @@ def _next_id(col, pk: str) -> int:
     return int(row[pk]) + 1
 
 
-def list_rows(name: str, *, limit: int = 50, offset: int = 0, search: str | None = None) -> dict[str, Any]:
+def list_rows(
+    name: str,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    search: str | None = None,
+    active: bool | None = None,
+) -> dict[str, Any]:
     meta = _table_meta(name)
     if not meta:
         raise ValueError("unknown_table")
     col = get_db()[name]
     query: dict[str, Any] = {}
+    if name in EDITABLE_MASTERS and active is not None:
+        query["active"] = {"$ne": False} if active else False
     if search:
         or_clauses: list[dict[str, Any]] = [{"name": {"$regex": re.escape(search), "$options": "i"}}]
         if name == "dim_producto":
@@ -107,15 +119,25 @@ def list_rows(name: str, *, limit: int = 50, offset: int = 0, search: str | None
     total = col.count_documents(query)
     pk = meta["pk"]
     rows = list(col.find(query, {"_id": 0}).sort(pk, 1).skip(offset).limit(limit))
+    if name in EDITABLE_MASTERS:
+        for row in rows:
+            row.setdefault("active", True)
+    if name == "dim_producto":
+        for row in rows:
+            row.setdefault("sale_enabled", False)
+            row.setdefault("sale_percent", 25)
     return {
         "name": name,
         "label": meta["label"],
-        "group": "comercio" if name in SHOPIFY_TABLES else "maestros",
+        "description": meta.get("description", ""),
+        "group": "comercio" if name in SHOPIFY_TABLES else "gestion",
         "layer": meta.get("layer"),
         "editable": meta.get("editable", False) and name in EDITABLE_MASTERS,
         "total": total,
         "limit": limit,
         "offset": offset,
+        "columns": meta.get("fields") or (list(rows[0].keys()) if rows else []),
+        "field_labels": {f: field_label(f) for f in (meta.get("fields") or [])},
         "rows": rows,
     }
 
@@ -174,6 +196,30 @@ def _validate_master_row(name: str, doc: dict[str, Any], *, partial: bool = Fals
         raise ValueError("invalid_field")
 
 
+def _check_master_duplicates(name: str, doc: dict[str, Any], *, exclude_key: Any | None = None) -> None:
+    meta = get_master(name)
+    if not meta:
+        return
+    unique_fields = {
+        "dim_region": ("name",), "dim_pais": ("name",), "dim_categoria": ("name",),
+        "dim_producto": ("name",), "dim_canal": ("name",), "dim_prioridad": ("code", "name"),
+        "dim_cliente": ("email",),
+    }.get(name, ())
+    pk = meta["pk"]
+    col = get_db()[name]
+    for field in unique_fields:
+        value = doc.get(field)
+        if value in (None, ""):
+            continue
+        query: dict[str, Any] = {
+            field: {"$regex": f"^{re.escape(str(value).strip())}$", "$options": "i"}
+        }
+        if exclude_key is not None:
+            query[pk] = {"$ne": exclude_key}
+        if col.find_one(query, {pk: 1}):
+            raise ValueError("duplicate_value")
+
+
 def _sync_shop_after_master_change(name: str) -> None:
     """Mantiene vitrina alineada con dim_categoria / dim_producto tras editar maestros."""
     if name not in ("dim_categoria", "dim_producto", "dim_cliente"):
@@ -189,6 +235,8 @@ def _sync_shop_after_master_change(name: str) -> None:
 def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
     if name not in EDITABLE_MASTERS:
         raise ValueError("read_only")
+    if not master_allows_create(name):
+        raise ValueError("fixed_catalog")
     meta = get_master(name)
     assert meta
     col = get_db()[name]
@@ -199,6 +247,7 @@ def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
     else:
         doc[pk] = int(data[pk]) if str(data[pk]).isdigit() else data[pk]
     _validate_master_row(name, doc)
+    _check_master_duplicates(name, doc)
     if col.find_one({pk: doc[pk]}):
         raise ValueError("duplicate_pk")
     if name == "dim_producto":
@@ -209,10 +258,16 @@ def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
         doc.setdefault("revenue", 0.0)
         doc.setdefault("line", int(doc.get("line") or 1))
         doc.setdefault("image_url", None)
+        doc.setdefault("sale_enabled", False)
+        doc.setdefault("sale_percent", 25)
     if name == "dim_cliente":
         doc.setdefault("created_at", date.today().isoformat())
+    doc.setdefault("active", True)
     col.insert_one(doc)
-    log_audit("create", entity=name, entity_id=doc[pk], details={"pk": doc[pk]})
+    if name == "dim_producto":
+        from shared.commercial import record_product_terms
+        record_product_terms(get_db(), product_id=int(doc[pk]), before=None, after=doc)
+    log_audit("create", entity=name, entity_id=doc[pk], details={"pk": doc[pk]}, after=doc)
     _sync_shop_after_master_change(name)
     return {k: v for k, v in doc.items()}
 
@@ -233,15 +288,45 @@ def update_row(name: str, row_id: str, data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("not_found")
     patch = {k: data[k] for k in meta["fields"] if k in data and k != pk}
     _validate_master_row(name, patch, partial=True)
-    if name == "dim_producto" and ("unit_price" in patch or "unit_cost" in patch):
+    _check_master_duplicates(name, patch, exclude_key=key)
+    if name == "dim_producto" and ("unit_price" in patch or "unit_cost" in patch or "sale_enabled" in patch):
         up = float(patch.get("unit_price", existing.get("unit_price") or 0))
         uc = float(patch.get("unit_cost", existing.get("unit_cost") or 0))
         patch["margin_pct"] = round(((up - uc) / up * 100) if up else 0, 2)
     col.update_one({pk: key}, {"$set": patch})
-    log_audit("update", entity=name, entity_id=key, details=patch)
+    if name == "dim_producto":
+        from shared.commercial import record_product_terms
+        record_product_terms(get_db(), product_id=int(key), before=existing, after={**existing, **patch})
+    log_audit("update", entity=name, entity_id=key, details=patch, before=existing, after={**existing, **patch})
     _sync_shop_after_master_change(name)
     updated = col.find_one({pk: key}, {"_id": 0})
     return dict(updated) if updated else {}
+
+
+def set_row_active(name: str, row_id: str, active: bool) -> dict[str, Any]:
+    """Inhabilita/reactiva un maestro sin romper su historial ni sus relaciones."""
+    if name not in EDITABLE_MASTERS:
+        raise ValueError("read_only")
+    meta = get_master(name)
+    assert meta
+    pk = meta["pk"]
+    try:
+        key: Any = int(row_id)
+    except ValueError:
+        key = row_id
+    col = get_db()[name]
+    existing = col.find_one({pk: key})
+    if not existing:
+        raise ValueError("not_found")
+    col.update_one({pk: key}, {"$set": {"active": bool(active)}})
+    action = "enable" if active else "disable"
+    log_audit(
+        action, entity=name, entity_id=key, details={"active": bool(active)},
+        before=existing, after={**existing, "active": bool(active)},
+    )
+    _sync_shop_after_master_change(name)
+    updated = col.find_one({pk: key}, {"_id": 0})
+    return dict(updated) if updated else {pk: key, "active": bool(active)}
 
 
 def delete_row(name: str, row_id: str) -> None:
@@ -255,22 +340,37 @@ def delete_row(name: str, row_id: str) -> None:
     except ValueError:
         key = row_id
     col = get_db()[name]
-    if not col.find_one({pk: key}):
+    existing = col.find_one({pk: key})
+    if not existing:
         raise ValueError("not_found")
     _check_delete_refs(name, key)
     col.delete_one({pk: key})
-    log_audit("delete", entity=name, entity_id=key)
+    log_audit("delete", entity=name, entity_id=key, before=existing)
     _sync_shop_after_master_change(name)
 
 
 def _check_delete_refs(name: str, key: Any) -> None:
     db = get_db()
-    if name == "dim_region" and db["dim_pais"].count_documents({"region_id": key}):
-        raise ValueError("has_children")
-    if name == "dim_categoria" and db["dim_producto"].count_documents({"category_id": key}):
-        raise ValueError("has_children")
-    if name == "dim_pais" and db["dim_cliente"].count_documents({"country_id": key}):
-        raise ValueError("has_children")
+    references: dict[str, list[tuple[str, str]]] = {
+        "dim_region": [("dim_pais", "region_id"), ("vendors", "region_id"), ("fact_ventas", "region_id")],
+        "dim_pais": [
+            ("dim_cliente", "country_id"), ("vendors", "country_id"),
+            ("purchase_requests", "country_id"), ("fact_ventas", "country_id"),
+        ],
+        "dim_categoria": [("dim_producto", "category_id"), ("fact_ventas", "category_id")],
+        "dim_producto": [
+            ("purchase_request_lines", "product_id"), ("fact_ventas", "product_id"),
+        ],
+        "dim_canal": [
+            ("dim_cliente", "channel_id"), ("purchase_requests", "channel_id"),
+            ("fact_ventas", "channel_id"),
+        ],
+        "dim_prioridad": [("fact_ventas", "priority_id")],
+        "dim_cliente": [("fact_ventas", "client_id")],
+    }
+    for collection, field in references.get(name, []):
+        if db[collection].count_documents({field: key}, limit=1):
+            raise ValueError("has_history")
 
 
 def save_product_image(product_id: int, filename: str, raw: bytes) -> str:
@@ -387,6 +487,13 @@ def list_audit_log(
     limit: int = 100,
     offset: int = 0,
     role: str | None = None,
+    entity: str | None = None,
+    entity_id: str | int | None = None,
+    email: str | None = None,
+    action: str | None = None,
+    module: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ) -> dict[str, Any]:
     col = get_db()["audit_log"]
     page_size = min(max(int(limit or 100), 1), 100)
@@ -395,6 +502,36 @@ def list_audit_log(
     role_filter = (role or "").strip()
     if role_filter:
         query["role"] = role_filter
+    entity_filter = (entity or "").strip()
+    if entity_filter:
+        query["entity"] = entity_filter
+    email_filter = (email or "").strip()
+    if email_filter:
+        query["email"] = {"$regex": re.escape(email_filter), "$options": "i"}
+    action_filter = (action or "").strip()
+    if action_filter:
+        query["action"] = action_filter
+    module_filter = (module or "").strip()
+    if module_filter:
+        query["module"] = module_filter
+    if date_from or date_to:
+        at_query: dict[str, str] = {}
+        if date_from:
+            at_query["$gte"] = f"{str(date_from)[:10]}T00:00:00"
+        if date_to:
+            at_query["$lte"] = f"{str(date_to)[:10]}T23:59:59.999999+00:00"
+        query["at"] = at_query
+    if entity_id is not None and str(entity_id).strip():
+        raw = str(entity_id).strip()
+        clauses: list[dict[str, Any]] = [{"entity_id": raw}]
+        try:
+            clauses.append({"entity_id": int(raw)})
+        except (TypeError, ValueError):
+            pass
+        if len(clauses) == 1:
+            query["entity_id"] = raw
+        else:
+            query["$or"] = clauses
     total = col.count_documents(query)
     rows = list(
         col.find(query, {"_id": 0})
@@ -403,11 +540,31 @@ def list_audit_log(
         .limit(page_size)
     )
     roles = sorted({str(r).strip() for r in col.distinct("role") if r and str(r).strip()})
+    actions = sorted({str(r).strip() for r in col.distinct("action") if r and str(r).strip()})
+    modules = sorted({str(r).strip() for r in col.distinct("module") if r and str(r).strip()})
     return {
         "total": total,
         "limit": page_size,
         "offset": page_offset,
         "role": role_filter or None,
+        "entity": entity_filter or None,
+        "entity_id": str(entity_id).strip() if entity_id is not None and str(entity_id).strip() else None,
         "roles": roles,
+        "actions": actions,
+        "modules": modules,
         "entries": [json_safe(row) for row in rows],
     }
+
+
+def list_audit_for_entity(
+    entity: str,
+    entity_id: str | int,
+    *,
+    limit: int = 20,
+) -> dict[str, Any]:
+    return list_audit_log(
+        limit=min(max(int(limit or 20), 1), 50),
+        offset=0,
+        entity=entity,
+        entity_id=entity_id,
+    )

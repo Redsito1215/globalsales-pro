@@ -66,7 +66,7 @@ SHOPIFY_TABLES: dict[str, dict[str, Any]] = {
         "label": "Clientes",
         "layer": "customers",
         "editable": True,
-        "fields": ["customer_id", "email", "first_name", "last_name", "phone", "orders_count", "total_spent"],
+        "fields": ["customer_id", "email", "first_name", "last_name", "phone", "orders_count", "total_spent", "segment", "purchase_limit", "credit_limit", "credit_days", "credit_enabled"],
     },
     "customer_addresses": {
         "pk": "address_id",

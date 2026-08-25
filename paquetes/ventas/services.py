@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from auth import roles_service
@@ -28,10 +28,55 @@ REQUEST_STATUSES = frozenset(
 ACTIVE_STATUSES = frozenset({"pendiente", "en_revision", "aprobada", "convertida", "enviada"})
 RESTOCK_STATUSES = frozenset({"rechazada", "cancelada"})
 POST_SALE_STATUSES = frozenset({"enviada", "entregada"})
-PAYMENT_STATUSES = frozenset({"pendiente_pago", "pagado", "credito"})
-PAYMENT_METHODS_OFFLINE = frozenset({"tarjeta", "efectivo_tarjeta"})
-PAYMENT_METHODS_ONLINE = frozenset({"tarjeta", "credito", "cuenta_bancaria"})
+PAYMENT_ALLOWED_STATUSES = frozenset({"aprobada"})
+PAYMENT_STATUSES = frozenset({"pendiente_pago", "parcial", "pagado", "credito"})
+PAYMENT_METHODS = frozenset({"tarjeta"})
 RETURN_CONDITIONS = frozenset({"apto", "danado", "mixto"})
+
+
+def _record_request_event(
+    db, request_id: int, event_type: str, *, actor_email: str | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    db["request_events"].insert_one({
+        "request_id": int(request_id), "event_type": event_type,
+        "actor_email": actor_email, "details": details or {},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+def request_timeline(request_id: int) -> list[dict[str, Any]]:
+    db = get_db()
+    req = db["purchase_requests"].find_one({"request_id": int(request_id)}, {"_id": 0})
+    if not req:
+        raise ValueError("not_found")
+    rows = list(db["request_events"].find({"request_id": int(request_id)}, {"_id": 0}).sort("created_at", 1))
+    created_at = req.get("created_at")
+    if created_at and not any(x.get("event_type") == "created" for x in rows):
+        rows.insert(0, {"request_id": int(request_id), "event_type": "created", "created_at": created_at, "details": {"status": "pendiente"}})
+    return rows
+
+
+def payment_receipt(request_id: int) -> dict[str, Any]:
+    db = get_db()
+    req = db["purchase_requests"].find_one({"request_id": int(request_id)}, {"_id": 0})
+    if not req:
+        raise ValueError("not_found")
+    attempt = db["payment_attempts"].find_one(
+        {"request_id": int(request_id), "outcome": "approved"}, {"_id": 0}, sort=[("attempt_id", -1)]
+    )
+    if not attempt or req.get("payment_status") != "pagado":
+        raise ValueError("payment_required")
+    from shared.accounting import get_or_create_invoice
+    invoice = get_or_create_invoice(req)
+    return {
+        "request_id": int(request_id), "order_id": req.get("order_id"),
+        "client_name": req.get("client_name"), "amount": attempt.get("amount"),
+        "currency": attempt.get("currency", "USD"), "paid_at": attempt.get("created_at"),
+        "transaction_reference": attempt.get("transaction_reference"),
+        "payment_method": "tarjeta", "card": attempt.get("card"),
+        "invoice_number": invoice.get("invoice_number"),
+    }
 
 
 def _allocate_discount(gross_amounts: list[float], discount: float) -> list[float]:
@@ -188,12 +233,8 @@ def _client_email_registered(email: str) -> bool:
 
 
 def _payment_methods_for(req: dict[str, Any]) -> frozenset[str]:
-    ch = req if req.get("channel_id") is not None or req.get("channel_name") else {}
-    if not ch.get("channel_name") and req.get("channel_id"):
-        ch = get_db()["dim_canal"].find_one({"channel_id": req.get("channel_id")}, {"_id": 0}) or ch
-    if _is_offline_channel(ch or req):
-        return PAYMENT_METHODS_OFFLINE
-    return PAYMENT_METHODS_ONLINE
+    del req  # Un solo medio: tarjeta, en todos los canales.
+    return PAYMENT_METHODS
 
 
 def _normalize_payment_method(method: str, req: dict[str, Any]) -> str:
@@ -202,6 +243,28 @@ def _normalize_payment_method(method: str, req: dict[str, Any]) -> str:
     if m not in allowed:
         raise ValueError("invalid_payment_method")
     return m
+
+
+def _request_expected_total(req: dict[str, Any]) -> float:
+    if req.get("total") is not None:
+        return round(float(req["total"]), 2)
+    subtotal = float(req.get("subtotal") or 0)
+    discount = float(req.get("discount_amount") or 0)
+    shipping = float(req.get("shipping_cost") or 0)
+    return round(max(subtotal - discount + shipping, 0.0), 2)
+
+
+def _payment_settled(req: dict[str, Any]) -> bool:
+    """Pago completo: estado pagado (o crédito offline) y monto abonado = total."""
+    pay = req.get("payment_status") or "pendiente_pago"
+    if pay == "credito":
+        return _is_offline_channel(req)
+    if pay != "pagado":
+        return False
+    expected = _request_expected_total(req)
+    paid_raw = req.get("paid_amount")
+    paid = round(float(paid_raw if paid_raw is not None else expected), 2)
+    return abs(paid - expected) < 0.01
 
 
 def _is_offline_channel(channel_or_req: dict[str, Any] | None) -> bool:
@@ -219,11 +282,22 @@ def _is_offline_channel(channel_or_req: dict[str, Any] | None) -> bool:
 
 
 def _payment_allows_progress(req: dict[str, Any]) -> bool:
-    """Online: solo «pagado» por el cliente. Offline: pagado o crédito comercial."""
-    pay = req.get("payment_status") or "pendiente_pago"
-    if _is_offline_channel(req):
-        return pay in ("pagado", "credito")
-    return pay == "pagado"
+    return _payment_settled(req)
+
+
+def _require_approved_for_payment(req: dict[str, Any]) -> None:
+    if req.get("status") not in PAYMENT_ALLOWED_STATUSES:
+        raise ValueError("approval_required_for_payment")
+
+
+def validate_credit_exposure(customer: dict[str, Any], *, current_exposure: float, requested: float) -> float:
+    if not customer.get("credit_enabled"):
+        raise ValueError("credit_not_enabled")
+    limit = round(float(customer.get("credit_limit") or 0), 2)
+    exposure = round(float(current_exposure or 0) + float(requested or 0), 2)
+    if not limit or exposure > limit + 0.009:
+        raise ValueError("credit_limit_exceeded")
+    return exposure
 
 
 def platform_order_id(request_id: int) -> str:
@@ -335,8 +409,9 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
 
     country_id = int(data.get("country_id") or 0)
     channel_id = int(data.get("channel_id") or 1)
-    country = db["dim_pais"].find_one({"country_id": country_id}, {"_id": 0})
-    channel = db["dim_canal"].find_one({"channel_id": channel_id}, {"_id": 0})
+    active_master = {"$ne": False}
+    country = db["dim_pais"].find_one({"country_id": country_id, "active": active_master}, {"_id": 0})
+    channel = db["dim_canal"].find_one({"channel_id": channel_id, "active": active_master}, {"_id": 0})
     if not country:
         raise ValueError("invalid_country")
     if not channel:
@@ -368,6 +443,8 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         "status": "pendiente",
         "payment_status": "pendiente_pago",
         "paid_at": None,
+        "paid_amount": None,
+        "payment_due": round(float(data.get("total") or 0), 2) if data.get("total") else None,
         "notes": (data.get("notes") or "").strip() or None,
         "created_at": date.today().isoformat(),
         "reviewed_by": None,
@@ -379,6 +456,7 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         "shipping_destination": (data.get("shipping_destination") or data.get("destination") or "").strip() or None,
         "shipping_region": (data.get("shipping_region") or "").strip() or None,
         "total": round(float(data.get("total") or 0), 2),
+        "commercial_policy": data.get("commercial_policy") or None,
         "stock_lines": stock_lines,
         "stock_restored": False,
         "stock_committed_closed": False,
@@ -396,7 +474,7 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         qty = int(item.get("quantity") or 0)
         if pid < 1 or qty < 1:
             raise ValueError("invalid_line")
-        prod = db["dim_producto"].find_one({"product_id": pid}, {"_id": 0})
+        prod = db["dim_producto"].find_one({"product_id": pid, "active": {"$ne": False}}, {"_id": 0})
         if not prod:
             raise ValueError("invalid_product")
         # Prioridad: precio de variante/checkout > maestro
@@ -449,10 +527,14 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
     if not data.get("total"):
         request_doc["total"] = calc_total
         req_col.update_one({"request_id": rid}, {"$set": {"total": calc_total}})
+    if request_doc.get("payment_due") is None:
+        request_doc["payment_due"] = calc_total
+        req_col.update_one({"request_id": rid}, {"$set": {"payment_due": calc_total}})
 
     if line_docs:
         line_col.insert_many(line_docs)
 
+    _record_request_event(db, rid, "created", actor_email=client_email, details={"status": "pendiente", "total": request_doc.get("total")})
     log_audit("create_request", entity="purchase_requests", entity_id=rid)
     full = get_request(rid) or request_doc
     _notify_request_status(full, "pendiente")
@@ -477,6 +559,7 @@ def cancel_request_by_client(request_id: int, *, client_email: str) -> dict[str,
         {"$set": {"status": "cancelada", "reviewed_by": client_email}},
     )
     _maybe_restock(req)
+    _record_request_event(db, request_id, "status_changed", actor_email=client_email, details={"from": current, "to": "cancelada"})
     log_audit("cancel_request", entity="purchase_requests", entity_id=request_id)
     full = get_request(request_id) or {}
     _notify_request_status(full, "cancelada")
@@ -534,7 +617,7 @@ def update_status(request_id: int, status: str, *, reviewer_email: str | None = 
         raise ValueError("invalid_transition")
 
     # Postventa: convertida → enviada → entregada (Offline: convertida → entregada)
-    if status == "enviada" and not _payment_allows_progress(req):
+    if status in ("enviada", "entregada") and not _payment_allows_progress(req):
         raise ValueError("payment_required")
 
     patch: dict[str, Any] = {"status": status, "reviewed_by": reviewer_email}
@@ -558,6 +641,7 @@ def update_status(request_id: int, status: str, *, reviewer_email: str | None = 
         entity_id=request_id,
         details={"status": status},
     )
+    _record_request_event(db, request_id, "status_changed", actor_email=reviewer_email, details={"from": req.get("status"), "to": status})
     full = get_request(request_id) or {}
     _notify_request_status(full, status)
     return full
@@ -569,6 +653,7 @@ def update_payment(
     *,
     reviewer_email: str | None = None,
     payment_method: str | None = None,
+    payment_attempt: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if payment_status not in PAYMENT_STATUSES:
         raise ValueError("invalid_payment")
@@ -578,20 +663,48 @@ def update_payment(
         raise ValueError("not_found")
     if req.get("status") in ("rechazada", "cancelada"):
         raise ValueError("cannot_pay_closed")
+    if payment_status in ("pagado", "credito"):
+        _require_approved_for_payment(req)
+    if payment_status == "pagado":
+        from shared.accounting import assert_period_open
+        assert_period_open()
     if payment_status == "credito":
         ch = db["dim_canal"].find_one({"channel_id": req.get("channel_id")}, {"_id": 0, "name": 1})
         if not _is_offline_channel(ch or {"channel_id": req.get("channel_id")}):
             raise ValueError("credit_offline_only")
+        email = str(req.get("client_email") or "").strip().lower()
+        customer = db["customers"].find_one({"email": email}, {"_id": 0}) or {}
+        open_rows = db["purchase_requests"].find({
+            "client_email": {"$regex": f"^{re.escape(email)}$", "$options": "i"},
+            "payment_status": "credito", "request_id": {"$ne": int(request_id)},
+            "status": {"$nin": ["rechazada", "cancelada", "devuelta"]},
+        }, {"subtotal": 1, "discount_amount": 1, "shipping_cost": 1, "total": 1})
+        validate_credit_exposure(
+            customer,
+            current_exposure=sum(_request_expected_total(row) for row in open_rows),
+            requested=_request_expected_total(req),
+        )
     patch: dict[str, Any] = {
         "payment_status": payment_status,
         "reviewed_by": reviewer_email,
     }
     if payment_status == "pagado":
+        expected = _request_expected_total(req)
         patch["paid_at"] = date.today().isoformat()
+        patch["paid_amount"] = expected
+        patch["payment_due"] = expected
         if payment_method:
             patch["payment_method"] = str(payment_method)[:40]
+    elif payment_status == "credito":
+        credit_days = max(min(int(customer.get("credit_days") or 30), 365), 1)
+        patch["paid_at"] = None
+        patch["paid_amount"] = 0.0
+        patch["payment_due"] = _request_expected_total(req)
+        patch["credit_days"] = credit_days
+        patch["credit_due_date"] = (date.today() + timedelta(days=credit_days)).isoformat()
     elif payment_status == "pendiente_pago":
         patch["paid_at"] = None
+        patch["paid_amount"] = None
     db["purchase_requests"].update_one({"request_id": int(request_id)}, {"$set": patch})
     # Sincronizar en sales_records si ya se convirtió
     oid = req.get("order_id")
@@ -604,9 +717,29 @@ def update_payment(
         "update_payment",
         entity="purchase_requests",
         entity_id=request_id,
-        details={"payment_status": payment_status},
+        details={"payment_status": payment_status, "paid_amount": patch.get("paid_amount")},
+    )
+    _record_request_event(
+        db, request_id, "payment_updated", actor_email=reviewer_email,
+        details={
+            "payment_status": payment_status, "amount": patch.get("paid_amount"),
+            "transaction_reference": (payment_attempt or {}).get("transaction_reference"),
+            "card": (payment_attempt or {}).get("card"),
+        },
     )
     full = get_request(request_id) or {}
+    if payment_status == "pagado":
+        from shared.cash_ledger import record_cash_movement
+
+        record_cash_movement(
+            movement_type="payment_in",
+            amount=float(patch.get("paid_amount") or _request_expected_total(full)),
+            request_id=int(request_id),
+            order_id=full.get("order_id"),
+            payment_method=patch.get("payment_method"),
+            actor_email=reviewer_email,
+            reference=(payment_attempt or {}).get("transaction_reference") or f"Pago solicitud #{request_id}",
+        )
     notify_user(
         recipient_email=full.get("client_email") or "",
         subject=f"Solicitud #{request_id} — pago {payment_status.replace('_', ' ')}",
@@ -626,8 +759,10 @@ def client_pay(
     *,
     client_email: str,
     method: str = "tarjeta",
+    card: dict[str, Any] | None = None,
+    idempotency_key: str = "",
 ) -> dict[str, Any]:
-    """El cliente confirma el pago de su propia solicitud (demo sin pasarela real)."""
+    """El cliente confirma el pago de su propia solicitud."""
     email = (client_email or "").strip().lower()
     if not email:
         raise ValueError("forbidden")
@@ -638,21 +773,25 @@ def client_pay(
         raise ValueError("forbidden")
     if req.get("status") in ("rechazada", "cancelada", "devuelta"):
         raise ValueError("cannot_pay_closed")
+    db = get_db()
+    existing = db["payment_attempts"].find_one({"idempotency_key": str(idempotency_key or "").strip()}, {"_id": 0})
+    if existing and int(existing.get("request_id") or 0) == int(request_id) and existing.get("outcome") == "approved":
+        return req
     if (req.get("payment_status") or "pendiente_pago") == "pagado":
         raise ValueError("already_paid")
+    _require_approved_for_payment(req)
     method_norm = _normalize_payment_method(method, req)
-    if method_norm == "credito":
-        return update_payment(
-            request_id,
-            "credito",
-            reviewer_email=email,
-            payment_method=method_norm,
-        )
+    from shared.payments import record_payment_attempt
+    attempt, _ = record_payment_attempt(
+        db, request_id=request_id, amount=_request_expected_total(req), outcome="approved",
+        idempotency_key=idempotency_key, card=card or {}, actor_email=email,
+    )
     return update_payment(
         request_id,
         "pagado",
         reviewer_email=email,
         payment_method=method_norm,
+        payment_attempt=attempt,
     )
 
 
@@ -661,6 +800,8 @@ def staff_register_payment(
     *,
     staff_email: str,
     method: str,
+    card: dict[str, Any] | None = None,
+    idempotency_key: str = "",
 ) -> dict[str, Any]:
     """Vendedor/admin registra pago cuando el cliente no puede (offline o correo sin cuenta)."""
     req = get_request(int(request_id))
@@ -670,25 +811,50 @@ def staff_register_payment(
         raise ValueError("cannot_pay_closed")
     if (req.get("payment_status") or "pendiente_pago") == "pagado":
         raise ValueError("already_paid")
+    _require_approved_for_payment(req)
     offline = _is_offline_channel(req)
     registered = bool(req.get("client_user_registered"))
     if not offline and registered:
         raise ValueError("client_must_pay")
     method_norm = _normalize_payment_method(method, req)
     reviewer = (staff_email or "").strip()
-    if method_norm == "credito":
-        return update_payment(
-            request_id,
-            "credito",
-            reviewer_email=reviewer,
-            payment_method=method_norm,
-        )
+    from shared.payments import record_payment_attempt
+    attempt, _ = record_payment_attempt(
+        get_db(), request_id=request_id, amount=_request_expected_total(req), outcome="approved",
+        idempotency_key=idempotency_key, card=card or {}, actor_email=reviewer,
+    )
     return update_payment(
         request_id,
         "pagado",
         reviewer_email=reviewer,
         payment_method=method_norm,
+        payment_attempt=attempt,
     )
+
+
+def record_failed_payment_attempt(
+    request_id: int, *, actor_email: str, outcome: str, idempotency_key: str,
+    card: dict[str, Any], failure_code: str | None = None, allow_staff: bool = False,
+) -> dict[str, Any]:
+    db = get_db()
+    req = db["purchase_requests"].find_one({"request_id": int(request_id)}, {"_id": 0})
+    if not req:
+        raise ValueError("not_found")
+    email = (actor_email or "").strip().lower()
+    if not allow_staff and (req.get("client_email") or "").strip().lower() != email:
+        raise ValueError("forbidden")
+    if outcome == "approved":
+        raise ValueError("invalid_payment_outcome")
+    from shared.payments import record_payment_attempt
+    attempt, _ = record_payment_attempt(
+        db, request_id=request_id, amount=_request_expected_total(req), outcome=outcome,
+        idempotency_key=idempotency_key, card=card, actor_email=email, failure_code=failure_code,
+    )
+    _record_request_event(
+        db, request_id, "payment_failed", actor_email=email,
+        details={"outcome": attempt.get("outcome"), "card": attempt.get("card")},
+    )
+    return attempt
 
 
 def convert_to_sale(
@@ -713,7 +879,10 @@ def convert_to_sale(
     if not can_bypass and req.get("status") != "aprobada":
         raise ValueError("approval_required")
 
-    if not _payment_allows_progress(req):
+    if not _payment_settled(req):
+        pay = req.get("payment_status") or "pendiente_pago"
+        if pay == "pagado":
+            raise ValueError("payment_amount_mismatch")
         raise ValueError("payment_required_before_convert")
 
     country = db["dim_pais"].find_one({"country_id": req["country_id"]}, {"_id": 0})
@@ -965,6 +1134,8 @@ def _apply_restock_qty(db, variant_id: int, qty: int) -> None:
     variant = db["product_variants"].find_one({"variant_id": int(variant_id)})
     if not variant:
         return
+    variant = db["product_variants"].find_one({"variant_id": int(variant_id)}) or {}
+    before = int(variant.get("inventory_quantity") or 0)
     db["product_variants"].update_one(
         {"variant_id": int(variant_id)},
         {"$inc": {"inventory_quantity": int(qty)}},
@@ -975,6 +1146,86 @@ def _apply_restock_qty(db, variant_id: int, qty: int) -> None:
             {"inventory_item_id": inv["inventory_item_id"]},
             {"$inc": {"available": int(qty)}},
         )
+    try:
+        from shared.inventory_ledger import record_movement
+        record_movement(
+            db, variant_id=int(variant_id), movement_type="customer_return", quantity=int(qty),
+            before=before, after=before + int(qty), reason="Reingreso apto por devolución de cliente",
+        )
+    except Exception:
+        pass
+
+
+def _returned_units_by_product(
+    stock_lines: list[dict[str, Any]],
+    restock_lines: list[dict[str, Any]],
+    damaged_lines: list[dict[str, Any]],
+) -> dict[int, int]:
+    vid_to_pid: dict[int, int] = {}
+    for line in stock_lines:
+        vid_to_pid[int(line["variant_id"])] = int(line.get("product_id") or 0)
+    by_pid: dict[int, int] = {}
+    for line in restock_lines + damaged_lines:
+        vid = int(line["variant_id"])
+        pid = vid_to_pid.get(vid) or 0
+        if pid > 0:
+            by_pid[pid] = by_pid.get(pid, 0) + int(line["quantity"])
+    return by_pid
+
+
+def _reverse_sale_revenue_for_return(
+    *,
+    order_id: str,
+    returned_by_product: dict[int, int],
+    reason: str | None = None,
+    condition: str | None = None,
+) -> float:
+    """Reduce revenue/cost/profit in landing proporcional a unidades devueltas."""
+    col = sales_collection()
+    rows = list(col.find({"order_id": str(order_id)}))
+    if not rows:
+        return 0.0
+    total_reversal = 0.0
+    today = date.today().isoformat()
+    for row in rows:
+        pid = int(row.get("product_id") or 0)
+        returned_units = int(returned_by_product.get(pid) or 0)
+        if returned_units <= 0:
+            continue
+        units = int(row.get("units_sold") or 0)
+        if units <= 0:
+            continue
+        ratio = min(returned_units / units, 1.0)
+        rev = float(row.get("total_revenue") or 0)
+        cost = float(row.get("total_cost") or 0)
+        profit = float(row.get("total_profit") if row.get("total_profit") is not None else rev - cost)
+        rev_delta = round(rev * ratio, 2)
+        cost_delta = round(cost * ratio, 2)
+        profit_delta = round(profit * ratio, 2)
+        total_reversal += rev_delta
+        new_units = max(units - returned_units, 0)
+        new_rev = round(max(rev - rev_delta, 0), 2)
+        new_cost = round(max(cost - cost_delta, 0), 2)
+        new_profit = round(max(profit - profit_delta, 0), 2)
+        net_unit = round(new_rev / new_units, 4) if new_units else 0.0
+        col.update_one(
+            {"_id": row["_id"]},
+            {
+                "$set": {
+                    "returned": True,
+                    "returned_at": today,
+                    "return_reason": (reason or "").strip() or None,
+                    "return_condition": (condition or "").strip().lower() or None,
+                    "units_sold": new_units,
+                    "total_revenue": new_rev,
+                    "total_cost": new_cost,
+                    "total_profit": new_profit,
+                    "unit_price": net_unit,
+                    "revenue_reversed": round(float(row.get("revenue_reversed") or 0) + rev_delta, 2),
+                }
+            },
+        )
+    return round(total_reversal, 2)
 
 
 def return_delivered_request(
@@ -994,6 +1245,10 @@ def return_delivered_request(
         raise ValueError("must_be_delivered")
     if req.get("status") == "devuelta" or req.get("returned_at"):
         raise ValueError("already_returned")
+    if req.get("payment_status") == "pagado":
+        from shared.accounting import assert_period_open
+
+        assert_period_open()
 
     stock_lines = _request_stock_lines(req)
     restock_lines, damaged_lines = plan_return_stock(
@@ -1023,21 +1278,41 @@ def return_delivered_request(
             db["inventory_scrapped"].insert_many(scrap_docs)
 
     oid = req.get("order_id")
+    refund_total = 0.0
     if oid:
-        sales_collection().update_many(
-            {"order_id": str(oid)},
-            {
-                "$set": {
-                    "returned": True,
-                    "returned_at": date.today().isoformat(),
-                    "return_reason": (reason or "").strip() or None,
-                    "return_condition": (condition or "").strip().lower(),
-                }
-            },
+        returned_by_product = _returned_units_by_product(stock_lines, restock_lines, damaged_lines)
+        refund_total = _reverse_sale_revenue_for_return(
+            order_id=str(oid),
+            returned_by_product=returned_by_product,
+            reason=reason,
+            condition=condition,
         )
+        if refund_total > 0:
+            try:
+                from shared.analytics_sync import sync_order_to_fact
+
+                sync_order_to_fact(str(oid), force=True)
+            except Exception:
+                pass
+            try:
+                from shared.accounting import create_credit_note
+
+                create_credit_note(
+                    amount=refund_total,
+                    request_id=int(request_id),
+                    actor_email=reviewer_email,
+                    reason=(reason or f"Devolución de solicitud #{request_id}").strip(),
+                    source="return",
+                )
+            except Exception:
+                raise
 
     restock_units = sum(int(l["quantity"]) for l in restock_lines)
     damaged_units = sum(int(l["quantity"]) for l in damaged_lines)
+    paid_amount = float(req.get("paid_amount") or 0)
+    refund_status = "sin_reembolso"
+    if refund_total > 0:
+        refund_status = "reembolsado" if refund_total >= paid_amount else "reembolso_parcial"
     db["purchase_requests"].update_one(
         {"request_id": int(request_id)},
         {
@@ -1050,6 +1325,8 @@ def return_delivered_request(
                 "return_damaged_lines": damaged_lines,
                 "return_restock_units": restock_units,
                 "return_damaged_units": damaged_units,
+                "return_refund_amount": round(refund_total, 2),
+                "refund_status": refund_status,
                 "reviewed_by": reviewer_email,
                 "stock_restored": restock_units > 0,
             }
@@ -1065,6 +1342,15 @@ def return_delivered_request(
             "order_id": oid,
             "restock_units": restock_units,
             "damaged_units": damaged_units,
+            "refund_amount": round(refund_total, 2),
+        },
+    )
+    _record_request_event(
+        db, request_id, "returned", actor_email=reviewer_email,
+        details={
+            "condition": condition, "restock_units": restock_units,
+            "damaged_units": damaged_units, "refund_amount": round(refund_total, 2),
+            "refund_status": refund_status,
         },
     )
     full = get_request(request_id) or {}

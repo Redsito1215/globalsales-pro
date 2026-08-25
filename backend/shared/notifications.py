@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Notificaciones in-app / correo simulado para demo académica."""
+"""Notificaciones in-app (bandeja del usuario)."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any
 
 from shared.mongo import get_collection
@@ -47,19 +48,40 @@ def notify_user(
     return doc
 
 
-def list_for_email(email: str, *, limit: int = 50, unread_only: bool = False) -> dict[str, Any]:
+def list_for_email(
+    email: str, *, limit: int = 50, unread_only: bool = False,
+    category: str | None = None, q: str | None = None, offset: int = 0,
+) -> dict[str, Any]:
     email = (email or "").strip().lower()
     query: dict[str, Any] = {"recipient_email": email}
     if unread_only:
         query["read"] = False
-    total = _col().count_documents({"recipient_email": email})
+    clean_category = (category or "").strip().lower()
+    if clean_category:
+        query["category"] = clean_category
+    term = (q or "").strip()
+    if term:
+        pattern = re.escape(term[:120])
+        query["$or"] = [
+            {"subject": {"$regex": pattern, "$options": "i"}},
+            {"body": {"$regex": pattern, "$options": "i"}},
+        ]
+    total = _col().count_documents(query)
     unread = _col().count_documents({"recipient_email": email, "read": False})
     rows = list(
         _col().find(query, {"_id": 0})
         .sort("notification_id", -1)
+        .skip(max(int(offset or 0), 0))
         .limit(min(limit, 200))
     )
-    return {"total": total, "unread": unread, "notifications": rows}
+    category_counts = {
+        str(row.get("_id") or "sistema"): int(row.get("count") or 0)
+        for row in _col().aggregate([
+            {"$match": {"recipient_email": email}},
+            {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        ])
+    }
+    return {"total": total, "unread": unread, "notifications": rows, "category_counts": category_counts}
 
 
 def pulse_for_email(email: str, *, after_id: int = 0) -> dict[str, Any]:
@@ -100,6 +122,17 @@ def mark_read(notification_id: int, email: str) -> bool:
 def mark_all_read(email: str) -> int:
     email = (email or "").strip().lower()
     res = _col().update_many({"recipient_email": email, "read": False}, {"$set": {"read": True}})
+    return res.modified_count
+
+
+def mark_category_read(email: str, category: str) -> int:
+    email = (email or "").strip().lower()
+    clean = (category or "").strip().lower()
+    if not clean:
+        raise ValueError("category_required")
+    res = _col().update_many(
+        {"recipient_email": email, "category": clean, "read": False}, {"$set": {"read": True}}
+    )
     return res.modified_count
 
 

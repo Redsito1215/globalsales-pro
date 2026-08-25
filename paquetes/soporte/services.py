@@ -160,12 +160,17 @@ def _format_invoice_date(value: Any) -> str:
 
 
 def _invoice_number(request: dict[str, Any]) -> str:
-    rid = request.get("request_id") or "-"
-    raw = str(request.get("created_at") or "")
-    year = datetime.now(timezone.utc).year
-    if raw[:4].isdigit():
-        year = int(raw[:4])
-    return f"GBT-{year}-{int(rid):05d}" if str(rid).isdigit() else f"GBT-{year}-{rid}"
+    try:
+        from shared.accounting import get_or_create_invoice
+
+        return str(get_or_create_invoice(request).get("invoice_number"))
+    except Exception:
+        rid = request.get("request_id") or "-"
+        raw = str(request.get("created_at") or "")
+        year = datetime.now(timezone.utc).year
+        if raw[:4].isdigit():
+            year = int(raw[:4])
+        return f"FAC-{year}-{int(rid):06d}" if str(rid).isdigit() else f"FAC-{year}-{rid}"
 
 
 def _order_status_label(status: str | None) -> str:
@@ -197,7 +202,6 @@ def _payment_method_label(method: str | None) -> str:
     if not method:
         return ""
     labels = {
-        "transferencia": "Transferencia bancaria",
         "tarjeta": "Tarjeta",
     }
     key = str(method).strip().lower()
@@ -325,6 +329,12 @@ def _draw_company_brand(c, x: float, y: float, profile: dict[str, Any]) -> None:
         c.setFont("Helvetica", 7.5)
         c.setFillColor(colors.HexColor("#64748b"))
         c.drawString(text_x, y - 11, _fit_text(c, tagline, "Helvetica", 7.5, 5.2 * cm))
+    tax_id = _pdf_text((profile.get("tax_id") or "").strip())
+    if tax_id:
+        c.setFont("Helvetica", 7.5)
+        c.setFillColor(colors.HexColor("#1a1f4b"))
+        offset = 22 if tagline else 11
+        c.drawString(text_x, y - offset, _fit_text(c, f"RUC / ID fiscal: {tax_id}", "Helvetica", 7.5, 5.2 * cm))
 
 
 def _draw_logo_mark(c, x: float, y: float) -> None:
@@ -521,6 +531,14 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     totals_w = 6.4 * cm
     totals_x = w - margin_x - totals_w
     extra_rows = (1 if discount > 0 else 0) + (1 if shipping > 0 else 0)
+    try:
+        tax_rate = float(str(profile.get("tax_rate") or "15").replace(",", "."))
+    except (TypeError, ValueError):
+        tax_rate = 15.0
+    if tax_rate < 0:
+        tax_rate = 0.0
+    if tax_rate > 0:
+        extra_rows += 2
     totals_h = 1.85 * cm + extra_rows * 0.55 * cm
     y -= 0.35 * cm
 
@@ -542,6 +560,16 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
         code = request.get("discount_code") or "Descuento"
         c.drawString(totals_x + 0.35 * cm, ty, _fit_text(c, f"Descuento ({code})", "Helvetica", 9, totals_w - 2.5 * cm))
         c.drawRightString(w - margin_x - 0.35 * cm, ty, f"-${discount:,.2f}")
+        ty -= 0.55 * cm
+    if tax_rate > 0 and total > 0:
+        factor = 1.0 + (tax_rate / 100.0)
+        base_imp = round(total / factor, 2)
+        iva_amt = round(total - base_imp, 2)
+        c.drawString(totals_x + 0.35 * cm, ty, "Base imponible")
+        c.drawRightString(w - margin_x - 0.35 * cm, ty, f"${base_imp:,.2f}")
+        ty -= 0.55 * cm
+        c.drawString(totals_x + 0.35 * cm, ty, f"IVA {tax_rate:g}% (incluido)")
+        c.drawRightString(w - margin_x - 0.35 * cm, ty, f"${iva_amt:,.2f}")
         ty -= 0.55 * cm
 
     c.setFillColor(LIGHT)
@@ -589,7 +617,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     c.drawCentredString(
         w / 2,
         1.15 * cm,
-        _pdf_text(profile.get("invoice_footer") or "Documento comercial GLOBTRADE (demo academica). No es factura fiscal."),
+        _pdf_text(profile.get("invoice_footer") or "Factura comercial GLOBTRADE. Conserve este documento."),
     )
 
     c.showPage()

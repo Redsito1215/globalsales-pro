@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-DAG: ETL estratégico GLOBTRADE → fact_ventas + dims (informes RC / Tablero).
+DAG: validación y sincronización segura GLOBTRADE → fact_ventas.
 
-Estrategia: truncate + reload (no append). Schedule diario; catchup desactivado.
+Estrategia idempotente: Mongo landing → sincronización pendiente → validación.
+No usa el CSV antiguo y no elimina colecciones. Ejecución exclusivamente manual.
 """
 from __future__ import annotations
 
@@ -29,22 +30,22 @@ default_args = {
 }
 
 
-def _task_extract() -> None:
-    from etl_proceso.steps.extract_csv import run
+def _task_inspect() -> None:
+    from etl_proceso.steps.airflow_safe import inspect_landing
 
-    run()
+    inspect_landing()
 
 
-def _task_load() -> None:
-    from etl_proceso.steps.load_landing import run
+def _task_preserve() -> None:
+    from etl_proceso.steps.airflow_safe import preserve_landing
 
-    run()
+    preserve_landing()
 
 
 def _task_transform() -> None:
-    from etl_proceso.steps.transform_star import run
+    from etl_proceso.steps.airflow_safe import synchronize_strategic
 
-    run()
+    synchronize_strategic()
 
 
 def _task_validate() -> None:
@@ -55,24 +56,24 @@ def _task_validate() -> None:
 
 with DAG(
     dag_id="globtrade_strategic_etl",
-    description="ETL estratégico rebuild: CSV→Parquet→sales_records→fact_ventas (RC/Tablero)",
+    description="ETL manual seguro: Mongo landing→sincronización→validación (RC/Tablero)",
     default_args=default_args,
     start_date=datetime(2026, 1, 1),
-    schedule="0 2 * * *",
+    schedule=None,
     catchup=False,
     tags=["globtrade", "etl", "estrategico", "reportes-rc"],
     max_active_runs=1,
 ) as dag:
-    extract_csv_to_parquet = PythonOperator(
-        task_id="extract_csv_to_parquet",
-        python_callable=_task_extract,
+    inspect_mongo_landing = PythonOperator(
+        task_id="inspect_mongo_landing",
+        python_callable=_task_inspect,
     )
-    load_landing_truncate = PythonOperator(
-        task_id="load_landing_truncate",
-        python_callable=_task_load,
+    preserve_landing_dataset = PythonOperator(
+        task_id="preserve_landing_dataset",
+        python_callable=_task_preserve,
     )
-    transform_star_rebuild = PythonOperator(
-        task_id="transform_star_rebuild",
+    synchronize_strategic_layer = PythonOperator(
+        task_id="synchronize_strategic_layer",
         python_callable=_task_transform,
     )
     validate_strategic_layer = PythonOperator(
@@ -81,8 +82,8 @@ with DAG(
     )
 
     (
-        extract_csv_to_parquet
-        >> load_landing_truncate
-        >> transform_star_rebuild
+        inspect_mongo_landing
+        >> preserve_landing_dataset
+        >> synchronize_strategic_layer
         >> validate_strategic_layer
     )

@@ -61,12 +61,21 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
     from paquetes.tablero import catalogo_modelo as cat_model
     from paquetes.tablero import catalogo_nombres as nom
 
+    # Conserva decisiones administrativas aunque el ELT regenere las dimensiones.
+    active_regions = {r.get("name"): r.get("active", True) for r in db["dim_region"].find({}, {"_id": 0, "name": 1, "active": 1})}
+    active_countries = {r.get("name"): r.get("active", True) for r in db["dim_pais"].find({}, {"_id": 0, "name": 1, "active": 1})}
+    active_categories = {int(r["category_id"]): r.get("active", True) for r in db["dim_categoria"].find({}, {"_id": 0, "category_id": 1, "active": 1})}
+    active_products = {int(r["product_id"]): r.get("active", True) for r in db["dim_producto"].find({}, {"_id": 0, "product_id": 1, "active": 1})}
+    active_channels = {r.get("name"): r.get("active", True) for r in db["dim_canal"].find({}, {"_id": 0, "name": 1, "active": 1})}
+    active_priorities = {r.get("code"): r.get("active", True) for r in db["dim_prioridad"].find({}, {"_id": 0, "code": 1, "active": 1})}
+    active_clients = {int(r["client_id"]): r.get("active", True) for r in db["dim_cliente"].find({}, {"_id": 0, "client_id": 1, "active": 1})}
+
     # ── Regiones y países ─────────────────────────────────────────────
     db["dim_region"].delete_many({})
     rmap: dict[str, int] = {}
     regions = []
     for i, rname in enumerate(sorted(df["region"].dropna().unique()), start=1):
-        regions.append({"region_id": i, "name": rname, "description": f"Zona comercial: {rname}"})
+        regions.append({"region_id": i, "name": rname, "description": f"Zona comercial: {rname}", "active": active_regions.get(rname, True)})
         rmap[rname] = i
     db["dim_region"].insert_many(regions)
 
@@ -77,7 +86,7 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
         df[["country", "region"]].drop_duplicates().sort_values("country").itertuples(index=False),
         start=1,
     ):
-        paises.append({"country_id": i, "name": row.country, "region_id": rmap[row.region]})
+        paises.append({"country_id": i, "name": row.country, "region_id": rmap[row.region], "active": active_countries.get(row.country, True)})
         cmap[row.country] = i
     db["dim_pais"].insert_many(paises)
 
@@ -92,6 +101,7 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
                 "category_id": cid,
                 "name": cname,
                 "description": CATEGORY_DESC.get(cname, "Categoría general"),
+                "active": active_categories.get(cid, True),
             }
         )
     db["dim_categoria"].insert_many(categorias)
@@ -128,6 +138,7 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
                     "orders": p["orders"],
                     "revenue": p["revenue"],
                     "image_url": old_images.get(pid),
+                    "active": active_products.get(pid, True),
                 }
             )
     db["dim_producto"].delete_many({})
@@ -139,8 +150,8 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
     chmap = {"Online": 1, "Offline": 2}
     db["dim_canal"].insert_many(
         [
-            {"channel_id": 1, "name": "Online", "description": "Ventas digitales"},
-            {"channel_id": 2, "name": "Offline", "description": "Ventas físicas"},
+            {"channel_id": 1, "name": "Online", "description": "Ventas digitales", "active": active_channels.get("Online", True)},
+            {"channel_id": 2, "name": "Offline", "description": "Ventas físicas", "active": active_channels.get("Offline", True)},
         ]
     )
 
@@ -148,10 +159,10 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
     pmap = {"C": 1, "H": 2, "M": 3, "L": 4}
     db["dim_prioridad"].insert_many(
         [
-            {"priority_id": 1, "code": "C", "name": "Critical", "sla_days": 1, "description": "24h"},
-            {"priority_id": 2, "code": "H", "name": "High", "sla_days": 3, "description": "3 días"},
-            {"priority_id": 3, "code": "M", "name": "Medium", "sla_days": 7, "description": "7 días"},
-            {"priority_id": 4, "code": "L", "name": "Low", "sla_days": 15, "description": "15 días"},
+            {"priority_id": 1, "code": "C", "name": "Critical", "sla_days": 1, "description": "24h", "active": active_priorities.get("C", True)},
+            {"priority_id": 2, "code": "H", "name": "High", "sla_days": 3, "description": "3 días", "active": active_priorities.get("H", True)},
+            {"priority_id": 3, "code": "M", "name": "Medium", "sla_days": 7, "description": "7 días", "active": active_priorities.get("M", True)},
+            {"priority_id": 4, "code": "L", "name": "Low", "sla_days": 15, "description": "15 días", "active": active_priorities.get("L", True)},
         ]
     )
 
@@ -170,6 +181,7 @@ def main(mongo_uri: str | None = None, mongo_db: str | None = None) -> None:
                 "email": None,
                 "phone": None,
                 "created_at": datetime.now().date().isoformat(),
+                "active": active_clients.get(i, True),
             }
         )
     db["dim_cliente"].insert_many(clientes)

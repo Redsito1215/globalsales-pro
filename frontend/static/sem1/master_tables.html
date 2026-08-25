@@ -10,7 +10,16 @@
 :root {
   --bg:#060a0f; --surface:#0d1520; --surface2:#111d2e; --border:#1a2f47;
   --accent:#00e5a0; --text:#e8edf5; --muted:#6b8299;
-  --font:'Syne',sans-serif; --mono:'DM Mono',monospace;
+  --font:'Syne',sans-serif;   --mono:'DM Mono',monospace;
+}
+.sem1-legacy-banner {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+  font-size: 13px;
+  color: var(--text);
 }
 body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; }
 .layout { display:flex; min-height:100vh; }
@@ -129,6 +138,9 @@ td { font-family:var(--mono); font-size:11px; max-width:220px; overflow:hidden; 
     <div id="db-status">Conectando…</div>
   </aside>
   <main class="main">
+    <div class="sem1-legacy-banner" role="status">
+      <strong>Vista legacy (sem1)</strong> — tablas maestras históricas. Usa la <a href="/" style="color:#0af">plataforma principal</a> y Maestros Q4 para operación actual.
+    </div>
     <button type="button" class="sem1-master-menu" id="sem1-master-menu" onclick="sem1MasterToggleNav()">☰ Tablas</button>
     <h1>Tablas maestras</h1>
     <p class="sub">Selecciona una colección para ver y filtrar sus registros (10 catálogos/dimensiones).</p>

@@ -1,10 +1,14 @@
 """Rutas Flask — paquete Q4 Datos."""
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+import csv
+import io
+
+from flask import Blueprint, Response, jsonify, request
 
 from auth.decorators import login_required, permission_required
 from paquetes.datos import services
+from shared.audit import log_audit
 
 datos_bp = Blueprint("datos", __name__, url_prefix="/api")
 
@@ -17,11 +21,14 @@ def master_tables():
 @datos_bp.get("/master/<name>")
 def master_list(name: str):
     try:
+        active_arg = (request.args.get("active") or "").strip().lower()
+        active = True if active_arg == "true" else False if active_arg == "false" else None
         data = services.list_rows(
             name,
             limit=min(int(request.args.get("limit", 50)), 200),
             offset=max(int(request.args.get("offset", 0)), 0),
             search=(request.args.get("search") or request.args.get("q") or "").strip() or None,
+            active=active,
         )
         return jsonify({"status": "ok", **data})
     except ValueError as e:
@@ -73,6 +80,21 @@ def master_delete(name: str, row_id: str):
     try:
         services.delete_row(name, row_id)
         return jsonify({"status": "ok", "message": "Registro eliminado."})
+    except ValueError as e:
+        return _master_error(e)
+
+
+@datos_bp.patch("/master/<name>/<row_id>/status")
+@login_required
+@permission_required("masters.write")
+def master_status(name: str, row_id: str):
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body.get("active"), bool):
+        return jsonify({"status": "error", "message": "Indique un estado válido.", "code": "invalid_active"}), 400
+    try:
+        row = services.set_row_active(name, row_id, body["active"])
+        label = "habilitado" if body["active"] else "inhabilitado"
+        return jsonify({"status": "ok", "message": f"Registro {label}.", "row": row})
     except ValueError as e:
         return _master_error(e)
 
@@ -133,16 +155,61 @@ def elt_status():
 def audit_log():
     try:
         role = (request.args.get("role") or "").strip() or None
+        entity = (request.args.get("entity") or "").strip() or None
+        entity_id = (request.args.get("entity_id") or "").strip() or None
         data = services.list_audit_log(
             limit=min(int(request.args.get("limit", 100)), 100),
             offset=max(int(request.args.get("offset", 0)), 0),
             role=role,
+            entity=entity,
+            entity_id=entity_id,
+            email=(request.args.get("email") or "").strip() or None,
+            action=(request.args.get("action") or "").strip() or None,
+            module=(request.args.get("module") or "").strip() or None,
+            date_from=(request.args.get("date_from") or "").strip() or None,
+            date_to=(request.args.get("date_to") or "").strip() or None,
         )
         return jsonify({"status": "ok", **data})
     except Exception as e:
         return jsonify(
             {"status": "error", "message": str(e), "code": "audit_error"}
         ), 500
+
+
+@datos_bp.get("/audit_log/export")
+@login_required
+@permission_required("audit.read")
+def audit_log_export():
+    """Exporta como CSV compatible con Excel, aplicando los mismos filtros de pantalla."""
+    filters = {
+        "role": (request.args.get("role") or "").strip() or None,
+        "entity": (request.args.get("entity") or "").strip() or None,
+        "email": (request.args.get("email") or "").strip() or None,
+        "action": (request.args.get("action") or "").strip() or None,
+        "module": (request.args.get("module") or "").strip() or None,
+        "date_from": (request.args.get("date_from") or "").strip() or None,
+        "date_to": (request.args.get("date_to") or "").strip() or None,
+    }
+    entries: list[dict] = []
+    for offset in range(0, 5000, 100):
+        page = services.list_audit_log(limit=100, offset=offset, **filters)
+        entries.extend(page["entries"])
+        if len(entries) >= page["total"] or not page["entries"]:
+            break
+    output = io.StringIO()
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    writer.writerow(["Fecha", "Modulo", "Accion", "Entidad", "Referencia", "Usuario", "Rol", "Cambios"])
+    for row in entries:
+        writer.writerow([
+            row.get("at"), row.get("module"), row.get("action"), row.get("entity"),
+            row.get("entity_id"), row.get("email"), row.get("role"), str(row.get("changes") or row.get("details") or {}),
+        ])
+    log_audit("export", entity="audit_log", details={"rows": len(entries), "filters": filters})
+    return Response(
+        output.getvalue(), mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=auditoria.csv"},
+    )
 
 
 @datos_bp.get("/schema")
@@ -152,7 +219,7 @@ def schema_summary():
 
 @datos_bp.get("/meta/data-layers")
 def meta_data_layers():
-    """Contrato demo: capas operativo / landing / estratégico."""
+    """Capas operativo / landing / estratégico."""
     from shared.data_layers import layers_overview
 
     return jsonify({"status": "ok", **layers_overview()})
@@ -199,9 +266,12 @@ def _master_error(exc: ValueError):
     messages = {
         "unknown_table": ("Tabla maestra no encontrada.", 404),
         "read_only": ("Esta tabla es solo lectura.", 403),
+        "fixed_catalog": ("Este es un catálogo fijo: puede editar o inhabilitar sus registros, pero no agregar nuevos.", 403),
         "not_found": ("Registro no encontrado.", 404),
         "duplicate_pk": ("Ya existe un registro con ese identificador.", 409),
+        "duplicate_value": ("Ya existe un registro con ese nombre, código o correo.", 409),
         "has_children": ("No se puede eliminar: hay registros relacionados.", 409),
+        "has_history": ("No se puede eliminar porque el registro tiene historial. Inhabilítelo en su lugar.", 409),
         "invalid_image_type": ("Formato no permitido. Use JPG, PNG o WEBP.", 400),
         "image_too_large": ("Imagen demasiado grande.", 400),
         "invalid_field": ("Revisa los campos: IDs y precios deben ser números positivos.", 400),

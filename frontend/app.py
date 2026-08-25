@@ -1,6 +1,8 @@
 """GLOBTRADE S.A. — Plataforma web (Q1–Q4)."""
 import os
 import sys
+import time
+import uuid
 from datetime import timedelta
 from pathlib import Path
 
@@ -8,8 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT))
 
-from flask import Flask, redirect, request, send_from_directory, session
+from flask import Flask, g, jsonify, redirect, request, send_from_directory, session
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 
 from auth import users as user_store
 from auth.routes import auth_bp
@@ -26,15 +29,18 @@ from paquetes.reportes import reportes_bp
 from paquetes.empresa import empresa_bp
 
 static_dir = Path(__file__).parent / "static"
+settings.assert_safe_production()
 
 app = Flask(__name__, static_folder=str(static_dir))
 app.secret_key = settings.flask_secret_key
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=settings.session_days)
+app.config["SESSION_COOKIE_SECURE"] = settings.session_cookie_secure
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=settings.session_idle_minutes)
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 app.config["MAX_CONTENT_LENGTH"] = settings.max_product_image_mb * 1024 * 1024
 
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=settings.allowed_cors_origins())
 
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
 app.register_blueprint(tablero_bp)
@@ -111,22 +117,53 @@ _init_legacy_order_ids()
 _init_mongo_split()
 
 
+@app.before_request
+def _request_context():
+    g.request_started = time.perf_counter()
+    g.request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+
+
 @app.after_request
 def _security_and_cache_headers(resp):
+    resp.headers["X-Request-ID"] = getattr(g, "request_id", "")
+    started = getattr(g, "request_started", None)
+    if started is not None:
+        resp.headers["Server-Timing"] = f"app;dur={(time.perf_counter() - started) * 1000:.1f}"
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    resp.headers.setdefault("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'")
     resp.headers.setdefault(
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=()",
     )
+    if settings.session_cookie_secure:
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     path = request.path or ""
-    if path.startswith("/static/") and (
-        path.endswith(".js") or path.endswith(".css") or path.endswith(".html")
+    if path == "/" or path.endswith(".html") or (
+        path.startswith("/static/")
+        and (path.endswith(".js") or path.endswith(".css") or path.endswith(".html"))
     ):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
     return resp
+
+
+@app.errorhandler(Exception)
+def _handle_unexpected_error(exc):
+    if isinstance(exc, HTTPException):
+        return exc
+    from shared.error_log import record_error
+
+    record_error(
+        exc, path=request.path, method=request.method,
+        actor_email=session.get("email"), context={"request_id": getattr(g, "request_id", None)},
+    )
+    return jsonify({
+        "status": "error", "message": "Ocurrió un error interno. Intenta nuevamente.",
+        "code": "internal_error", "request_id": getattr(g, "request_id", None),
+    }), 500
 
 
 @app.route("/")
@@ -145,7 +182,10 @@ def sem1_dashboard():
     denied = _sem1_admin_only()
     if denied:
         return denied
-    return send_from_directory(Path(app.static_folder) / "sem1", "index.html")
+    resp = send_from_directory(Path(app.static_folder) / "sem1", "index.html")
+    resp.headers["X-Globtrade-Legacy"] = "sem1"
+    resp.headers["Deprecation"] = "true"
+    return resp
 
 
 @app.route("/sem1/master")
@@ -153,12 +193,15 @@ def sem1_master_tables():
     denied = _sem1_admin_only()
     if denied:
         return denied
-    return send_from_directory(Path(app.static_folder) / "sem1", "master_tables.html")
+    resp = send_from_directory(Path(app.static_folder) / "sem1", "master_tables.html")
+    resp.headers["X-Globtrade-Legacy"] = "sem1"
+    resp.headers["Deprecation"] = "true"
+    return resp
 
 
 if __name__ == "__main__":
     port = settings.web_port
-    debug = os.getenv("FLASK_DEBUG", "1").lower() in ("1", "true", "yes", "on")
+    debug = settings.app_env.lower() != "production" and os.getenv("FLASK_DEBUG", "1").lower() in ("1", "true", "yes", "on")
     from shared.mongo import mongo_topology
 
     topo = mongo_topology()

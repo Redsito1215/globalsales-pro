@@ -2,11 +2,15 @@
 """API reportes simples y compuestos — Tarea 11 / Evaluación."""
 from __future__ import annotations
 
-from flask import Blueprint, Response, jsonify, request
+from datetime import datetime, timezone
+
+from flask import Blueprint, Response, jsonify, request, session
 
 from auth.decorators import login_required, permission_required
 from paquetes.reportes import ai_service, compuestos, services
 from paquetes.reportes.pdf_export import generate_report_pdf
+from paquetes.reportes.csv_export import generate_report_csv
+from shared.mongo import get_db
 
 reportes_bp = Blueprint("reportes", __name__, url_prefix="/api")
 
@@ -28,7 +32,7 @@ def run(report_id: str):
     threshold = int(request.args.get("threshold", 20))
     try:
         data = services.run_report(report_id, q=q, limit=limit, threshold=threshold)
-        return jsonify({"status": "ok", **data})
+        return jsonify({"status": "ok", "generated_at": datetime.now(timezone.utc).isoformat(), **data})
     except ValueError as e:
         if str(e) == "unknown_report":
             return jsonify({"status": "error", "message": "Informe no encontrado."}), 404
@@ -52,7 +56,7 @@ def run_complex(report_id: str):
     limit = min(int(request.args.get("limit", 100)), 500)
     try:
         data = compuestos.run_complex_report(report_id, limit=limit)
-        return jsonify({"status": "ok", **data})
+        return jsonify({"status": "ok", "generated_at": datetime.now(timezone.utc).isoformat(), **data})
     except ValueError as e:
         if str(e) == "unknown_report":
             return jsonify({"status": "error", "message": "Informe no encontrado."}), 404
@@ -82,6 +86,22 @@ def _pdf_response(pdf: bytes, filename: str) -> Response:
     )
 
 
+def _record_export(report_id: str, export_format: str, row_count: int, report_type: str) -> None:
+    get_db()["report_exports"].insert_one({
+        "report_id": report_id.upper(), "format": export_format,
+        "report_type": report_type, "row_count": int(row_count),
+        "actor_email": session.get("email"), "actor_role": session.get("role"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+def _csv_response(payload: bytes, filename: str) -> Response:
+    return Response(
+        payload, mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 def _pdf_error_response(exc: Exception) -> tuple[Response, int]:
     if isinstance(exc, ImportError):
         return (
@@ -103,6 +123,7 @@ def _pdf_error_response(exc: Exception) -> tuple[Response, int]:
 @reportes_bp.get("/reportes/<report_id>/pdf")
 @login_required
 @permission_required("reportes.view")
+@permission_required("analysis.export")
 def export_report_pdf(report_id: str):
     q = (request.args.get("q") or request.args.get("search") or "").strip() or None
     limit = min(int(request.args.get("limit", 200)), 500)
@@ -127,12 +148,36 @@ def export_report_pdf(report_id: str):
         body, code = _pdf_error_response(exc)
         return body, code
     rid = (report.get("id") or report_id).upper()
+    _record_export(rid, "pdf", len(data.get("rows") or []), "simple")
     return _pdf_response(pdf, f"globtrade-{rid}.pdf")
+
+
+@reportes_bp.get("/reportes/<report_id>/csv")
+@login_required
+@permission_required("reportes.view")
+@permission_required("analysis.export")
+def export_report_csv(report_id: str):
+    q = (request.args.get("q") or request.args.get("search") or "").strip() or None
+    limit = min(int(request.args.get("limit", 500)), 2000)
+    threshold = int(request.args.get("threshold", 20))
+    try:
+        data = services.run_report(report_id, q=q, limit=limit, threshold=threshold)
+    except ValueError as exc:
+        if str(exc) == "unknown_report":
+            return jsonify({"status": "error", "message": "Informe no encontrado."}), 404
+        raise
+    report = data.get("report") or {}
+    rid = (report.get("id") or report_id).upper()
+    rows = data.get("rows") or []
+    payload = generate_report_csv(columns=report.get("columns") or [], rows=rows)
+    _record_export(rid, "csv", len(rows), "simple")
+    return _csv_response(payload, f"globtrade-{rid}.csv")
 
 
 @reportes_bp.get("/compuestos/<report_id>/pdf")
 @login_required
 @permission_required("reportes.view")
+@permission_required("analysis.export")
 def export_complex_pdf(report_id: str):
     limit = min(int(request.args.get("limit", 200)), 500)
     try:
@@ -155,7 +200,36 @@ def export_complex_pdf(report_id: str):
         body, code = _pdf_error_response(exc)
         return body, code
     rid = (report.get("id") or report_id).upper()
+    _record_export(rid, "pdf", len(data.get("rows") or []), "compuesto")
     return _pdf_response(pdf, f"globtrade-{rid}.pdf")
+
+
+@reportes_bp.get("/compuestos/<report_id>/csv")
+@login_required
+@permission_required("reportes.view")
+@permission_required("analysis.export")
+def export_complex_csv(report_id: str):
+    limit = min(int(request.args.get("limit", 500)), 2000)
+    try:
+        data = compuestos.run_complex_report(report_id, limit=limit)
+    except ValueError as exc:
+        if str(exc) == "unknown_report":
+            return jsonify({"status": "error", "message": "Informe no encontrado."}), 404
+        raise
+    report = data.get("report") or {}
+    rid = (report.get("id") or report_id).upper()
+    rows = data.get("rows") or []
+    payload = generate_report_csv(columns=report.get("columns") or [], rows=rows)
+    _record_export(rid, "csv", len(rows), "compuesto")
+    return _csv_response(payload, f"globtrade-{rid}.csv")
+
+
+@reportes_bp.get("/reportes/exportaciones")
+@login_required
+@permission_required("audit.read")
+def export_history():
+    rows = list(get_db()["report_exports"].find({}, {"_id": 0}).sort("created_at", -1).limit(100))
+    return jsonify({"status": "ok", "exports": rows, "count": len(rows)})
 
 
 @reportes_bp.get("/reportes/compuestos/<report_id>/pdf")

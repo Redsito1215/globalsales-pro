@@ -1,88 +1,11 @@
-/* GLOBTRADE — skin innovador, coherente en claro y oscuro */
+/* GLOBTRADE — layout innovador (tokens en theme-normalize.css) */
+:root,
 html[data-theme="light"],
 html.theme-light,
-:root {
-  color-scheme: light;
-  --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-ui: "Syne", "Plus Jakarta Sans", system-ui, sans-serif;
-  --innovate-ink: #0c0c10;
-  --innovate-pink: #ea4c89;
-  --innovate-violet: #a855f7;
-  --innovate-mint: #10b981;
-  --innovate-cyan: #22d3ee;
-  --innovate-radius-xl: 28px;
-  --innovate-radius-pill: 999px;
-  --hero-bg: #0c0c10;
-  --hero-shadow: 0 28px 70px rgba(12, 12, 16, 0.22);
-  --bg: #f4f4f7;
-  --surface: #ffffff;
-  --surface2: #ececf1;
-  --border: rgba(12, 12, 16, 0.09);
-  --text: #0c0c10;
-  --muted: #5c5c6a;
-  --accent: #0f766e;
-  --accent-hover: #0d5f58;
-  --topbar-bg: rgba(255, 255, 255, 0.92);
-  --topbar-text: #0c0c10;
-  --topbar-border: rgba(12, 12, 16, 0.07);
-  --topbar-control-bg: #f0f0f5;
-  --topbar-control-border: rgba(12, 12, 16, 0.1);
-  --topbar-control-text: #0c0c10;
-  --input-bg: #ffffff;
-  --input-border: rgba(12, 12, 16, 0.12);
-  --bg-glow:
-    radial-gradient(900px 420px at 0% -5%, rgba(16, 185, 129, 0.1), transparent 55%),
-    radial-gradient(700px 380px at 100% 0%, rgba(168, 85, 247, 0.08), transparent 50%),
-    radial-gradient(600px 300px at 50% 100%, rgba(234, 76, 137, 0.05), transparent 45%);
-  --shadow: 0 1px 2px rgba(12, 12, 16, 0.04), 0 16px 40px rgba(12, 12, 16, 0.06);
-  --shadow-sm: 0 1px 2px rgba(12, 12, 16, 0.04), 0 8px 20px rgba(12, 12, 16, 0.04);
-  --shop-sidebar-bg: #ffffff;
-  --shop-sidebar-text: #0c0c10;
-  --shop-sidebar-muted: #6b6b78;
-  --shop-sidebar-border: rgba(12, 12, 16, 0.08);
-  --shop-sidebar-hover: #f0f0f5;
-  --shop-sidebar-active-bg: rgba(16, 185, 129, 0.12);
-  --shop-sidebar-active-border: rgba(16, 185, 129, 0.35);
-  --shop-green-light: #e8faf3;
-  --shop-green-dark: #065f46;
-}
-
 html[data-theme="dark"],
 html.theme-dark {
-  color-scheme: dark;
-  --hero-bg: #06060a;
-  --hero-shadow: 0 32px 80px rgba(0, 0, 0, 0.45);
-  --bg: #08080c;
-  --surface: #121218;
-  --surface2: #1a1a22;
-  --border: rgba(255, 255, 255, 0.09);
-  --text: #f4f4f7;
-  --muted: #9b9bab;
-  --accent: #2dd4bf;
-  --accent-hover: #14b8a6;
-  --topbar-bg: rgba(8, 8, 12, 0.9);
-  --topbar-text: #f4f4f7;
-  --topbar-border: rgba(255, 255, 255, 0.08);
-  --topbar-control-bg: #1a1a22;
-  --topbar-control-border: rgba(255, 255, 255, 0.1);
-  --topbar-control-text: #f4f4f7;
-  --input-bg: #1a1a22;
-  --input-border: rgba(255, 255, 255, 0.12);
-  --bg-glow:
-    radial-gradient(900px 420px at 0% -5%, rgba(45, 212, 191, 0.12), transparent 55%),
-    radial-gradient(700px 380px at 100% 0%, rgba(168, 85, 247, 0.1), transparent 50%),
-    radial-gradient(600px 300px at 50% 100%, rgba(234, 76, 137, 0.07), transparent 45%);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 20px 48px rgba(0, 0, 0, 0.35);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25), 0 10px 28px rgba(0, 0, 0, 0.22);
-  --shop-sidebar-bg: #0e0e14;
-  --shop-sidebar-text: #f4f4f7;
-  --shop-sidebar-muted: #8b8b9a;
-  --shop-sidebar-border: rgba(255, 255, 255, 0.07);
-  --shop-sidebar-hover: rgba(255, 255, 255, 0.06);
-  --shop-sidebar-active-bg: rgba(45, 212, 191, 0.14);
-  --shop-sidebar-active-border: rgba(45, 212, 191, 0.38);
-  --shop-green-light: rgba(45, 212, 191, 0.16);
-  --shop-green-dark: #6ee7b7;
+  --innovate-radius-xl: 28px;
+  --innovate-radius-pill: 999px;
 }
 
 body {
@@ -91,7 +14,7 @@ body {
 }
 
 body::before {
-  opacity: 0.025;
+  opacity: 0;
 }
 
 /* ── Topbar ── */
@@ -124,18 +47,18 @@ html.theme-light .topbar {
 
 html[data-theme="light"] .btn-topbar--solid,
 html.theme-light .btn-topbar--solid {
-  background: var(--innovate-ink);
-  border-color: var(--innovate-ink);
-  color: #fff;
-  box-shadow: 0 8px 22px rgba(12, 12, 16, 0.16);
+  background: var(--accent);
+  border-color: var(--accent-hover);
+  color: var(--btn-primary-text, #fff);
+  box-shadow: var(--shadow-sm);
 }
 
 html[data-theme="dark"] .btn-topbar--solid,
 html.theme-dark .btn-topbar--solid {
-  background: linear-gradient(135deg, var(--innovate-mint), #059669);
-  border-color: transparent;
-  color: #04110d;
-  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.28);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border-color: var(--accent-hover);
+  color: var(--btn-primary-text, #fff);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ── Sidebar (respeta variables de tema) ── */
@@ -203,9 +126,9 @@ html.theme-dark .sidebar .nav-item.active .nav-icon {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: var(--hero-bg);
+  background: linear-gradient(135deg, var(--gt-brand-ink) 0%, color-mix(in srgb, var(--accent) 38%, var(--gt-brand-ink)) 58%, var(--accent) 100%);
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
   box-shadow: var(--hero-shadow);
 }
 
@@ -278,7 +201,7 @@ html.theme-dark .sidebar .nav-item.active .nav-icon {
 
 .shop-landing-title em {
   font-style: normal;
-  color: #a8e6d7;
+  color: var(--madson-gold-soft, var(--accent3));
 }
 
 /* Badges fuera del hero → colores de tema */
@@ -468,9 +391,9 @@ html.theme-dark .fg select {
 
 html[data-theme="light"] .shop-collection-btn.active,
 html.theme-light .shop-collection-btn.active {
-  background: var(--innovate-ink);
-  color: #fff;
-  border-color: var(--innovate-ink);
+  background: var(--accent);
+  color: var(--btn-primary-text, #fff);
+  border-color: var(--accent-hover);
 }
 
 html[data-theme="dark"] .shop-collection-btn.active,

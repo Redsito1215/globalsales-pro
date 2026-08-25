@@ -11,6 +11,16 @@ function openSolicitudPdf(id) {
   window.open(`${API}/soporte/solicitudes/${id}/factura.pdf`, '_blank', 'noopener');
 }
 
+async function showPaymentReceipt(id) {
+  const r = await fetch(`${API}/solicitudes/${id}/comprobante`, { credentials: 'same-origin' });
+  const data = await r.json();
+  if (!r.ok) { notifyErr(data.message || 'No se pudo cargar el comprobante.'); return; }
+  const x = data.receipt || {};
+  const card = x.card || {};
+  const message = `${x.transaction_reference}\n${x.invoice_number}\nTarjeta ${card.brand || ''} •••• ${card.last4 || ''}\nTotal: $${Number(x.amount || 0).toFixed(2)}\nFecha: ${(x.paid_at || '').replace('T', ' ').slice(0, 19)}`;
+  if (typeof opsConfirm === 'function') await opsConfirm({ title: 'Comprobante de pago', message, confirmLabel: 'Cerrar' });
+}
+
 async function openSolicitudDetail(id) {
   const body = document.getElementById('sol-detail-body');
   const title = document.getElementById('sol-detail-title');
@@ -62,6 +72,7 @@ async function openSolicitudDetail(id) {
       ${req.shipped_at ? `<div><span class="detail-label">Enviado</span>${req.shipped_at}</div>` : ''}
       ${req.delivered_at ? `<div><span class="detail-label">Entregado</span>${req.delivered_at}</div>` : ''}
       ${req.paid_at ? `<div><span class="detail-label">Pagado el</span>${req.paid_at}</div>` : ''}
+      ${req.refund_status ? `<div><span class="detail-label">Reembolso</span>${req.refund_status.replaceAll('_', ' ')} · $${Number(req.return_refund_amount || 0).toFixed(2)}</div>` : ''}
       ${req.status === 'devuelta' ? `<div><span class="detail-label">Devolución</span>${req.return_condition || '—'} · apto ${req.return_restock_units ?? 0} · dañado ${req.return_damaged_units ?? 0}</div>` : ''}
     </div>
     ${req.return_reason ? `<p class="modal-sub"><strong>Motivo devolución:</strong> ${req.return_reason}</p>` : ''}
@@ -73,17 +84,30 @@ async function openSolicitudDetail(id) {
       ${req.discount_code ? `<div>Descuento <code>${req.discount_code}</code>: -$${Number(req.discount_amount || 0).toFixed(2)}</div>` : ''}
       <div><strong>Total:</strong> $${Number(req.total || req.subtotal || 0).toFixed(2)}</div>
     </div>
+    ${pay === 'pagado' ? `<button type="button" class="btn btn-ghost btn-sm" onclick="showPaymentReceipt(${id})">Ver comprobante de pago</button>` : ''}
     ${canManage && !['rechazada','cancelada'].includes(req.status) && pay === 'pendiente_pago' ? `
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <span class="modal-sub" style="margin:0">${typeof isOfflineRequest === 'function' && isOfflineRequest(req)
-          ? 'El pago lo confirma el cliente en Mis pedidos, o puedes dar crédito (solo presencial).'
-          : 'En pedidos online el cliente debe pagar en Mis pedidos antes de continuar.'}</span>
-        ${typeof isOfflineRequest === 'function' && isOfflineRequest(req)
-          ? `<button type="button" class="btn btn-ghost" onclick="setSolicitudPago(${id},'credito');closeSolicitudDetail()">Dar crédito</button>`
-          : ''}
-      </div>` : ''}`;
+        <span class="modal-sub" style="margin:0">${req.status === 'aprobada'
+          ? 'El cliente debe pagar con tarjeta en Mis pedidos antes de continuar.'
+          : 'Aprueba la solicitud para que el cliente pueda pagar en Mis pedidos.'}</span>
+      </div>` : ''}
+    <div id="sol-detail-audit" style="margin-top:14px"></div>`;
     const pdfBtn = document.getElementById('sol-detail-pdf');
     if (pdfBtn) pdfBtn.onclick = () => openSolicitudPdf(id);
+    const auditHost = document.getElementById('sol-detail-audit');
+    if (auditHost) {
+      auditHost.innerHTML = '<p class="modal-sub">Cargando línea de tiempo…</p>';
+      try {
+        const hr = await fetch(`${API}/solicitudes/${id}/timeline`, { credentials: 'same-origin' });
+        const hist = await hr.json();
+        const labels = { created: 'Solicitud creada', status_changed: 'Estado actualizado', payment_updated: 'Pago aprobado', payment_failed: 'Intento de pago rechazado', returned: 'Devolución y reembolso' };
+        auditHost.innerHTML = `<h3 class="table-title">Línea de tiempo</h3>${(hist.events || []).map(event => `
+          <div class="page-meta-strip" style="margin-top:7px"><strong>${labels[event.event_type] || event.event_type}</strong>
+          <span> · ${(event.created_at || '').replace('T', ' ').slice(0, 19)}</span></div>`).join('') || '<p class="modal-sub">Sin eventos.</p>'}`;
+      } catch {
+        auditHost.innerHTML = '';
+      }
+    }
   } catch (_) {
     showSolicitudDetailModal(false);
     notifyErr('Error de red al cargar la solicitud.');
@@ -96,4 +120,5 @@ function closeSolicitudDetail() {
 
 window.openSolicitudDetail = openSolicitudDetail;
 window.openSolicitudPdf = openSolicitudPdf;
+window.showPaymentReceipt = showPaymentReceipt;
 window.closeSolicitudDetail = closeSolicitudDetail;

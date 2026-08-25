@@ -4,13 +4,13 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from shared.data_layers import analytics_fact, landing_sales, strategic_ready
 from shared.mongo import get_db, get_read_dw_db, sales_collection
 
-# Caché en memoria (demo / tablero)
+# Caché en memoria del tablero (TTL corto)
 _CACHE: dict[str, tuple[float, Any]] = {}
 _CACHE_TTL_SEC = 300.0
 _DIM_NAME_CACHE: dict[str, tuple[float, dict[str, int]]] = {}
@@ -19,6 +19,14 @@ _MAX_DATE_CACHE: tuple[float, str | None] | None = None
 _FILTER_ANCHOR_CACHE: tuple[float, str | None] | None = None
 _FACT_HAS_DATA_CACHE: tuple[float, bool] | None = None
 _FACT_GEN_CACHE: tuple[float, int] | None = None
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _utc_today_str() -> str:
+    return _utc_now().strftime("%Y-%m-%d")
 
 
 def _fact_gen() -> int:
@@ -150,7 +158,7 @@ def dataset_max_order_date() -> str | None:
         val = val.strftime("%Y-%m-%d")
     elif val is not None:
         val = str(val)[:10]
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = _utc_today_str()
     if val and val > today:
         val = today
     _MAX_DATE_CACHE = (now, val)
@@ -158,37 +166,18 @@ def dataset_max_order_date() -> str | None:
 
 
 def dataset_filter_anchor_date() -> str | None:
-    """Fin del periodo con más ventas; ancla ventanas 12/24/48 meses (evita fechas futuras espurias)."""
+    """Fecha máxima válida para anclar ventanas 12/24/48 meses.
+
+    La versión anterior agrupaba toda ``fact_ventas`` por año antes de cada
+    primera consulta. Con millones de filas ese escaneo retrasaba incluso los
+    filtros más sencillos; la fecha máxima ya está cubierta por ``fact_fecha``.
+    """
     global _FILTER_ANCHOR_CACHE
     now = time.monotonic()
     if _FILTER_ANCHOR_CACHE and now - _FILTER_ANCHOR_CACHE[0] < 300:
         return _FILTER_ANCHOR_CACHE[1]
 
-    val = None
-    if strategic_ready():
-        try:
-            rows = list(
-                analytics_fact().aggregate(
-                    [
-                        {"$group": {"_id": {"$substr": ["$fecha_id", 0, 4]}, "n": {"$sum": 1}}},
-                        {"$sort": {"n": -1}},
-                        {"$limit": 1},
-                    ],
-                    allowDiskUse=True,
-                )
-            )
-            if rows and rows[0].get("_id"):
-                year = str(rows[0]["_id"])
-                doc = analytics_fact().find_one(
-                    {"fecha_id": {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}},
-                    {"fecha_id": 1, "_id": 0},
-                    sort=[("fecha_id", -1)],
-                )
-                val = (doc or {}).get("fecha_id")
-        except Exception:
-            val = None
-    if not val:
-        val = dataset_max_order_date()
+    val = dataset_max_order_date()
     if isinstance(val, datetime):
         val = val.strftime("%Y-%m-%d")
     elif val is not None:
@@ -197,14 +186,109 @@ def dataset_filter_anchor_date() -> str | None:
     return val
 
 
+def _dim_id_to_label(collection: str, id_field: str, *, name_field: str = "name") -> dict[int, str]:
+    """Invierte el mapa de dimensiones que ya vive en caché."""
+    return {int(rid): label for label, rid in _dim_name_to_id(collection, id_field, name_field).items()}
+
+
+def dashboard_bundle(*, top: int = 10, **filters) -> dict[str, Any]:
+    """Construye todo el tablero con un único recorrido sobre ``fact_ventas``."""
+    key = _cache_key("dashboard_bundle", {**filters, "top": top, "layer": "fact"})
+    hit = _cache_get(key)
+    if hit is not None:
+        return hit
+    if not strategic_ready():
+        return _cache_set(key, {
+            "summary": _empty_summary(**filters), "trend": [], "regions": [],
+            "channels": [], "priorities": [], "countries": [],
+        })
+
+    match = _fact_match(**filters)
+    pipeline = _prefix(match) + [
+        {"$project": {
+            "fecha_id": 1, "region_id": 1, "country_id": 1,
+            "category_id": 1, "channel_id": 1, "priority_id": 1,
+            "total_revenue": 1, "total_profit": 1, "total_cost": 1,
+        }},
+        {"$facet": {
+            "summary": [{"$group": {
+                "_id": None, "revenue": {"$sum": "$total_revenue"},
+                "profit": {"$sum": "$total_profit"}, "cost": {"$sum": "$total_cost"},
+                "orders": {"$sum": 1}, "countries": {"$addToSet": "$country_id"},
+                "categories": {"$addToSet": "$category_id"},
+            }}],
+            "trend": [
+                {"$group": {"_id": {"$substr": ["$fecha_id", 0, 7]},
+                    "revenue": {"$sum": "$total_revenue"}, "profit": {"$sum": "$total_profit"},
+                    "orders": {"$sum": 1}}}, {"$sort": {"_id": 1}},
+            ],
+            "regions": [{"$group": {"_id": "$region_id", "revenue": {"$sum": "$total_revenue"},
+                "profit": {"$sum": "$total_profit"}, "orders": {"$sum": 1}}}],
+            "channels": [{"$group": {"_id": "$channel_id", "revenue": {"$sum": "$total_revenue"},
+                "orders": {"$sum": 1}}}],
+            "priorities": [{"$group": {"_id": "$priority_id", "orders": {"$sum": 1}}}],
+            "countries": [{"$group": {"_id": "$country_id", "revenue": {"$sum": "$total_revenue"},
+                "orders": {"$sum": 1}}}, {"$sort": {"revenue": -1}}, {"$limit": max(1, min(int(top), 50))}],
+        }},
+    ]
+    raw_rows = list(analytics_fact().aggregate(pipeline, allowDiskUse=True))
+    raw = raw_rows[0] if raw_rows else {}
+    total = (raw.get("summary") or [{}])[0]
+    revenue = float(total.get("revenue") or 0)
+    months = filters.get("months")
+    cutoff = _months_cutoff(months) if months and int(months) < 999 else None
+    region_names = _dim_id_to_label("dim_region", "region_id")
+    channel_names = _dim_id_to_label("dim_canal", "channel_id")
+    priority_names = _dim_id_to_label("dim_prioridad", "priority_id", name_field="code")
+    country_names = _dim_id_to_label("dim_pais", "country_id")
+    lagging = False
+    try:
+        sync_meta = get_db()["app_meta"].find_one(
+            {"_id": "strategic_sync"}, {"strategic_lagging": 1}
+        ) or {}
+        lagging = bool(sync_meta.get("strategic_lagging"))
+    except Exception:
+        pass
+
+    summary = {
+        "total_orders": int(total.get("orders") or 0), "total_revenue": round(revenue, 2),
+        "total_profit": round(float(total.get("profit") or 0), 2),
+        "total_cost": round(float(total.get("cost") or 0), 2),
+        "avg_margin": round(float(total.get("profit") or 0) / revenue * 100, 2) if revenue else 0.0,
+        "countries": len(total.get("countries") or []), "item_types": len(total.get("categories") or []),
+        "dataset_max_date": dataset_max_order_date(), "filter_months": int(months) if cutoff else None,
+        "filter_period_start": cutoff, "filter_anchor_date": dataset_filter_anchor_date() if cutoff else None,
+        "historic_total_orders": int(_fact_gen()) if cutoff else int(total.get("orders") or 0),
+        "strategic_ready": True, "strategic_lagging": lagging, "data_layer": "estrategico",
+    }
+    result = {
+        "summary": summary,
+        "trend": [{"month": r["_id"], "revenue": round(float(r.get("revenue") or 0), 2),
+            "profit": round(float(r.get("profit") or 0), 2), "orders": int(r.get("orders") or 0)}
+            for r in raw.get("trend", [])],
+        "regions": sorted([{"region": region_names.get(int(r["_id"]), "Sin región"),
+            "revenue": round(float(r.get("revenue") or 0), 2), "profit": round(float(r.get("profit") or 0), 2),
+            "orders": int(r.get("orders") or 0)} for r in raw.get("regions", [])], key=lambda r: r["revenue"], reverse=True),
+        "channels": [{"sales_channel": channel_names.get(int(r["_id"]), "Sin canal"),
+            "revenue": round(float(r.get("revenue") or 0), 2), "orders": int(r.get("orders") or 0)}
+            for r in raw.get("channels", [])],
+        "priorities": sorted([{"order_priority": priority_names.get(int(r["_id"]), "M"),
+            "orders": int(r.get("orders") or 0)} for r in raw.get("priorities", [])], key=lambda r: r["order_priority"]),
+        "countries": [{"country": country_names.get(int(r["_id"]), "Sin país"),
+            "revenue": round(float(r.get("revenue") or 0), 2), "orders": int(r.get("orders") or 0)}
+            for r in raw.get("countries", [])],
+    }
+    return _cache_set(key, result, skip_if_empty=summary["total_orders"] == 0)
+
+
 def _months_cutoff(months: int | None) -> str | None:
     if not months or months >= 999:
         return None
-    anchor = dataset_filter_anchor_date() or datetime.utcnow().strftime("%Y-%m-%d")
+    anchor = dataset_filter_anchor_date() or _utc_today_str()
     try:
         end = datetime.strptime(anchor[:10], "%Y-%m-%d")
     except ValueError:
-        end = datetime.utcnow()
+        end = _utc_now().replace(tzinfo=None)
     return (end - timedelta(days=int(months) * 31)).strftime("%Y-%m-%d")
 
 
@@ -464,7 +548,7 @@ def monthly_trend(last_n: int = 24, **filters):
                     }
                 },
                 {"$sort": {"_id": -1}},
-                {"$limit": last_n if last_n < 999 else 120},
+                {"$limit": last_n if last_n < 999 else 600},
                 {
                     "$project": {
                         "month": "$_id",

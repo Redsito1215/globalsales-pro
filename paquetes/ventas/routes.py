@@ -23,6 +23,13 @@ def _can_manage_solicitudes(role: str | None) -> bool:
     return role == "administrador" or roles_service.has_permission(role, "ventas.manage")
 
 
+def _can_access_request(req: dict) -> bool:
+    role = session.get("role")
+    if _can_manage_solicitudes(role) or roles_service.has_permission(role, "orders.read"):
+        return True
+    return (req.get("client_email") or "").strip().lower() == (session.get("email") or "").strip().lower()
+
+
 @ventas_bp.get("/sales/orders")
 @login_required
 @permission_required("orders.read")
@@ -167,6 +174,49 @@ def obtener_solicitud(request_id: int):
     return jsonify({"status": "ok", "request": req})
 
 
+@ventas_bp.get("/solicitudes/<int:request_id>/historial")
+@login_required
+@permission_required("ventas.manage")
+def solicitud_historial(request_id: int):
+    from paquetes.datos.services import list_audit_for_entity
+
+    req = services.get_request(request_id)
+    if not req:
+        return jsonify({"status": "error", "message": "Solicitud no encontrada."}), 404
+    entries = list(list_audit_for_entity("purchase_requests", request_id, limit=20).get("entries") or [])
+    oid = req.get("order_id")
+    if oid:
+        entries.extend(list_audit_for_entity("sales_records", str(oid), limit=10).get("entries") or [])
+    entries.sort(key=lambda row: str(row.get("at") or ""), reverse=True)
+    return jsonify({"status": "ok", "entries": entries[:30], "total": len(entries[:30])})
+
+
+@ventas_bp.get("/solicitudes/<int:request_id>/timeline")
+@login_required
+def solicitud_timeline(request_id: int):
+    req = services.get_request(request_id)
+    if not req:
+        return _ventas_error(ValueError("not_found"))
+    if not _can_access_request(req):
+        return _ventas_error(ValueError("forbidden"))
+    events = services.request_timeline(request_id)
+    return jsonify({"status": "ok", "events": events, "count": len(events)})
+
+
+@ventas_bp.get("/solicitudes/<int:request_id>/comprobante")
+@login_required
+def solicitud_comprobante(request_id: int):
+    req = services.get_request(request_id)
+    if not req:
+        return _ventas_error(ValueError("not_found"))
+    if not _can_access_request(req):
+        return _ventas_error(ValueError("forbidden"))
+    try:
+        return jsonify({"status": "ok", "receipt": services.payment_receipt(request_id)})
+    except ValueError as exc:
+        return _ventas_error(exc)
+
+
 @ventas_bp.post("/solicitudes/<int:request_id>/cancelar")
 @login_required
 def cancelar_solicitud(request_id: int):
@@ -218,13 +268,15 @@ def cambiar_pago(request_id: int):
 @ventas_bp.post("/solicitudes/<int:request_id>/pagar")
 @login_required
 def cliente_pagar(request_id: int):
-    """Pago del cliente dueño de la solicitud (simulado)."""
+    """Pago del cliente dueño de la solicitud."""
     body = request.get_json(silent=True) or {}
     try:
         req = services.client_pay(
             request_id,
             client_email=session.get("email") or "",
             method=(body.get("method") or body.get("payment_method") or "tarjeta"),
+            card=body.get("card") or {},
+            idempotency_key=body.get("idempotency_key") or "",
         )
         return jsonify({"status": "ok", "message": "Pago registrado.", "request": req})
     except ValueError as e:
@@ -241,10 +293,29 @@ def staff_registrar_pago(request_id: int):
             request_id,
             staff_email=session.get("email") or "",
             method=(body.get("method") or body.get("payment_method") or "tarjeta"),
+            card=body.get("card") or {},
+            idempotency_key=body.get("idempotency_key") or "",
         )
         return jsonify({"status": "ok", "message": "Pago registrado por el vendedor.", "request": req})
     except ValueError as e:
         return _ventas_error(e)
+
+
+@ventas_bp.post("/solicitudes/<int:request_id>/intentos-pago")
+@login_required
+def registrar_intento_pago_fallido(request_id: int):
+    body = request.get_json(silent=True) or {}
+    try:
+        attempt = services.record_failed_payment_attempt(
+            request_id, actor_email=session.get("email") or "",
+            outcome=body.get("outcome") or "declined",
+            failure_code=body.get("failure_code"),
+            idempotency_key=body.get("idempotency_key") or "", card=body.get("card") or {},
+            allow_staff=_can_manage_solicitudes(session.get("role")),
+        )
+        return jsonify({"status": "ok", "attempt": attempt}), 201
+    except ValueError as exc:
+        return _ventas_error(exc)
 
 
 @ventas_bp.post("/solicitudes/<int:request_id>/convertir")
@@ -307,20 +378,32 @@ def _ventas_error(exc: ValueError):
         "not_found": ("Solicitud no encontrada.", 404),
         "invalid_status": ("Estado no válido.", 400),
         "invalid_payment_method": (
-            "Método de pago no válido para este canal.",
+            "Solo se admite pago con tarjeta.",
             400,
         ),
+        "sensitive_card_data": ("No envíes el número completo ni el CVV de la tarjeta.", 400),
+        "invalid_card_metadata": ("Los datos seguros de la tarjeta están incompletos.", 400),
+        "invalid_idempotency_key": ("La referencia del intento de pago no es válida.", 400),
+        "duplicate_payment_attempt": ("Ese intento de pago ya fue utilizado.", 409),
+        "invalid_payment_outcome": ("Resultado de pago no válido.", 400),
+        "forbidden": ("No autorizado.", 403),
         "cannot_pay_closed": ("No se puede registrar pago en una solicitud cerrada.", 409),
+        "approval_required_for_payment": (
+            "La solicitud debe estar aprobada antes de registrar el pago.",
+            409,
+        ),
         "already_paid": ("Esta solicitud ya está pagada.", 409),
         "client_must_pay": ("Solo el cliente puede marcar el pedido como pagado.", 409),
         "payment_required": (
-            "En pedidos online el cliente debe pagar antes de enviar. "
-            "En venta presencial puedes registrar crédito.",
+            "El cliente debe pagar con tarjeta antes de enviar o entregar.",
             409,
         ),
         "payment_required_before_convert": (
-            "En pedidos online el cliente debe pagar primero (Mis pedidos → Pagar). "
-            "En venta presencial puedes registrar crédito.",
+            "El cliente debe pagar con tarjeta (Mis pedidos → Pagar) antes de convertir.",
+            409,
+        ),
+        "payment_amount_mismatch": (
+            "El monto pagado no coincide con el total del pedido. No se puede convertir.",
             409,
         ),
         "credit_offline_only": (
@@ -328,6 +411,17 @@ def _ventas_error(exc: ValueError):
             "En online el cliente debe pagar en Mis pedidos.",
             409,
         ),
+        "credit_not_enabled": (
+            "El cliente no tiene habilitado el crédito comercial.",
+            409,
+        ),
+        "credit_limit_exceeded": (
+            "La operación supera el cupo de crédito disponible del cliente.",
+            409,
+        ),
+        "payment_exceeds_balance": ("El abono supera el saldo pendiente.", 409),
+        "duplicate_payment_reference": ("Ya existe un abono con esa referencia.", 409),
+        "reference_required": ("Indica una referencia de al menos 6 caracteres.", 400),
         "already_converted": ("La solicitud ya fue convertida.", 409),
         "already_rejected": ("La solicitud ya fue rechazada.", 409),
         "already_delivered": ("La solicitud ya fue entregada.", 409),

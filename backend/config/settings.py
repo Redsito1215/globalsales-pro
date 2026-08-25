@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     data_parquet_dir: Path = ROOT / "data" / "parquet"
 
     mongo_uri: str = "mongodb://localhost:27017"
+    mongo_server_selection_timeout_ms: int = 5000
+    mongo_connect_timeout_ms: int = 5000
     mongo_db: str = "globtrade_dw"
     mongo_ops_db: str | None = None
     mongo_replica_uri: str | None = None
@@ -22,9 +24,25 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8001
     web_port: int = 5001
+    app_env: str = "development"
+    cors_origins: str = "http://localhost:5001,http://127.0.0.1:5001"
 
     flask_secret_key: str = "globtrade-dev-change-in-production"
-    session_days: int = 7
+    session_days: int = 7  # compatibilidad con instalaciones anteriores
+    session_idle_minutes: int = 120
+    session_cookie_secure: bool = False
+
+    def allowed_cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    def assert_safe_production(self) -> None:
+        if self.app_env.lower() != "production":
+            return
+        insecure = {"", "globtrade-dev-change-in-production", "globtrade-docker-change-me", "cambia-esto-en-produccion"}
+        if self.flask_secret_key in insecure or len(self.flask_secret_key) < 32:
+            raise RuntimeError("FLASK_SECRET_KEY debe ser aleatoria y tener al menos 32 caracteres en producción.")
+        if not self.session_cookie_secure:
+            raise RuntimeError("SESSION_COOKIE_SECURE debe estar habilitado en producción.")
 
     product_uploads_dir: Path = ROOT / "frontend" / "static" / "uploads" / "products"
     company_uploads_dir: Path = ROOT / "frontend" / "static" / "uploads" / "company"

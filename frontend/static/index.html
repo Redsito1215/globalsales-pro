@@ -8,31 +8,36 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260813j" />
-<link rel="stylesheet" href="/static/css/storefront.css?v=20260813j" />
-<link rel="stylesheet" href="/static/css/page-unified.css?v=20260813i" />
-<link rel="stylesheet" href="/static/css/admin-ui.css?v=20260813j" />
+<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260820e" />
+<link rel="stylesheet" href="/static/css/storefront.css?v=20260824a" />
+<link rel="stylesheet" href="/static/css/page-unified.css?v=20260820a" />
+<link rel="stylesheet" href="/static/css/admin-ui.css?v=20260824b" />
+<link rel="stylesheet" href="/static/css/commercial-admin.css?v=20260824a" />
 <link rel="stylesheet" href="/static/css/ux-live.css?v=20260813i" />
-<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260813i" />
-<link rel="stylesheet" href="/static/css/innovate-ui.css?v=20260813i" />
-<link rel="stylesheet" href="/static/css/globtrade-identity.css?v=20260813j" />
-<script src="/static/js/ops-ui.js?v=20260810v" defer></script>
-<script src="/static/js/ops-live.js?v=20260810q" defer></script>
-<script src="/static/js/auth-nav.js?v=20260810q" defer></script>
-<script src="/static/js/company-admin.js?v=20260813a" defer></script>
-<script src="/static/js/q4-datos.js?v=20260813b" defer></script>
-<script src="/static/js/q3-ventas.js?v=20260810v" defer></script>
-<script src="/static/js/q3-pedidos.js?v=20260810v" defer></script>
+<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260820b" />
+<link rel="stylesheet" href="/static/css/innovate-ui.css?v=20260820c" />
+<link rel="stylesheet" href="/static/css/globtrade-identity.css?v=20260820b" />
+<link rel="stylesheet" href="/static/css/accessibility.css?v=20260824a" />
+<script src="/static/js/ops-ui.js?v=20260822a" defer></script>
+<script src="/static/js/ops-live.js?v=20260820a" defer></script>
+<script src="/static/js/auth-nav.js?v=20260819c" defer></script>
+<script src="/static/js/company-admin.js?v=20260822a" defer></script>
+<script src="/static/js/commercial-admin.js?v=20260824a" defer></script>
+<script src="/static/js/q4-datos.js?v=20260824c" defer></script>
+<script src="/static/js/q3-ventas.js?v=20260820a" defer></script>
+<script src="/static/js/q3-pedidos.js?v=20260819c" defer></script>
 <script src="/static/js/q2-analisis.js?v=20260810v" defer></script>
-<script src="/static/js/tienda.js?v=20260813f" defer></script>
-<script src="/static/js/mis-pedidos.js?v=20260810v" defer></script>
-<script src="/static/js/solicitud-detail.js?v=20260810v" defer></script>
-<script src="/static/js/notificaciones.js?v=20260810v" defer></script>
-<script src="/static/js/soporte.js?v=20260810v" defer></script>
-<script src="/static/js/roles-admin.js?v=20260810v" defer></script>
+<script src="/static/js/tienda.js?v=20260824a" defer></script>
+<script src="/static/js/shop-header-nav.js?v=20260820i" defer></script>
+<script src="/static/js/mis-pedidos.js?v=20260824b" defer></script>
+<script src="/static/js/solicitud-detail.js?v=20260824c" defer></script>
+<script src="/static/js/notificaciones.js?v=20260824c" defer></script>
+<script src="/static/js/soporte.js?v=20260816a" defer></script>
+<script src="/static/js/roles-admin.js?v=20260820a" defer></script>
 <script src="/static/js/decisiones.js?v=20260810v" defer></script>
-<script src="/static/js/compras.js?v=20260810v" defer></script>
-<script src="/static/js/reportes.js?v=20260813ai3" defer></script>
+<script src="/static/js/compras.js?v=20260824d" defer></script>
+<script src="/static/js/reportes.js?v=20260824b" defer></script>
+<script src="/static/js/accessibility.js?v=20260824a" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 (function(){
@@ -44,7 +49,9 @@
 })();
 </script>
 </head>
-<body>
+<body class="shop-page-active shop-on-tienda">
+<a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+<div id="a11y-page-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="boot-screen" aria-live="polite">
   <div class="boot-brand">
     <span class="boot-mark" aria-hidden="true"><img src="/static/img/globtrade-logo.png" alt="" width="72" height="72" /></span>
@@ -54,7 +61,6 @@
   <p class="boot-msg">Iniciando plataforma…</p>
 </div>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
-
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="logo logo--rail">
@@ -76,11 +82,11 @@
         <span class="nav-folder-chevron" aria-hidden="true"></span>
       </button>
       <div class="nav-folder-body">
-        <button type="button" class="nav-item active" data-page="dashboard" data-nav-section="ops" onclick="showPage('dashboard', this)">
+        <button type="button" class="nav-item" data-page="dashboard" data-nav-section="ops" onclick="showPage('dashboard', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg></span>
           <span class="nav-label">Tablero</span>
         </button>
-        <button type="button" class="nav-item" data-page="tienda" data-nav-section="ops" onclick="showPage('tienda', this)">
+        <button type="button" class="nav-item active" data-page="tienda" data-nav-section="ops" onclick="showPage('tienda', this, { tiendaMode: 'catalog' })">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h8l1 4H5l1-4z"/><path d="M5 6h10l-1 11H6L5 6z"/></svg></span>
           <span class="nav-label">Tienda</span>
         </button>
@@ -154,6 +160,43 @@
       </div>
     </div>
 
+    <div class="nav-block nav-folder" data-nav-section="gestion">
+      <button type="button" class="nav-folder-toggle" aria-expanded="false" onclick="toggleNavGroup(this)">
+        <span class="nav-section-label nav-section-label--toggle">Gestión</span>
+        <span class="nav-folder-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="nav-folder-body">
+        <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_region" data-nav-section="gestion" onclick="showGestion('dim_region', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3a12 12 0 010 14M10 3a12 12 0 000 14"/></svg></span>
+          <span class="nav-label">Regiones</span>
+        </button>
+        <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_pais" data-nav-section="gestion" onclick="showGestion('dim_pais', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h5v5H4zM11 4h5v5h-5zM4 11h5v5H4zM13 13h3v3h-3z"/></svg></span>
+          <span class="nav-label">Países</span>
+        </button>
+        <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_categoria" data-nav-section="gestion" onclick="showGestion('dim_categoria', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h12M4 10h8M4 14h10"/></svg></span>
+          <span class="nav-label">Categorías</span>
+        </button>
+        <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_producto" data-nav-section="gestion" onclick="showGestion('dim_producto', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 4h8l2 4v8a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z"/><path d="M8 4V2h4v2"/></svg></span>
+          <span class="nav-label">Productos</span>
+        </button>
+        <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_canal" data-nav-section="gestion" onclick="showGestion('dim_canal', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h14v9H3z"/><path d="M7 7V5h6v2"/></svg></span>
+          <span class="nav-label">Canales</span>
+        </button>
+        <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_prioridad" data-nav-section="gestion" onclick="showGestion('dim_prioridad', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3l2.5 5 5.5.8-4 3.9.9 5.5L10 15.8 5.1 18.2l.9-5.5-4-3.9 5.5-.8L10 3z"/></svg></span>
+          <span class="nav-label">Prioridades</span>
+        </button>
+        <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_cliente" data-nav-section="gestion" onclick="showGestion('dim_cliente', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/></svg></span>
+          <span class="nav-label">Clientes</span>
+        </button>
+      </div>
+    </div>
+
     <div class="nav-block nav-folder" data-nav-section="admin">
       <button type="button" class="nav-folder-toggle" aria-expanded="false" onclick="toggleNavGroup(this)">
         <span class="nav-section-label nav-section-label--toggle">Administración</span>
@@ -163,10 +206,6 @@
         <button type="button" class="nav-item" data-page="company" data-nav-section="admin" onclick="showPage('company', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 17V7l6-3 6 3v10"/><path d="M8 17v-5h4v5"/></svg></span>
           <span class="nav-label">Empresa</span>
-        </button>
-        <button type="button" class="nav-item" data-page="datos" data-nav-section="admin" onclick="showPage('datos', this)">
-          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="10" cy="5" rx="7" ry="2.5"/><path d="M3 5v4c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V5"/><path d="M3 9v4c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V9"/></svg></span>
-          <span class="nav-label">Datos maestros</span>
         </button>
         <button type="button" class="nav-item" data-page="schema" data-nav-section="admin" onclick="showPage('schema', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h12v4H4zM6 8v4M14 8v4M4 12h12v4H4z"/></svg></span>
@@ -179,6 +218,10 @@
         <button type="button" class="nav-item" data-page="audit" data-nav-section="admin" onclick="showPage('audit', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h8v14H6z"/><path d="M8 7h4M8 10h4M8 13h2"/></svg></span>
           <span class="nav-label">Auditoría</span>
+        </button>
+        <button type="button" class="nav-item" data-page="commercial-admin" data-nav-section="admin" data-require-perm="users.manage" onclick="showPage('commercial-admin', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 15V8m7 7V4m7 11v-5"/><path d="M2 17h16"/></svg></span>
+          <span class="nav-label">Gestión comercial</span>
         </button>
         <button type="button" class="nav-item" data-page="roles-admin" data-nav-section="admin" data-require-perm="users.manage" onclick="showPage('roles-admin', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 2a4 4 0 100 8 4 4 0 000-8zM3 18c0-3.3 3.1-6 7-6s7 2.7 7 6"/></svg></span>
@@ -210,19 +253,19 @@
 </aside>
 
 <!-- MAIN -->
-<main class="main">
+<main class="main" id="main-content" tabindex="-1">
   <div class="topbar">
     <div class="topbar-left">
       <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Mostrar menú" aria-expanded="true" onclick="toggleSidebar()"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg></button>
-      <div id="topbar-title">GLOBTRADE S.A. — Inicio</div>
+      <div id="topbar-title">Tienda</div>
     </div>
     <div class="topbar-right">
-      <button type="button" class="btn-topbar btn-topbar--ghost notif-btn" id="btn-notifications" hidden title="Notificaciones en vivo" onclick="showPage('notificaciones', document.querySelector('[data-page=notificaciones]'))">
+      <button type="button" class="btn-topbar btn-topbar--ghost notif-btn" id="btn-notifications" hidden title="Notificaciones en vivo" aria-label="Abrir notificaciones" onclick="showPage('notificaciones', document.querySelector('[data-page=notificaciones]'))">
         <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 2a5 5 0 00-5 5v2.2L3.5 12h13L15 9.2V7a5 5 0 00-5-5z"/><path d="M8 15a2 2 0 004 0"/></svg>
         <span class="live-dot" id="notif-live-dot" hidden aria-hidden="true"></span>
         <span class="notif-badge" id="notif-badge" hidden>0</span>
       </button>
-      <span class="auth-user-label auth-user-label--clickable" id="topbar-auth-user" hidden title="Editar perfil" onclick="openProfileModal()"></span>
+      <button type="button" class="auth-user-label auth-user-label--clickable" id="topbar-auth-user" hidden title="Editar perfil" onclick="openProfileModal()"></button>
       <button type="button" class="btn-topbar btn-topbar--ghost" id="btn-register" onclick="openRegisterModal()">Crear cuenta</button>
       <button type="button" class="btn-topbar btn-topbar--ghost" id="btn-login" onclick="openLoginModal()">Iniciar sesión</button>
       <button type="button" class="btn-topbar btn-topbar--solid" id="btn-logout" onclick="logout()" hidden>Cerrar sesión</button>
@@ -233,14 +276,51 @@
     </div>
   </div>
 
+  <header class="shop-madson-header" id="shop-madson-header" aria-label="Navegación GLOBTRADE">
+    <div class="shop-madson-header-top">
+      <button type="button" class="shop-madson-menu-btn" id="shop-panel-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="shop-madson-nav" onclick="toggleShopNavDropdown()">
+        <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
+      </button>
+      <form class="shop-madson-search" role="search" onsubmit="event.preventDefault(); submitShopHeaderSearch();">
+        <label class="visually-hidden" for="shop-search">Buscar productos</label>
+        <div class="shop-madson-search-field">
+          <svg class="shop-madson-search-icon" viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg>
+          <input type="search" class="shop-madson-search-input" id="shop-search" placeholder="¿Qué producto buscas?" autocomplete="off" oninput="onShopHeaderSearchInput()" />
+          <button type="submit" class="shop-madson-search-btn">Buscar</button>
+        </div>
+      </form>
+      <a href="#" class="shop-madson-logo" onclick="event.preventDefault(); showPage('tienda', document.querySelector('[data-page=tienda]'), { tiendaMode: 'home' })" aria-label="GLOBTRADE inicio">
+        <span class="shop-madson-logo-mark" aria-hidden="true">///</span>
+        <span class="shop-madson-logo-text">GLOBTRADE</span>
+      </a>
+      <div class="shop-madson-actions">
+        <button type="button" class="shop-header-login-btn" id="shop-header-login" onclick="openLoginModal()">Iniciar sesión</button>
+        <div class="shop-header-auth" id="shop-header-auth" hidden>
+          <button type="button" class="shop-header-auth-link" onclick="openProfileModal()">Mi perfil</button>
+          <button type="button" class="shop-header-auth-link shop-header-auth-link--logout" onclick="logout()">Cerrar sesión</button>
+        </div>
+        <button type="button" class="shop-madson-icon-btn shop-madson-notif-btn" id="shop-header-notifications" title="Notificaciones" hidden onclick="window._authUser?showPage('notificaciones', document.querySelector('[data-page=notificaciones]')):openLoginModal()" aria-label="Notificaciones">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="shop-madson-notif-count" id="shop-header-notif-badge" hidden>0</span>
+        </button>
+        <button type="button" class="shop-madson-icon-btn shop-madson-cart-btn" title="Ver carrito" onclick="scrollShopToCart()" aria-label="Ver carrito">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12l1 4H5l1-4z"/><path d="M5 6h14l-1.2 7.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 6z"/><circle cx="9" cy="20" r="1.25"/><circle cx="17" cy="20" r="1.25"/></svg>
+                <span class="shop-madson-cart-count" id="shop-header-cart-badge">0</span>
+              </button>
+      </div>
+    </div>
+    <nav class="shop-madson-nav" id="shop-madson-nav" aria-label="Navegación principal"></nav>
+    <div class="shop-nav-backdrop" id="shop-nav-backdrop" hidden onclick="closeShopNavDropdown()"></div>
+  </header>
+
   <div class="content">
 
     <!-- ══════════════════════════════════════════
          PAGE: DASHBOARD (página principal)
     ══════════════════════════════════════════ -->
-    <div class="page active" id="page-dashboard">
+    <div class="page" id="page-dashboard">
       <div class="page-shell">
-      <header class="page-hero page-hero--showcase">
+      <header class="page-hero">
         <span class="page-badge">Tablero Q1</span>
         <h1 class="page-title">Explora el comercio global con datos en tiempo real</h1>
         <p class="page-lead">KPIs, tendencias y desglose por región, canal y producto — una vista ejecutiva diseñada para decidir rápido, no para perderse en tablas.</p>
@@ -668,11 +748,35 @@
             </div>
             <div class="fg"><label for="company-field-website">Sitio web</label><input id="company-field-website" type="text" placeholder="www.ejemplo.com" /></div>
             <div class="fg"><label for="company-field-invoice_signer">Firma en factura</label><input id="company-field-invoice_signer" type="text" placeholder="Equipo Comercial GLOBTRADE" /></div>
+            <div class="fg"><label for="company-field-tax_rate">IVA % (incluido en el total de la factura)</label><input id="company-field-tax_rate" type="number" min="0" max="30" step="1" /></div>
             <div class="fg"><label for="company-field-invoice_footer">Nota al pie de factura</label><textarea id="company-field-invoice_footer" rows="2"></textarea></div>
             <div class="company-admin-actions">
               <button type="button" class="btn btn-primary" onclick="saveCompanyProfile()">Guardar datos</button>
               <span id="company-admin-status" class="admin-page-meta" aria-live="polite"></span>
             </div>
+          </div>
+        </div>
+      </section>
+      <section id="company-storefront-hero-panel" class="table-box table-box--admin company-admin-panel company-storefront-panel" data-require-perm="company.manage" hidden>
+        <div class="dash-section-head" style="margin-bottom:1rem">
+          <h2>Banner de la tienda</h2>
+          <p>Imagen y textos del banner principal en la página Tienda. Visible para todos los visitantes.</p>
+        </div>
+        <div class="company-admin-grid">
+          <div class="company-admin-logo">
+            <img id="storefront-hero-preview" class="company-logo-preview company-hero-preview" src="/static/img/products/88.jpg" alt="Vista previa del banner" />
+            <label class="btn btn-ghost btn-sm company-logo-upload">
+              Cambiar imagen
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="uploadStorefrontHeroImage(this)" />
+            </label>
+            <p class="admin-page-meta">PNG, JPG o WebP · máx. 2 MB · recomendado 1200×600 px</p>
+          </div>
+          <div class="company-admin-fields">
+            <div class="fg"><label for="company-field-storefront_hero_kicker">Etiqueta superior</label><input id="company-field-storefront_hero_kicker" type="text" placeholder="Ej. Comercio mayorista B2B" /></div>
+            <div class="fg"><label for="company-field-storefront_hero_title">Título principal</label><input id="company-field-storefront_hero_title" type="text" /></div>
+            <div class="fg"><label for="company-field-storefront_hero_lead">Descripción</label><textarea id="company-field-storefront_hero_lead" rows="3"></textarea></div>
+            <div class="fg"><label for="company-field-storefront_hero_cta">Texto del botón</label><input id="company-field-storefront_hero_cta" type="text" placeholder="Ver catálogo" /></div>
+            <p class="admin-page-meta">Guarda junto con los datos de empresa usando el botón «Guardar datos» del bloque anterior.</p>
           </div>
         </div>
       </section>
@@ -727,7 +831,17 @@
       <!-- 10 PROBLEMAS SISTEMAS & SOFTWARE -->
       <div class="section-head">
         <h2>Problemas — <span style="color:var(--accent2)">Sistemas &amp; Software</span></h2>
-        <p>Ámbito tecnológico · 10 problemas identificados</p>
+        <p>Diagnóstico original del proyecto · varios puntos ya resueltos en la plataforma</p>
+      </div>
+      <div class="platform-status-banner">
+        <p><strong>Estado en GLOBTRADE:</strong> roles y permisos, ETL manual + Airflow, sync incremental al tablero, libro de caja, requisiciones → OC, notificaciones in-app y respaldos con <code>scripts/backup_mongo</code>.</p>
+        <div class="ops-chips platform-status-chips">
+          <span class="ops-chip ops-chip--ok"><span>Roles</span><strong>OK</strong></span>
+          <span class="ops-chip ops-chip--ok"><span>ETL / sync</span><strong>OK</strong></span>
+          <span class="ops-chip ops-chip--ok"><span>Caja</span><strong>OK</strong></span>
+          <span class="ops-chip ops-chip--ok"><span>Compras</span><strong>OK</strong></span>
+          <span class="ops-chip"><span>Backup</span><strong>Script</strong></span>
+        </div>
       </div>
       <div class="problems-grid" style="margin-bottom:36px">
         <div class="problem-card sys">
@@ -742,8 +856,8 @@
         </div>
         <div class="problem-card sys">
           <div class="num">03</div>
-          <h4>Ausencia de pipeline ETL automatizado</h4>
-          <p>La carga de datos se realiza manualmente cada vez; no existe un proceso ETL programado que actualice la BD de forma continua y confiable.</p>
+          <h4>Pipeline ETL</h4>
+          <p><span class="badge badge--ok" style="margin-bottom:6px;display:inline-block">Resuelto</span> Carga CSV, Construir modelo, DAG Airflow y sync incremental tras convertir ventas alimentan <code>fact_ventas</code>.</p>
         </div>
         <div class="problem-card sys">
           <div class="num">04</div>
@@ -753,7 +867,7 @@
         <div class="problem-card sys">
           <div class="num">05</div>
           <h4>Seguridad y control de acceso</h4>
-          <p>No existe sistema de roles y permisos granular; todos los usuarios ven datos sensibles de precios, costos y utilidades sin restricción.</p>
+          <p><span class="badge badge--ok" style="margin-bottom:6px;display:inline-block">Implementado</span> Roles configurables (cliente, vendedor, analista, admin), permisos por módulo y auditoría de acciones sensibles.</p>
         </div>
         <div class="problem-card sys">
           <div class="num">06</div>
@@ -767,8 +881,8 @@
         </div>
         <div class="problem-card sys">
           <div class="num">08</div>
-          <h4>Sin estrategia de backup y recuperación</h4>
-          <p>La base de datos carece de política de respaldos automáticos (full + incremental); una falla de disco implicaría pérdida total de los 100K registros.</p>
+          <h4>Backup y recuperación</h4>
+          <p><span class="badge badge--warn" style="margin-bottom:6px;display:inline-block">Parcial</span> Scripts <code>backup_mongo</code> para volcados manuales; restauración documentada en <code>scripts/README-operaciones.md</code>.</p>
         </div>
         <div class="problem-card sys">
           <div class="num">09</div>
@@ -811,7 +925,7 @@
         <div class="problem-card dec">
           <div class="num">05</div>
           <h4>¿Cuándo y cuánto stockear?</h4>
-          <p>Sin modelo predictivo de demanda por categoría y región, el área de compras sobreabastece productos de baja rotación y desabastece los de alta.</p>
+          <p><span class="badge badge--ok" style="margin-bottom:6px;display:inline-block">Panel Decisiones</span> Alertas de stock bajo, notificaciones proactivas y flujo requisición → OC a proveedor.</p>
         </div>
         <div class="problem-card dec">
           <div class="num">06</div>
@@ -895,9 +1009,9 @@
               <button type="button" class="btn btn-ghost" id="rc-btn-csv" onclick="exportRcCsv()">Exportar CSV</button>
             </div>
           </div>
-          <p id="rc-fallback-banner" class="reportes-fallback-banner" hidden></p>
-          <p id="rc-export-status" class="reportes-export-status" hidden></p>
-          <p id="rc-meta" class="catalog-meta" style="margin-bottom:12px"></p>
+          <p id="rc-fallback-banner" class="reportes-fallback-banner page-meta-strip" hidden></p>
+          <p id="rc-export-status" class="reportes-export-status page-meta-strip" hidden></p>
+          <p id="rc-meta" class="catalog-meta page-meta-strip"></p>
           <div class="table-box">
             <div class="table-header">
               <div class="table-title" id="rc-title">Selecciona un informe</div>
@@ -943,8 +1057,8 @@
               <button type="button" class="btn btn-ghost" id="reportes-btn-csv" onclick="exportReporteCsv()">Exportar CSV</button>
             </div>
           </div>
-          <p id="reportes-export-status" class="reportes-export-status" hidden></p>
-          <p id="reportes-meta" class="catalog-meta" style="margin-bottom:12px"></p>
+          <p id="reportes-export-status" class="reportes-export-status page-meta-strip" hidden></p>
+          <p id="reportes-meta" class="catalog-meta page-meta-strip"></p>
           <div class="table-box">
             <div class="table-header">
               <div class="table-title" id="reportes-title">Selecciona un reporte</div>
@@ -967,13 +1081,16 @@
         <header class="page-hero">
         <span class="page-badge">Operaciones Q3</span>
         <h1 class="page-title">Compras y stock</h1>
-        <p class="page-lead">Inventario centralizado en bodega general, proveedores por continente y OCs: borrador → enviar → recibir.</p>
+        <p class="page-lead">Inventario en bodega general, proveedores y <strong>órdenes de compra a proveedor (OC)</strong> — distintas de las solicitudes de cliente en Ventas.</p>
       </header>
         <div class="page-body" id="compras-root">
           <div class="page-tabs">
             <button type="button" class="btn btn-ghost tab-btn compras-tab-btn active" data-tab="inventario" onclick="showComprasTab('inventario')">Inventario</button>
             <button type="button" class="btn btn-ghost tab-btn compras-tab-btn" data-tab="proveedores" onclick="showComprasTab('proveedores')">Proveedores</button>
-            <button type="button" class="btn btn-ghost tab-btn compras-tab-btn" data-tab="ocs" onclick="showComprasTab('ocs')">Órdenes de compra</button>
+            <button type="button" class="btn btn-ghost tab-btn compras-tab-btn" data-tab="requisiciones" onclick="showComprasTab('requisiciones')">Requisiciones</button>
+            <button type="button" class="btn btn-ghost tab-btn compras-tab-btn" data-tab="ocs" onclick="showComprasTab('ocs')">OC a proveedor</button>
+            <button type="button" class="btn btn-ghost tab-btn compras-tab-btn" data-tab="caja" onclick="showComprasTab('caja')">Libro de caja</button>
+            <button type="button" class="btn btn-ghost tab-btn compras-tab-btn" data-tab="merma" onclick="showComprasTab('merma')">Merma</button>
           </div>
           <div id="compras-panel-inventario" class="compras-panel">
             <div id="compras-warehouse-banner" class="compras-wh-banner" hidden>
@@ -989,7 +1106,7 @@
             <div class="table-box">
               <div class="table-header"><div class="table-title">Inventario por variante</div></div>
               <div class="table-scroll">
-                <table><thead><tr><th>Var.</th><th>Producto</th><th>Bodega</th><th>Proveedor</th><th>Existencias</th><th>Precio</th><th>Costo</th><th>Ajuste</th></tr></thead>
+                <table><thead><tr><th>Var.</th><th>Producto</th><th>Disponible</th><th>Comprometido</th><th>Dañado</th><th>En tránsito</th><th>Mínimo</th><th>Reposición</th><th>Precio</th><th>Costo</th><th>Acciones</th></tr></thead>
                 <tbody id="compras-inv-body"></tbody></table>
               </div>
             </div>
@@ -1037,6 +1154,26 @@
               </div>
             </div>
           </div>
+          <div id="compras-panel-requisiciones" class="compras-panel" hidden>
+            <p class="modal-sub" style="margin-bottom:12px">Requisición interna → aprobar → generar <strong>OC a proveedor</strong> en borrador.</p>
+            <div class="page-panel panel-form">
+              <h3 class="panel-form-title">Nueva requisición interna</h3>
+              <div class="filters filters--flat">
+                <div class="filter-group"><label>Proveedor</label><select id="preq-vendor"><option value="">—</option></select></div>
+                <div class="filter-group"><label>Variante</label><select id="preq-variant"><option value="">—</option></select></div>
+                <div class="filter-group filter-input--narrow"><label>Cantidad</label><input id="preq-qty" type="number" value="20" min="1" /></div>
+                <div class="filter-group filter-input--narrow"><label>Costo unit.</label><input id="preq-cost" type="number" step="0.01" value="0" /></div>
+                <div class="filter-group filter-group--action"><button type="button" class="btn btn-primary" onclick="createRequisition()">Crear requisición</button></div>
+              </div>
+            </div>
+            <div class="table-box">
+              <div class="table-header"><div class="table-title">Requisiciones internas</div></div>
+              <div class="table-scroll">
+                <table><thead><tr><th>#</th><th>Proveedor</th><th>Estado</th><th>Líneas</th><th>Fecha</th><th>OC</th><th></th></tr></thead>
+                <tbody id="compras-preq-body"></tbody></table>
+              </div>
+            </div>
+          </div>
           <div id="compras-panel-ocs" class="compras-panel" hidden>
             <div class="page-panel panel-form">
               <h3 class="panel-form-title">Nueva orden de compra</h3>
@@ -1057,14 +1194,73 @@
               </div>
             </div>
           </div>
+          <div id="compras-panel-caja" class="compras-panel" hidden>
+            <div id="compras-caja-summary" class="compras-caja-summary"></div>
+            <div class="filters">
+              <div class="filter-group filter-group--action">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="closeAccountingPeriod('daily')">Cerrar día</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="closeAccountingPeriod('monthly')">Cerrar mes</button>
+              </div>
+              <span id="accounting-period-meta" class="dash-records-meta"></span>
+            </div>
+            <div class="table-box" style="margin-bottom:14px">
+              <div class="table-header"><div class="table-title">Cuentas por cobrar</div><span id="accounting-receivables-meta" class="dash-records-meta"></span></div>
+              <div class="table-scroll">
+                <table><thead><tr><th>Solicitud</th><th>Cliente</th><th>Vencimiento</th><th>Antigüedad</th><th>Esperado</th><th>Pagado neto</th><th>Saldo</th><th>Acciones</th></tr></thead>
+                <tbody id="accounting-receivables-body"></tbody></table>
+              </div>
+            </div>
+            <div id="accounting-aging-summary" class="ops-chips" style="margin-bottom:14px"></div>
+            <div class="table-box" style="margin-bottom:14px">
+              <div class="table-header table-header--split"><div class="table-title">Margen comercial</div><select id="accounting-margin-group" onchange="loadAccountingMargins()"><option value="product">Por producto</option><option value="customer">Por cliente</option><option value="channel">Por canal</option><option value="country">Por país</option></select></div>
+              <div class="table-scroll"><table><thead><tr><th>Grupo</th><th>Pedidos</th><th>Unidades</th><th>Ingresos</th><th>Costos</th><th>Utilidad</th><th>Margen</th></tr></thead><tbody id="accounting-margins-body"></tbody></table></div>
+            </div>
+            <div class="filters">
+              <div class="filter-group"><label>Buscar</label><input id="compras-caja-q" type="search" placeholder="Solicitud, pedido, referencia…" onkeydown="if(event.key==='Enter')loadComprasCaja()" /></div>
+              <div class="filter-group"><label>Tipo</label>
+                <select id="compras-caja-type" onchange="loadComprasCaja()">
+                  <option value="">Todos</option>
+                  <option value="payment_in">Entradas (pagos)</option>
+                  <option value="refund_out">Salidas (devoluciones)</option>
+                </select>
+              </div>
+              <div class="filter-group filter-group--action"><button type="button" class="btn btn-ghost" onclick="loadComprasCaja()">Actualizar</button></div>
+            </div>
+            <div class="table-box">
+              <div class="table-header"><div class="table-title">Movimientos de caja</div></div>
+              <div class="table-scroll">
+                <table><thead><tr><th>ID</th><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Solicitud</th><th>Pedido</th><th>Referencia</th><th>Método</th></tr></thead>
+                <tbody id="compras-caja-body"></tbody></table>
+              </div>
+            </div>
+            <div class="table-box" style="margin-top:14px">
+              <div class="table-header">
+                <div class="table-title">Notas de crédito</div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="createManualCreditNote()">Nueva nota</button>
+              </div>
+              <div class="table-scroll">
+                <table><thead><tr><th>Número</th><th>Fecha</th><th>Solicitud</th><th>Monto</th><th>Motivo</th><th>Origen</th></tr></thead>
+                <tbody id="accounting-credit-notes-body"></tbody></table>
+              </div>
+            </div>
+          </div>
+          <div id="compras-panel-merma" class="compras-panel" hidden>
+            <p class="modal-sub" style="margin-bottom:12px">Unidades dañadas en devoluciones que no regresan al inventario disponible.</p>
+            <div class="filters">
+              <div class="filter-group"><label>Buscar</label><input id="compras-merma-q" type="search" placeholder="Solicitud, SKU, producto…" onkeydown="if(event.key==='Enter')loadComprasMerma()" /></div>
+              <div class="filter-group filter-group--action"><button type="button" class="btn btn-ghost" onclick="loadComprasMerma()">Actualizar</button></div>
+            </div>
+            <div class="table-box">
+              <div class="table-header"><div class="table-title">Registro de merma</div><span id="compras-merma-meta" class="dash-records-meta"></span></div>
+              <div class="table-scroll">
+                <table><thead><tr><th>Fecha</th><th>Solicitud</th><th>Producto</th><th>SKU</th><th>Var.</th><th>Cant.</th><th>Motivo</th><th>Revisó</th></tr></thead>
+                <tbody id="compras-merma-body"></tbody></table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-
-
-    <!-- ══════════════════════════════════════════
-         PAGE: SCHEMA
-    ══════════════════════════════════════════ -->
     <div class="page" id="page-schema">
       <div class="page-shell">
       <header class="page-hero">
@@ -1084,23 +1280,32 @@
          PAGE: LOAD DATASET
     ══════════════════════════════════════════ -->
     <!-- PAGE: TIENDA (storefront B2B) -->
-    <div class="page" id="page-tienda">
-      <div class="shop-storefront shop-classic">
+    <div class="page active" id="page-tienda">
+      <div class="shop-storefront shop-classic shop-madson">
+        <section class="shop-madson-hero" id="shop-storefront-hero" aria-label="Promoción tienda">
+          <div class="shop-madson-hero-frame">
+            <div class="shop-madson-hero-media">
+              <img src="/static/img/products/88.jpg" alt="" class="shop-madson-hero-img" id="shop-hero-img" loading="eager" />
+            </div>
+            <div class="shop-madson-hero-panel">
+              <p class="shop-madson-hero-kicker" id="shop-hero-kicker">Comercio mayorista B2B</p>
+              <h2 class="shop-madson-hero-title" id="shop-hero-title">Abastece tu negocio con catálogo global</h2>
+              <p class="shop-madson-hero-lead" id="shop-hero-lead">Pedidos consolidados, envío coordinado y seguimiento en Mis pedidos — todo desde un solo lugar.</p>
+              <button type="button" class="shop-madson-cta" id="shop-hero-cta" onclick="applyTiendaMode('catalog')">Ver catálogo</button>
+            </div>
+          </div>
+        </section>
+
         <div class="shop-catalog-wrap" id="shop-catalog-anchor">
         <div class="shop-layout shop-layout--classic">
           <aside class="shop-sidebar-classic" aria-label="Filtros de tienda">
             <div class="shop-widget">
               <h3 class="shop-widget-title">Filtrar por precio</h3>
               <div class="shop-price-range">
-                <input type="range" id="shop-price-max" class="shop-price-slider" min="0" max="500" value="500" oninput="onShopPriceSlider()" />
+                <input type="range" id="shop-price-max" class="shop-price-slider" min="0" max="500" value="500" aria-label="Precio máximo" oninput="onShopPriceSlider()" />
                 <p class="shop-price-range-label" id="shop-price-range-label">Precio: $0 — $500</p>
                 <button type="button" class="shop-widget-btn" onclick="applyShopFilters()">Filtrar</button>
               </div>
-            </div>
-            <div class="shop-widget">
-              <h3 class="shop-widget-title">Buscar por:</h3>
-              <input type="search" class="shop-widget-input" id="shop-search" placeholder="Buscar productos…" onkeydown="if(event.key==='Enter')applyShopFilters()" />
-              <button type="button" class="shop-widget-btn shop-widget-btn--primary" onclick="applyShopFilters()">Búsqueda</button>
             </div>
             <div class="shop-widget">
               <h3 class="shop-widget-title">Por categorías</h3>
@@ -1168,11 +1373,12 @@
       <header class="page-hero">
         <span class="page-badge">Operaciones Q3</span>
         <h1 class="page-title">Solicitudes y ventas</h1>
-        <p class="page-lead">Bandeja comercial: revisar, aprobar, pago/crédito, convertir, enviar y devolver con inspección.</p>
+        <p class="page-lead">Bandeja de <strong>solicitudes de cliente</strong> (pedidos B2B): revisar, aprobar, cobro con tarjeta, convertir, enviar y devolver.</p>
+        <div id="ventas-lag-banner" class="dash-lag-banner" hidden></div>
       </header>
       <div class="page-body">
       <div class="page-tabs">
-        <button type="button" class="btn btn-ghost tab-btn ventas-tab-btn active" data-tab="solicitudes" onclick="showVentasTab('solicitudes')">Solicitudes</button>
+        <button type="button" class="btn btn-ghost tab-btn ventas-tab-btn active" data-tab="solicitudes" onclick="showVentasTab('solicitudes')">Solicitudes cliente</button>
         <button type="button" class="btn btn-ghost tab-btn ventas-tab-btn" data-tab="pedidos" onclick="showVentasTab('pedidos')">Pedidos históricos</button>
       </div>
       <div id="ventas-panel-solicitudes" class="ventas-tab-panel">
@@ -1203,7 +1409,7 @@
         </div>
         <div class="table-box">
           <div class="table-header">
-            <div class="table-title">Solicitudes de compra</div>
+            <div class="table-title">Solicitudes de cliente</div>
             <span id="solicitudes-meta" class="dash-records-meta"></span>
           </div>
           <div class="table-scroll">
@@ -1233,8 +1439,28 @@
         <div class="table-box">
           <div class="table-header"><div class="table-title">Últimos pedidos</div></div>
           <div class="table-scroll">
-            <table><thead><tr><th>ID</th><th>País</th><th>Producto</th><th>Unidades</th><th>Ingreso</th><th></th></tr></thead>
+            <table><thead><tr><th>ID</th><th>País</th><th>Producto</th><th>Unidades</th><th>Ingreso</th><th>Acciones</th></tr></thead>
             <tbody id="pedidos-admin-body"></tbody></table>
+          </div>
+        </div>
+        <div id="pedido-edit-modal" class="modal" hidden role="dialog" aria-labelledby="pedido-edit-title">
+          <div class="modal-box">
+            <h3 id="pedido-edit-title" class="modal-title">Editar pedido histórico</h3>
+            <input type="hidden" id="ep-order-id" />
+            <div class="filters filters--flat">
+              <div class="filter-group"><label>Región</label><input id="ep-region" /></div>
+              <div class="filter-group"><label>País</label><input id="ep-country" /></div>
+              <div class="filter-group"><label>Producto (categoría)</label><input id="ep-item" /></div>
+              <div class="filter-group"><label>Canal</label><input id="ep-channel" /></div>
+              <div class="filter-group filter-input--narrow"><label>Prioridad</label><input id="ep-priority" maxlength="1" /></div>
+              <div class="filter-group filter-input--narrow"><label>Unidades</label><input id="ep-units" type="number" min="0" /></div>
+              <div class="filter-group filter-input--narrow"><label>Precio unit.</label><input id="ep-price" type="number" step="0.01" /></div>
+              <div class="filter-group filter-input--narrow"><label>Costo unit.</label><input id="ep-cost" type="number" step="0.01" /></div>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-ghost" onclick="closePedidoEditModal()">Cancelar</button>
+              <button type="button" class="btn btn-primary" onclick="savePedidoEdit()">Guardar cambios</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1248,7 +1474,7 @@
       <header class="page-hero">
         <span class="page-badge">Mi cuenta</span>
         <h1 class="page-title">Mis pedidos</h1>
-        <p class="page-lead">Seguimiento de tus solicitudes. Cuando estén listas, paga aquí (transferencia o pago simulado).</p>
+        <p class="page-lead">Seguimiento de tus solicitudes. Cuando estén aprobadas, paga aquí con tarjeta.</p>
       </header>
       <div class="page-body">
       <div id="mis-pedidos-chips" class="ops-chips"></div>
@@ -1284,6 +1510,11 @@
               </div>
               <button type="button" class="btn btn-primary btn-sm" onclick="markAllNotificationsRead()">Marcar todo leído</button>
             </div>
+            <div class="filters filters--flat" style="margin-bottom:10px">
+              <div class="filter-group" style="flex:1"><label>Buscar avisos</label><input id="notificaciones-q" type="search" placeholder="Asunto o contenido" oninput="renderNotificacionesList()" /></div>
+              <div class="filter-group"><label><input id="notificaciones-unread" type="checkbox" onchange="renderNotificacionesList()" /> Solo sin leer</label></div>
+            </div>
+            <div id="notificaciones-filters" class="notif-filters" role="toolbar" aria-label="Filtrar por categoría"></div>
             <div id="notificaciones-list" class="notificaciones-list"></div>
           </div>
         </div>
@@ -1296,27 +1527,102 @@
         <header class="page-hero">
         <span class="page-badge">Soporte</span>
         <h1 class="page-title">Soporte en línea</h1>
-        <p class="page-lead">Chat con el equipo comercial. Staff responde hilos; clientes ven su conversación.</p>
+        <p id="soporte-lead" class="page-lead">Escribe al equipo comercial. Te responden en este mismo hilo.</p>
       </header>
         <div class="page-body">
+          <div id="soporte-chips" class="ops-chips"></div>
           <div id="soporte-admin-bar" class="filters" hidden>
             <div class="filter-group"><label>Correo del cliente</label><input id="soporte-thread-email" type="email" placeholder="cliente@email.com" /></div>
             <div class="filter-group filter-group--action"><button type="button" class="btn btn-ghost" onclick="loadSoportePage()">Cargar hilo</button></div>
           </div>
           <div class="soporte-layout">
             <aside id="soporte-inbox" class="soporte-inbox" hidden>
-              <div class="table-title" style="padding:10px 12px;border-bottom:1px solid var(--border)">Bandeja de hilos</div>
+              <div class="table-title soporte-inbox-title">Bandeja de hilos</div>
               <div id="soporte-inbox-list" class="soporte-inbox-list"></div>
             </aside>
             <div class="chat-panel">
-              <div id="soporte-messages" class="chat-messages"></div>
-              <div class="chat-compose">
-                <input id="soporte-input" type="text" placeholder="Escribe tu mensaje (máx. 100 palabras)…" onkeydown="if(event.key==='Enter')sendSoporteMessage()" />
-                <button type="button" class="btn btn-primary" onclick="sendSoporteMessage()">Enviar</button>
+              <div id="soporte-chat-head" class="chat-head">
+                <strong id="soporte-chat-title">Conversación</strong>
+                <span id="soporte-chat-sub" class="chat-head-sub"></span>
               </div>
-              <p id="soporte-word-hint" class="chat-word-hint">0/100 palabras</p>
+              <div id="soporte-messages" class="chat-messages" aria-live="polite"></div>
+              <div class="chat-compose">
+                <div class="chat-compose-main">
+                  <textarea id="soporte-input" rows="2" maxlength="2000" placeholder="Escribe tu mensaje (máx. 100 palabras)…"></textarea>
+                  <p id="soporte-word-hint" class="chat-word-hint">0/100 palabras</p>
+                </div>
+                <button type="button" class="btn btn-primary" id="soporte-send-btn">Enviar</button>
+              </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: ROLES ADMIN -->
+    <div class="page" id="page-commercial-admin">
+      <div class="page-shell">
+        <header class="page-hero">
+          <span class="page-badge">Administración comercial</span>
+          <h1 class="page-title">Políticas y condiciones comerciales</h1>
+          <p class="page-lead">Controla límites, márgenes, descuentos, excepciones, crédito y productos destacados.</p>
+        </header>
+        <div class="page-body commercial-admin">
+          <div class="commercial-tabs" role="tablist" aria-label="Secciones comerciales">
+            <button class="btn btn-ghost is-active" data-commercial-tab="policies" onclick="showCommercialTab('policies',this)">Políticas</button>
+            <button class="btn btn-ghost" data-commercial-tab="discounts" onclick="showCommercialTab('discounts',this)">Descuentos</button>
+            <button class="btn btn-ghost" data-commercial-tab="exceptions" onclick="showCommercialTab('exceptions',this)">Excepciones</button>
+            <button class="btn btn-ghost" data-commercial-tab="customers" onclick="showCommercialTab('customers',this)">Clientes y crédito</button>
+            <button class="btn btn-ghost" data-commercial-tab="products" onclick="showCommercialTab('products',this)">Productos</button>
+          </div>
+
+          <section id="commercial-panel-policies" class="commercial-panel">
+            <div class="page-panel commercial-form-card">
+              <div><h3>Reglas generales</h3><p>Los valores en cero dejan la regla sin límite.</p></div>
+              <form id="commercial-settings-form" class="commercial-form-grid" onsubmit="saveCommercialSettings(event)">
+                <label>Monto mínimo<input id="commercial-min-order" type="number" min="0" step="0.01"></label>
+                <label>Monto máximo<input id="commercial-max-order" type="number" min="0" step="0.01"></label>
+                <label>Margen mínimo (%)<input id="commercial-min-margin" type="number" min="0" max="100" step="0.01"></label>
+                <label>Límite predeterminado por cliente<input id="commercial-default-limit" type="number" min="0" step="0.01"></label>
+                <button class="btn btn-primary" type="submit">Guardar políticas</button>
+              </form>
+            </div>
+          </section>
+
+          <section id="commercial-panel-discounts" class="commercial-panel" hidden>
+            <div class="page-panel commercial-form-card">
+              <div><h3>Crear o actualizar descuento</h3><p>Usa el mismo código para actualizarlo y conservar su historial.</p></div>
+              <form id="commercial-discount-form" class="commercial-form-grid" onsubmit="saveCommercialDiscount(event)">
+                <label>Código<input id="discount-code" required maxlength="30"></label>
+                <label>Tipo<select id="discount-type"><option value="percentage">Porcentaje</option><option value="fixed">Valor fijo</option></select></label>
+                <label>Valor<input id="discount-value" type="number" min="0.01" step="0.01" required></label>
+                <label>Pedido mínimo<input id="discount-minimum" type="number" min="0" step="0.01" value="0"></label>
+                <label>Válido desde<input id="discount-from" type="date"></label>
+                <label>Válido hasta<input id="discount-to" type="date"></label>
+                <label>Límite de usos<input id="discount-usage-limit" type="number" min="0" step="1" value="0"></label>
+                <label>Segmentos<input id="discount-segments" placeholder="vip, frecuente"></label>
+                <label class="commercial-check"><input id="discount-active" type="checkbox" checked> Activo</label>
+                <button class="btn btn-primary" type="submit">Guardar descuento</button>
+              </form>
+            </div>
+            <div class="table-box"><div class="table-header"><div class="table-title">Descuentos registrados</div></div><div class="table-scroll"><table><thead><tr><th>Código</th><th>Tipo</th><th>Valor</th><th>Vigencia</th><th>Usos</th><th>Segmentos</th><th>Estado</th><th></th></tr></thead><tbody id="commercial-discounts-body"></tbody></table></div></div>
+          </section>
+
+          <section id="commercial-panel-exceptions" class="commercial-panel" hidden>
+            <div class="filters"><div class="filter-group"><label>Estado</label><select id="commercial-exception-status" onchange="loadCommercialExceptions()"><option value="">Todos</option><option value="pending">Pendientes</option><option value="approved">Aprobadas</option><option value="rejected">Rechazadas</option><option value="used">Utilizadas</option></select></div><div class="filter-group filter-group--action"><button class="btn btn-ghost" onclick="loadCommercialExceptions()">Actualizar</button></div></div>
+            <div class="table-box"><div class="table-header"><div class="table-title">Solicitudes de excepción</div></div><div class="table-scroll"><table><thead><tr><th>#</th><th>Cliente</th><th>Monto</th><th>Incumplimientos</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="commercial-exceptions-body"></tbody></table></div></div>
+          </section>
+
+          <section id="commercial-panel-customers" class="commercial-panel" hidden>
+            <div class="filters"><div class="filter-group filter-group--grow"><label>Buscar cliente</label><input id="commercial-customer-search" type="search" placeholder="Nombre o correo" onkeydown="if(event.key==='Enter')loadCommercialCustomers()"></div><div class="filter-group filter-group--action"><button class="btn btn-ghost" onclick="loadCommercialCustomers()">Buscar</button><button class="btn btn-primary" onclick="refreshCommercialSegments()">Actualizar segmentos</button></div></div>
+            <div class="table-box"><div class="table-header"><div class="table-title">Condiciones por cliente</div></div><div class="table-scroll"><table><thead><tr><th>Cliente</th><th>Segmento</th><th>Límite compra</th><th>Crédito</th><th>Cupo</th><th>Días</th><th>Acciones</th></tr></thead><tbody id="commercial-customers-body"></tbody></table></div></div>
+          </section>
+
+          <section id="commercial-panel-products" class="commercial-panel" hidden>
+            <div class="filters"><div class="filter-group filter-group--grow"><label>Buscar producto</label><input id="commercial-product-search" type="search" placeholder="Nombre o código" onkeydown="if(event.key==='Enter')loadCommercialProducts()"></div><div class="filter-group filter-group--action"><button class="btn btn-ghost" onclick="loadCommercialProducts()">Buscar</button></div></div>
+            <div class="table-box"><div class="table-header"><div class="table-title">Destacados e historial</div></div><div class="table-scroll"><table><thead><tr><th>ID</th><th>Producto</th><th>Precio</th><th>Costo</th><th>Destacado</th><th>Acciones</th></tr></thead><tbody id="commercial-products-body"></tbody></table></div></div>
+            <div class="table-box commercial-history-box" id="commercial-history-box" hidden><div class="table-header"><div class="table-title" id="commercial-history-title">Historial</div></div><div class="table-scroll"><table><thead><tr><th>Desde</th><th>Hasta</th><th>Precio</th><th>Costo</th><th>Rebaja</th><th>Margen</th></tr></thead><tbody id="commercial-history-body"></tbody></table></div></div>
+          </section>
         </div>
       </div>
     </div>
@@ -1409,7 +1715,7 @@
       <header class="page-hero">
         <span class="page-badge">Gobernanza</span>
         <h1 class="page-title">Auditoría</h1>
-        <p class="page-lead">Historial permanente de acciones administrativas. Filtra por rol y navega de 100 en 100.</p>
+        <p class="page-lead">Historial permanente de acciones administrativas con detalle de los valores modificados.</p>
       </header>
       <div class="page-body">
       <div class="filters page-panel--filters">
@@ -1419,8 +1725,29 @@
             <option value="">Todos los roles</option>
           </select>
         </div>
+        <div class="filter-group">
+          <label for="audit-module-filter">Módulo</label>
+          <select id="audit-module-filter" onchange="auditGoPage(0)"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="audit-action-filter">Acción</label>
+          <select id="audit-action-filter" onchange="auditGoPage(0)"><option value="">Todas</option></select>
+        </div>
+        <div class="filter-group filter-group--grow">
+          <label for="audit-user-filter">Usuario</label>
+          <input id="audit-user-filter" type="search" placeholder="Correo del usuario" onchange="auditGoPage(0)" />
+        </div>
+        <div class="filter-group">
+          <label for="audit-date-from">Desde</label>
+          <input id="audit-date-from" type="date" onchange="auditGoPage(0)" />
+        </div>
+        <div class="filter-group">
+          <label for="audit-date-to">Hasta</label>
+          <input id="audit-date-to" type="date" onchange="auditGoPage(0)" />
+        </div>
         <div class="filter-group filter-group--action">
           <button type="button" class="btn btn-ghost" onclick="loadAuditPage()">Actualizar</button>
+          <button type="button" class="btn btn-primary" onclick="exportAuditLog()">Exportar Excel</button>
         </div>
       </div>
       <div class="table-box table-box--admin">
@@ -1431,7 +1758,7 @@
           </div>
         </div>
         <div class="table-scroll">
-          <table><thead><tr><th>Fecha</th><th>Acción</th><th>Entidad</th><th>Usuario</th><th>Rol</th><th>Referencia</th></tr></thead>
+          <table><thead><tr><th>Fecha</th><th>Módulo</th><th>Acción</th><th>Entidad</th><th>Usuario</th><th>Rol</th><th>Referencia</th><th>Detalle</th></tr></thead>
           <tbody id="audit-body"></tbody></table>
         </div>
         <div id="audit-pager" class="table-pager" hidden></div>
@@ -1440,44 +1767,52 @@
       </div><!-- /page-shell -->
     </div>
 
-    <!-- PAGE: DATOS Q4 -->
-    <div class="page" id="page-datos">
+    <!-- PAGE: GESTIÓN -->
+    <div class="page" id="page-gestion">
       <div class="page-shell">
-      <header class="page-hero">
-        <span class="page-badge">Datos Q4</span>
-        <h1 class="page-title">Tablas maestras</h1>
-        <p class="page-lead">Edita las dimensiones del almacén de datos (regiones, países, categorías, productos, canales, prioridades y clientes). Las tablas de tienda e inventario se sincronizan con <strong>Sincronizar catálogo</strong>; el calendario (<code>dim_tiempo</code>) lo genera la carga ELT.</p>
+        <header class="page-hero">
+        <span class="page-badge">Gestión de datos</span>
+        <h1 class="page-title" id="gestion-title">—</h1>
+        <p class="page-lead" id="gestion-lead"></p>
       </header>
-      <div class="page-body">
-      <div class="filters page-panel--filters">
-        <div class="filter-group filter-group--wide">
-          <label for="datos-table-select">Tabla</label>
-          <select id="datos-table-select" onchange="onDatosTableChange()"></select>
-        </div>
-        <div class="filter-group filter-group--action filter-group--actions-row">
-          <button type="button" class="btn btn-primary btn-sm" data-require-perm="masters.write" onclick="openMasterCreate()">+ Nuevo</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="syncStaleAnalytics()">Sincronizar fact</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="runBuildModel()">Reconstruir modelo</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync()">Sincronizar catálogo</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync(true)" title="Regenera inventario desde maestros">Sincronizar y reiniciar existencias</button>
-        </div>
-      </div>
-      <p id="datos-build-status" class="catalog-meta admin-page-meta"></p>
-      <div class="table-box table-box--admin">
-        <div class="table-header table-header--split">
-          <div class="table-title-wrap">
-            <div class="table-title">Registros</div>
-            <span id="datos-rows-meta" class="dash-records-meta"></span>
+        <div class="page-body">
+          <div class="filters">
+            <div class="filter-group filter-group--grow">
+              <label for="gestion-search">Buscar</label>
+              <input id="gestion-search" type="search" placeholder="Nombre o ID…" oninput="onGestionSearchInput()" />
+            </div>
+            <div class="filter-group">
+              <label for="gestion-status">Estado</label>
+              <select id="gestion-status" onchange="onGestionStatusChange(this.value)">
+                <option value="">Todos</option>
+                <option value="true">Activos</option>
+                <option value="false">Inactivos</option>
+              </select>
+            </div>
+            <div class="filter-group filter-group--action filter-group--actions-row">
+              <button type="button" class="btn btn-primary btn-sm" id="gestion-create-btn" data-require-perm="masters.write" onclick="openMasterCreate()">+ Nuevo</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="syncStaleAnalytics()">Sincronizar fact</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="runBuildModel()">Reconstruir modelo</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync()">Sincronizar catálogo</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync(true)" title="Regenera inventario desde maestros">Reiniciar stock</button>
+            </div>
+          </div>
+          <p id="datos-build-status" class="catalog-meta admin-page-meta"></p>
+          <div class="table-box table-box--admin">
+            <div class="table-header table-header--split">
+              <div class="table-title-wrap">
+                <div class="table-title">Registros</div>
+                <span id="datos-rows-meta" class="dash-records-meta"></span>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table><thead id="datos-rows-head"><tr><th>Cargando…</th></tr></thead>
+              <tbody id="datos-rows-body"></tbody></table>
+            </div>
+            <div id="datos-pager" class="table-pager" hidden></div>
           </div>
         </div>
-        <div class="table-scroll">
-          <table><thead id="datos-rows-head"><tr><th>Cargando…</th></tr></thead>
-          <tbody id="datos-rows-body"></tbody></table>
-        </div>
-        <div id="datos-pager" class="table-pager" hidden></div>
       </div>
-      </div>
-      </div><!-- /page-shell -->
     </div>
 
     <div class="page" id="page-load">
@@ -1647,6 +1982,27 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay')?.classList.remove('show');
   if (isMobileNav()) syncSidebarToggles(false);
 }
+function closeShopNavDropdown() {
+  document.getElementById('shop-madson-header')?.classList.remove('is-nav-open');
+  const backdrop = document.getElementById('shop-nav-backdrop');
+  if (backdrop) backdrop.setAttribute('hidden', '');
+  const btn = document.getElementById('shop-panel-toggle');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  if (typeof closeShopNavGroups === 'function') closeShopNavGroups();
+}
+function toggleShopNavDropdown() {
+  const header = document.getElementById('shop-madson-header');
+  const backdrop = document.getElementById('shop-nav-backdrop');
+  if (!header) return;
+  const open = !header.classList.contains('is-nav-open');
+  header.classList.toggle('is-nav-open', open);
+  if (backdrop) {
+    if (open) backdrop.removeAttribute('hidden');
+    else backdrop.setAttribute('hidden', '');
+  }
+  const btn = document.getElementById('shop-panel-toggle');
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
 
 // ── Reloj ───────────────────────────────────────────────────────────
 function updateClock(){
@@ -1712,7 +2068,7 @@ function pageLoadSignature(id) {
   if (id === 'regions') return `regions:${countriesLimit}`;
   return id;
 }
-const ALWAYS_RELOAD_PAGES = new Set(['orders', 'datos', 'ventas', 'compras', 'notificaciones', 'soporte', 'audit', 'load']);
+const ALWAYS_RELOAD_PAGES = new Set(['orders', 'gestion', 'ventas', 'compras', 'notificaciones', 'soporte', 'audit', 'load']);
 function shouldSkipPageLoad(id, force) {
   if (force || ALWAYS_RELOAD_PAGES.has(id)) return false;
   const prev = _pageLoadState[id];
@@ -1740,7 +2096,8 @@ const titles = {
   ventas:'Pedidos y ventas',
   orders:'Explorar ventas',
   'roles-admin':'Roles y usuarios',
-  datos:'Datos maestros',
+  'commercial-admin':'Gestión comercial',
+  gestion:'Gestión',
   schema:'Modelo de datos',
   load:'Carga de datos',
   audit:'Auditoría',
@@ -1748,7 +2105,9 @@ const titles = {
   reportes:'Informes simples',
   'reportes-compuestos':'Informes compuestos',
 };
-function showPage(id, btn) {
+function showPage(id, btn, opts) {
+  opts = opts || {};
+  if (id === 'datos') id = 'gestion';
   if (!canAccessPage(id)) {
     guardPageAccess(id);
     return;
@@ -1763,7 +2122,15 @@ function showPage(id, btn) {
   }
   if (typeof openNavGroupForPage === 'function') openNavGroupForPage(id);
   document.getElementById('topbar-title').textContent = titles[id]||id;
-  loadPage(id);
+  document.title = `${titles[id] || id} — GLOBTRADE S.A.`;
+  document.body.classList.add('shop-page-active');
+  document.body.classList.toggle('shop-on-tienda', id === 'tienda');
+  if (id !== 'tienda') closeShopNavDropdown();
+  loadPage(id, opts);
+  if (typeof window.opsA11yPageChanged === 'function') window.opsA11yPageChanged(id, titles[id] || id);
+  if (id === 'tienda' && typeof applyTiendaMode === 'function') {
+    applyTiendaMode(opts.tiendaMode === 'catalog' ? 'catalog' : 'home');
+  }
 }
 function loadPage(id, opts = {}) {
   const force = !!(opts && opts.force);
@@ -1779,7 +2146,13 @@ function loadPage(id, opts = {}) {
     showVentasTab(tab);
     markPageLoaded(id);
   }
-  else if(id==='datos') { loadDatosPage(); markPageLoaded(id); }
+  else if(id==='gestion') {
+    if (!datosState.table) datosState.table = 'dim_producto';
+    const gNav = document.querySelector(`.nav-item[data-gestion-table="${datosState.table}"]`);
+    if (gNav && !btn) gNav.classList.add('active');
+    loadGestionPage(true);
+    markPageLoaded(id);
+  }
   else if(id==='trends') loadTrends(force);
   else if(id==='regions') loadRegions(force);
   else if(id==='products') loadProducts(force);
@@ -1793,6 +2166,7 @@ function loadPage(id, opts = {}) {
   else if(id==='load') { loadDatosEltPage(); markPageLoaded(id); }
   else if(id==='audit') { loadAuditPage(); markPageLoaded(id); }
   else if(id==='roles-admin') { loadRolesAdminPage(); markPageLoaded(id); }
+  else if(id==='commercial-admin') { loadCommercialAdminPage(); markPageLoaded(id); }
   else if(id==='company') { if (typeof loadCompanyAdmin === 'function') loadCompanyAdmin(); markPageLoaded(id); }
 }
 
@@ -1919,15 +2293,13 @@ async function loadDashboard(force = false) {
   }
 
   const { months, region, itemtype, channel, priority } = getDashParams();
-  const trendUrl = apiUrlTrend();
-  const [s, trend, regions, channels, priorities, countries] = await Promise.all([
-    get('/summary', { force }),
-    get('/trend', { url: trendUrl, force }),
-    get('/regions', { force }),
-    get('/channels', { force }),
-    get('/priorities', { force }),
-    get('/countries?top=10', { force }),
-  ]);
+  const bundle = await get('/dashboard?top=10', { force });
+  const s = bundle?.summary;
+  const trend = bundle?.trend || [];
+  const regions = bundle?.regions || [];
+  const channels = bundle?.channels || [];
+  const priorities = bundle?.priorities || [];
+  const countries = bundle?.countries || [];
   markPageLoaded('dashboard');
   if(!s) {
     setChartsLoading(false);
@@ -2779,6 +3151,14 @@ function refreshAuthUi(user, access) {
     topUser.textContent = label;
     topUser.hidden = !logged;
   }
+  const shopNotif = document.getElementById('shop-header-notifications');
+  if (shopNotif) {
+    shopNotif.hidden = !logged || (typeof canAccessPage === 'function' && !canAccessPage('notificaciones'));
+  }
+  const shopLogin = document.getElementById('shop-header-login');
+  if (shopLogin) shopLogin.hidden = logged;
+  const shopAuth = document.getElementById('shop-header-auth');
+  if (shopAuth) shopAuth.hidden = !logged;
   applyNavAccess();
   if (typeof applyPermissionUi === 'function') applyPermissionUi();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
@@ -2830,7 +3210,7 @@ async function submitRegister(e) {
     }
     closeRegisterModal();
     refreshAuthUi(data.user, data.access);
-    showPage(defaultPageForUser(), document.querySelector('.nav-item[data-page="' + defaultPageForUser() + '"]'));
+    showPage(pageAfterAuth(), document.querySelector('.nav-item[data-page="' + pageAfterAuth() + '"]'));
     notifyOk(data.message || 'Cuenta creada. ¡Bienvenido!');
   } catch (e) {
     errEl.textContent = String(e.message || e);
@@ -2853,7 +3233,7 @@ async function submitLogin(e) {
     if (!r.ok) throw new Error(data.message || r.statusText);
     closeLoginModal();
     refreshAuthUi(data.user, data.access);
-    showPage(defaultPageForUser(), document.querySelector('.nav-item[data-page="' + defaultPageForUser() + '"]'));
+    showPage(pageAfterAuth(), document.querySelector('.nav-item[data-page="' + pageAfterAuth() + '"]'));
     notifyOk(data.message || `Sesión iniciada. Hola, ${data.user?.name || email}.`);
   } catch (e) {
     errEl.textContent = String(e.message || e);
@@ -2863,48 +3243,12 @@ async function logout() {
   try {
     await fetch(API + '/auth/logout', { method: 'POST', credentials: 'same-origin' });
   } catch { /* ignore */ }
+  if (typeof closeProfileModal === 'function') closeProfileModal();
+  if (typeof closeShopNavDropdown === 'function') closeShopNavDropdown();
+  if (typeof closeShopNavGroups === 'function') closeShopNavGroups();
   refreshAuthUi(null, { pages: ['tienda'], permissions: [] });
-}
-function openForgotModal() {
-  document.getElementById('forgot-modal').hidden = false;
-  document.getElementById('forgot-error').textContent = '';
-}
-function closeForgotModal() { document.getElementById('forgot-modal').hidden = true; }
-async function submitForgotPassword() {
-  const err = document.getElementById('forgot-error');
-  err.textContent = '';
-  const email = document.getElementById('forgot-email').value.trim();
-  const r = await fetch(API + '/auth/forgot-password', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-  const data = await r.json();
-  if (!r.ok) { err.textContent = data.message || 'Error al iniciar sesión'; return; }
-  closeForgotModal();
-  notifyOk(data.message || 'Revisa tu correo (demo: usa el token de restablecimiento).');
-  openResetModal();
-}
-function openResetModal() {
-  document.getElementById('reset-modal').hidden = false;
-  document.getElementById('reset-error').textContent = '';
-}
-function closeResetModal() { document.getElementById('reset-modal').hidden = true; }
-async function submitResetPassword() {
-  const err = document.getElementById('reset-error');
-  err.textContent = '';
-  const r = await fetch(API + '/auth/reset-password', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      token: document.getElementById('reset-token').value.trim(),
-      new_password: document.getElementById('reset-pass').value,
-      password_confirm: document.getElementById('reset-pass2').value,
-    }),
-  });
-  const data = await r.json();
-  if (!r.ok) { err.textContent = data.message || 'Error al iniciar sesión'; return; }
-  closeResetModal();
-  notifyOk(data.message || 'Contraseña actualizada. Ya puedes iniciar sesión.');
-  openLoginModal();
+  const tiendaNav = document.querySelector('.nav-item[data-page="tienda"]');
+  showPage('tienda', tiendaNav, { tiendaMode: 'home' });
 }
 function openProfileModal() {
   const user = window._authUser;
@@ -2970,14 +3314,17 @@ async function submitProfile(e) {
 // ── Init ──────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initThemeUi();
+  if (typeof renderShopHeaderNav === 'function') renderShopHeaderNav();
   fetchMe().then(data => {
     refreshAuthUi(data?.user || null, data?.access);
     if (typeof opsLiveSeed === 'function') opsLiveSeed(data?.user || null, data?.access);
     const active = document.querySelector('.page.active');
-    const currentId = active?.id?.replace('page-', '') || 'dashboard';
+    const currentId = active?.id?.replace('page-', '') || 'tienda';
     if (!canAccessPage(currentId)) {
       const fb = defaultPageForUser();
       showPage(fb, document.querySelector('.nav-item[data-page="' + fb + '"]'));
+    } else if (currentId === 'tienda') {
+      loadTiendaPage().catch(console.error);
     } else if (currentId === 'dashboard') {
       loadDashboard().catch(console.error);
     }
@@ -2990,7 +3337,6 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="modal-backdrop" onclick="closeLoginModal()"></div>
   <div class="modal-card">
     <h2 id="login-modal-title">Iniciar sesión</h2>
-    <p class="modal-sub">Para exportar, generar o administrar datos necesitas una cuenta GLOBTRADE.</p>
     <form onsubmit="submitLogin(event)">
       <div class="fg">
         <label for="login-user">Correo electrónico</label>
@@ -3004,8 +3350,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <button type="submit" class="btn btn-primary btn-block">Entrar</button>
       <button type="button" class="btn btn-ghost btn-block" onclick="closeLoginModal()">Cancelar</button>
       <p class="modal-sub" style="margin-top:12px;text-align:center">
-        <a href="#" onclick="event.preventDefault();closeLoginModal();openForgotModal()">¿Olvidaste tu contraseña?</a>
-        · <a href="#" onclick="event.preventDefault();closeLoginModal();openRegisterModal()">Crear cuenta</a></p>
+        ¿No tienes cuenta? <a href="#" onclick="event.preventDefault();closeLoginModal();openRegisterModal()">Crear cuenta</a></p>
     </form>
   </div>
 </div>
@@ -3060,8 +3405,9 @@ document.addEventListener('DOMContentLoaded', () => {
         Sonido al recibir notificaciones nuevas
       </label>
       <div id="profile-sem1-wrap" class="fg fg--spaced" hidden>
-        <button type="button" class="btn btn-primary btn-block" onclick="window.location.href='/sem1'">Vista clásica</button>
-        <p class="modal-sub" style="margin-top:6px;margin-bottom:0">Tablero clásico (misma vista que el puerto 5000), sin otro contenedor.</p>
+        <p class="modal-sub" style="margin-bottom:8px">Vista histórica del tablero (solo administrador). La plataforma principal es la SPA actual.</p>
+        <button type="button" class="btn btn-ghost btn-block" onclick="window.location.href='/sem1'">Vista histórica</button>
+        <p class="modal-sub" style="margin-top:6px;margin-bottom:0">Tablero histórico disponible solo para administradores.</p>
       </div>
       <p class="modal-sub" style="margin-top:8px;margin-bottom:4px">Cambiar contraseña (opcional)</p>
       <div class="fg">
@@ -3150,16 +3496,71 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <div id="pago-modal" class="modal" hidden aria-hidden="true">
   <div class="modal-backdrop" onclick="closePagoModal()"></div>
-  <div class="modal-card">
-    <h2 id="pago-modal-title">Pagar solicitud</h2>
-    <p class="modal-sub" id="pago-modal-lead">Simulación de pago (sin pasarela real). Elige un método para marcar tu pedido como pagado.</p>
+  <div class="modal-card modal-card--pago">
+    <h2 id="pago-modal-title">Pagar con tarjeta</h2>
+    <p class="modal-sub" id="pago-modal-lead">Ingresa los datos de la tarjeta para completar el pago.</p>
     <input type="hidden" id="pago-request-id" value="" />
     <input type="hidden" id="pago-mode" value="client" />
-    <div class="fg"><label for="pago-method">Método de pago</label>
-      <select id="pago-method"></select>
+    <div class="pago-summary">
+      <div>
+        <span class="pago-summary-label">Solicitud</span>
+        <strong id="pago-order-ref">—</strong>
+      </div>
+      <div class="pago-summary-total">
+        <span class="pago-summary-label">Total a pagar</span>
+        <strong id="pago-total">$0.00</strong>
+      </div>
     </div>
-    <button type="button" class="btn btn-primary btn-block" onclick="confirmClientePagar()">Confirmar pago</button>
-    <button type="button" class="btn btn-ghost btn-block" onclick="closePagoModal()">Cancelar</button>
+    <div class="pago-card-mock" id="pago-card-mock" aria-hidden="true">
+      <div class="pago-card-mock-top">
+        <span class="pago-card-mock-chip"></span>
+        <span class="pago-card-mock-brand" id="pago-card-brand">TARJETA</span>
+      </div>
+      <div class="pago-card-mock-number" id="pago-card-preview-number">•••• •••• •••• ••••</div>
+      <div class="pago-card-mock-foot">
+        <div class="pago-card-mock-field">
+          <span class="pago-card-mock-label">Titular</span>
+          <span id="pago-card-preview-name">NOMBRE APELLIDO</span>
+        </div>
+        <div class="pago-card-mock-field">
+          <span class="pago-card-mock-label">Vence</span>
+          <span id="pago-card-preview-exp">MM/AA</span>
+        </div>
+      </div>
+    </div>
+    <form id="pago-card-form" class="pago-card-form" novalidate>
+      <div class="fg pago-field" data-pago-field="name">
+        <label for="pago-card-name">Titular de la tarjeta</label>
+        <input id="pago-card-name" type="text" autocomplete="cc-name" placeholder="Como aparece en la tarjeta" maxlength="80" required />
+        <span class="pago-field-error" id="pago-error-name" hidden></span>
+      </div>
+      <div class="fg pago-field" data-pago-field="number">
+        <label for="pago-card-number">Número de tarjeta</label>
+        <input id="pago-card-number" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="19" required />
+        <span class="pago-field-error" id="pago-error-number" hidden></span>
+      </div>
+      <div class="pago-card-row">
+        <div class="fg pago-field" data-pago-field="exp">
+          <label for="pago-card-exp">Vencimiento</label>
+          <input id="pago-card-exp" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5" required />
+          <span class="pago-field-error" id="pago-error-exp" hidden></span>
+        </div>
+        <div class="fg pago-field" data-pago-field="cvv">
+          <label for="pago-card-cvv">CVV</label>
+          <input id="pago-card-cvv" type="password" inputmode="numeric" autocomplete="cc-csc" placeholder="•••" maxlength="4" required />
+          <span class="pago-field-error" id="pago-error-cvv" hidden></span>
+        </div>
+      </div>
+    </form>
+    <p id="pago-form-error" class="pago-form-error" hidden></p>
+    <div id="pago-processing" class="pago-processing" hidden>
+      <span class="pago-spinner" aria-hidden="true"></span>
+      <span id="pago-processing-text">Validando tarjeta…</span>
+    </div>
+    <div id="pago-actions" class="pago-actions">
+      <button type="button" class="btn btn-primary btn-block" id="pago-confirm-btn">Pagar con tarjeta</button>
+      <button type="button" class="btn btn-ghost btn-block" onclick="closePagoModal()">Cancelar</button>
+    </div>
   </div>
 </div>
 <div id="devolver-modal" class="modal" hidden aria-hidden="true">
@@ -3190,29 +3591,12 @@ document.addEventListener('DOMContentLoaded', () => {
     <button type="button" class="btn btn-ghost btn-block" onclick="closeDevolverModal()">Cancelar</button>
   </div>
 </div>
-<div id="forgot-modal" class="modal" hidden aria-hidden="true">
-  <div class="modal-backdrop" onclick="closeForgotModal()"></div>
-  <div class="modal-card">
-    <h2>Recuperar contraseña</h2>
-    <p class="modal-sub">Te enviaremos un código a Notificaciones (correo simulado).</p>
-    <div class="fg"><label for="forgot-email">Correo</label><input type="email" id="forgot-email" required /></div>
-    <p id="forgot-error" class="login-error"></p>
-    <button type="button" class="btn btn-primary btn-block" onclick="submitForgotPassword()">Enviar código</button>
-    <button type="button" class="btn btn-ghost btn-block" onclick="closeForgotModal()">Cancelar</button>
-  </div>
-</div>
-
-<div id="reset-modal" class="modal" hidden aria-hidden="true">
-  <div class="modal-backdrop" onclick="closeResetModal()"></div>
-  <div class="modal-card">
-    <h2>Restablecer contraseña</h2>
-    <p class="modal-sub">Pega el código que recibiste en Notificaciones.</p>
-    <div class="fg"><label for="reset-token">Código</label><input id="reset-token" required /></div>
-    <div class="fg"><label for="reset-pass">Nueva contraseña</label><input type="password" id="reset-pass" required /></div>
-    <div class="fg"><label for="reset-pass2">Confirmar</label><input type="password" id="reset-pass2" required /></div>
-    <p id="reset-error" class="login-error"></p>
-    <button type="button" class="btn btn-primary btn-block" onclick="submitResetPassword()">Guardar contraseña</button>
-    <button type="button" class="btn btn-ghost btn-block" onclick="closeResetModal()">Cancelar</button>
+<div id="po-detail-modal" class="modal" hidden aria-hidden="true">
+  <div class="modal-backdrop" onclick="closePoDetail()"></div>
+  <div class="modal-card" style="max-width:560px;max-height:90vh;overflow:auto">
+    <h2 id="po-detail-title">OC a proveedor</h2>
+    <div id="po-detail-body"></div>
+    <button type="button" class="btn btn-ghost btn-block" onclick="closePoDetail()">Cerrar</button>
   </div>
 </div>
 

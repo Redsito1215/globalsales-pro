@@ -308,6 +308,67 @@ def rs12(*, q: str | None = None, limit: int = 100) -> dict[str, Any]:
     return {"rows": out[:limit], "total": len(out)}
 
 
+def rs13(*, q: str | None = None, limit: int = 100) -> dict[str, Any]:
+    from shared.cash_ledger import list_cash_movements
+
+    data = list_cash_movements(limit=limit, q=q)
+    rows = []
+    type_labels = {"payment_in": "Entrada (pago)", "refund_out": "Salida (devolución)", "adjustment": "Ajuste"}
+    for m in data.get("movements") or []:
+        row = {
+            "movement_id": m.get("movement_id"),
+            "created_at": (m.get("created_at") or "")[:10],
+            "movement_type": type_labels.get(m.get("movement_type"), m.get("movement_type")),
+            "amount": m.get("amount"),
+            "request_id": m.get("request_id"),
+            "order_id": m.get("order_id"),
+            "reference": m.get("reference"),
+        }
+        if _search_match(row, q, ["reference", "order_id", "movement_type"]):
+            rows.append(row)
+    return {"rows": rows[:limit], "total": len(rows), "summary": data.get("summary")}
+
+
+def rs14(*, q: str | None = None, limit: int = 100) -> dict[str, Any]:
+    from shared.cash_ledger import list_cash_movements
+
+    db = get_db()
+    cash = list_cash_movements(limit=500)
+    summary = cash.get("summary") or {}
+    returns = db["purchase_requests"].count_documents({"status": "devuelta"})
+    refund_amount = round(float(summary.get("total_out") or 0), 2)
+    rows = [
+        {"concepto": "Pagos recibidos", "monto": summary.get("total_in", 0), "cantidad": cash.get("summary", {}).get("count", 0), "periodo": "acumulado"},
+        {"concepto": "Reembolsos / devoluciones", "monto": refund_amount, "cantidad": returns, "periodo": "acumulado"},
+        {"concepto": "Neto caja", "monto": summary.get("net", 0), "cantidad": "—", "periodo": "acumulado"},
+    ]
+    out = [r for r in rows if _search_match(r, q, ["concepto", "periodo"])]
+    return {"rows": out[:limit], "total": len(out)}
+
+
+def rs15(*, q: str | None = None, limit: int = 100, threshold: int = 20) -> dict[str, Any]:
+    db = get_db()
+    variants = list(db["product_variants"].find({}, {"_id": 0}).sort("sku", 1).limit(limit * 2))
+    out = []
+    total_value = 0.0
+    for v in variants:
+        qty = int(v.get("inventory_quantity") or 0)
+        cost = float(v.get("cost") or 0)
+        value = round(qty * cost, 2)
+        total_value += value
+        prod = db["products"].find_one({"product_id": v.get("product_id")}, {"_id": 0, "title": 1})
+        row = {
+            "sku": v.get("sku") or "",
+            "product_name": (prod or {}).get("title") or f"Producto {v.get('product_id')}",
+            "inventory_quantity": qty,
+            "unit_cost": round(cost, 2),
+            "stock_value": value,
+        }
+        if _search_match(row, q, ["sku", "product_name"]):
+            out.append(row)
+    return {"rows": out[:limit], "total": len(out), "total_stock_value": round(total_value, 2)}
+
+
 _RUNNERS: dict[str, Callable[..., dict[str, Any]]] = {
     "RS-01": rs01,
     "RS-02": rs02,
@@ -321,6 +382,9 @@ _RUNNERS: dict[str, Callable[..., dict[str, Any]]] = {
     "RS-10": rs10,
     "RS-11": rs11,
     "RS-12": rs12,
+    "RS-13": rs13,
+    "RS-14": rs14,
+    "RS-15": rs15,
 }
 
 
@@ -331,6 +395,8 @@ def run_report(report_id: str, *, q: str | None = None, limit: int = 100, thresh
         raise ValueError("unknown_report")
     runner = _RUNNERS[rid]
     if rid == "RS-03":
+        data = runner(q=q, threshold=threshold, limit=limit)
+    elif rid == "RS-15":
         data = runner(q=q, threshold=threshold, limit=limit)
     else:
         data = runner(q=q, limit=limit)

@@ -146,7 +146,7 @@ async function loadUsersList() {
   }
   if (!rolesAdminState.users.length) {
     body.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(4, { title: q ? 'Sin coincidencias' : 'Sin usuarios', hint: q ? 'Prueba otro término.' : 'Registra cuentas desde auth o seed demo.' })
+      ? opsEmptyRow(4, { title: q ? 'Sin coincidencias' : 'Sin usuarios', hint: q ? 'Prueba otro término.' : 'Registra cuentas desde autenticación.' })
       : '<tr><td colspan="4">Sin usuarios</td></tr>';
     return;
   }

@@ -160,3 +160,21 @@ sesion y verificar permisos en generar ventas, exportar, CRUD y ELT.
 - MongoDB `globtrade_dw` and the `globtrade-mongo` container are available locally for validation.
 - The project remains a single Flask application with package-based blueprints and a static SPA frontend.
 - Automated tests may be added where practical, but browser/API manual validation is acceptable for academic demo checkpoints.
+
+## Deliberate exclusions
+
+### Correo electrónico (simulado)
+
+El envío de correo **no se integra con SMTP real** de forma intencional. Una integración
+productiva exigiría cuentas de correo reales, credenciales gestionadas de forma segura
+y, en muchos casos, dominio verificado (SPF/DKIM) para evitar que los mensajes se marquen
+como spam. Eso añade fricción operativa y dependencias externas que no están disponibles
+en el entorno de desarrollo del proyecto.
+
+En su lugar, GLOBTRADE **modela** las notificaciones y confirmaciones (registro en base de
+datos, mensajes en UI, flujos de soporte/pedidos) **sin disparar emails reales**. Esto
+cubre el comportamiento demostrable de la aplicación sin salir a internet ni usar buzones
+de terceros.
+
+Para la defensa o revisión académica: la ausencia de correo real es una **decisión de
+alcance**, no un fallo pendiente de implementación.

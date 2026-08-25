@@ -26,6 +26,15 @@
   --radius:     12px;
   --glow:       0 0 30px rgba(0,229,160,.18);
 }
+.sem1-legacy-banner {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+  font-size: 13px;
+  color: var(--text);
+}
 
 html { scroll-behavior: smooth; }
 body {
@@ -453,6 +462,9 @@ tr:hover td { background:rgba(255,255,255,.02); }
 
 <!-- MAIN -->
 <main class="main">
+  <div class="sem1-legacy-banner" role="status">
+    <strong>Vista legacy (sem1)</strong> — conservada solo para administradores. Usa la <a href="/" style="color:var(--accent2)">plataforma principal</a> para operación diaria.
+  </div>
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:14px;min-width:0;flex:1">
       <button type="button" class="sem1-menu-toggle" id="sem1-menu-toggle" aria-label="Menú" onclick="sem1ToggleSidebar()">☰</button>

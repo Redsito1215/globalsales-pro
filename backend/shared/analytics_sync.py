@@ -163,6 +163,132 @@ def _row_to_fact(db, row: dict[str, Any], venta_id: int, cache: dict | None = No
     }
 
 
+def _month_key_from_fecha(fecha_id: str | None) -> tuple[int, int] | None:
+    raw = str(fecha_id or "")[:10]
+    if len(raw) < 7 or raw[4] != "-":
+        return None
+    try:
+        year = int(raw[:4])
+        month = int(raw[5:7])
+    except ValueError:
+        return None
+    if month < 1 or month > 12:
+        return None
+    return year, month
+
+
+def rebuild_monthly_kpis_for_month(year: int, month: int) -> int:
+    """Recalcula KPIs mensuales de un mes desde fact_ventas (idempotente)."""
+    db = get_db()
+    prefix = f"{int(year):04d}-{int(month):02d}"
+    db["monthly_kpis"].delete_many({"year": int(year), "month": int(month)})
+
+    rows = list(
+        db["fact_ventas"].find(
+            {"fecha_id": {"$regex": f"^{prefix}"}},
+            {
+                "_id": 0,
+                "fecha_id": 1,
+                "region_id": 1,
+                "category_id": 1,
+                "units_sold": 1,
+                "total_revenue": 1,
+                "total_cost": 1,
+                "total_profit": 1,
+            },
+        )
+    )
+    if not rows:
+        return 0
+
+    region_names: dict[int, str] = {}
+    category_names: dict[int, str] = {}
+    buckets: dict[tuple[str, str], dict[str, float | int]] = {}
+
+    for row in rows:
+        rid = row.get("region_id")
+        cid = row.get("category_id")
+        region = "—"
+        item_type = "—"
+        if rid is not None:
+            if int(rid) not in region_names:
+                doc = db["dim_region"].find_one({"region_id": int(rid)}, {"name": 1, "_id": 0})
+                region_names[int(rid)] = str((doc or {}).get("name") or "—")
+            region = region_names[int(rid)]
+        if cid is not None:
+            if int(cid) not in category_names:
+                doc = db["dim_categoria"].find_one({"category_id": int(cid)}, {"name": 1, "_id": 0})
+                category_names[int(cid)] = str((doc or {}).get("name") or "—")
+            item_type = category_names[int(cid)]
+
+        key = (region, item_type)
+        bucket = buckets.setdefault(
+            key,
+            {
+                "total_orders": 0,
+                "total_units": 0,
+                "total_revenue": 0.0,
+                "total_cost": 0.0,
+                "total_profit": 0.0,
+            },
+        )
+        bucket["total_orders"] = int(bucket["total_orders"]) + 1
+        bucket["total_units"] = int(bucket["total_units"]) + int(row.get("units_sold") or 0)
+        bucket["total_revenue"] = float(bucket["total_revenue"]) + float(row.get("total_revenue") or 0)
+        bucket["total_cost"] = float(bucket["total_cost"]) + float(row.get("total_cost") or 0)
+        bucket["total_profit"] = float(bucket["total_profit"]) + float(
+            row.get("total_profit")
+            if row.get("total_profit") is not None
+            else float(row.get("total_revenue") or 0) - float(row.get("total_cost") or 0)
+        )
+
+    last = db["monthly_kpis"].find_one({}, {"kpi_id": 1, "_id": 0}, sort=[("kpi_id", -1)])
+    next_id = int(last["kpi_id"]) + 1 if last and last.get("kpi_id") is not None else 1
+    docs: list[dict[str, Any]] = []
+    for (region, item_type), agg in buckets.items():
+        rev = round(float(agg["total_revenue"]), 2)
+        prof = round(float(agg["total_profit"]), 2)
+        docs.append(
+            {
+                "kpi_id": next_id,
+                "year": int(year),
+                "month": int(month),
+                "region": region,
+                "item_type": item_type,
+                "total_orders": int(agg["total_orders"]),
+                "total_units": int(agg["total_units"]),
+                "total_revenue": rev,
+                "total_cost": round(float(agg["total_cost"]), 2),
+                "total_profit": prof,
+                "avg_margin_pct": round((prof / rev * 100) if rev else 0.0, 2),
+            }
+        )
+        next_id += 1
+    if docs:
+        db["monthly_kpis"].insert_many(docs)
+    return len(docs)
+
+
+def refresh_monthly_kpis_for_order(order_id: str | int) -> list[tuple[int, int]]:
+    """Recalcula KPIs de los meses tocados por un order_id."""
+    db = get_db()
+    oid = str(order_id)
+    rows = list(db["fact_ventas"].find({"order_id": oid}, {"fecha_id": 1, "_id": 0}))
+    if not rows:
+        try:
+            rows = list(db["fact_ventas"].find({"order_id": int(oid)}, {"fecha_id": 1, "_id": 0}))
+        except (TypeError, ValueError):
+            rows = []
+    months: set[tuple[int, int]] = set()
+    for row in rows:
+        key = _month_key_from_fecha(row.get("fecha_id"))
+        if key:
+            months.add(key)
+    for year, month in sorted(months):
+        rebuild_monthly_kpis_for_month(year, month)
+    return sorted(months)
+
+
 def sync_order_to_fact(order_id: str | int, *, force: bool = False) -> dict[str, Any]:
     """Append (o re-sincroniza con force) hechos de un order_id desde sales_records → fact_ventas."""
     db = get_db()
@@ -215,12 +341,18 @@ def sync_order_to_fact(order_id: str | int, *, force: bool = False) -> dict[str,
         pass
 
     set_strategic_lag(False)
+    kpi_months: list[tuple[int, int]] = []
+    try:
+        kpi_months = refresh_monthly_kpis_for_order(oid)
+    except Exception:
+        pass
     return {
         "order_id": oid,
         "synced": len(hechos),
         "skipped": False,
         "analytics_stale": False,
         "fact_ventas_count": db["fact_ventas"].estimated_document_count(),
+        "kpi_months_refreshed": [{"year": y, "month": m} for y, m in kpi_months],
         "message": f"Sincronizados {len(hechos)} hecho(s) a fact_ventas.",
     }
 
@@ -342,6 +474,7 @@ def sync_stale_orders(*, limit: int = 50) -> dict[str, Any]:
         .find({}, {"order_id": 1, "_id": 0})
         .sort([("order_date", -1), ("_id", -1)])
         .limit(max(limit * 3, 50))
+        .max_time_ms(8000)
     )
     synced_total = 0
     orders: list[str] = []

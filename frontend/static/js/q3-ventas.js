@@ -63,24 +63,34 @@ function paymentOkForProgress(req) {
   return pay === 'pagado';
 }
 
+function canClientPayRequest(req) {
+  const pay = req.payment_status || 'pendiente_pago';
+  return pay === 'pendiente_pago'
+    && req.status === 'aprobada'
+    && !['rechazada', 'cancelada', 'devuelta'].includes(req.status);
+}
+window.canClientPayRequest = canClientPayRequest;
+
 function payButtons(req) {
   if (!hasPermission('ventas.manage')) return '';
   if (['rechazada', 'cancelada'].includes(req.status)) return '';
   const pay = req.payment_status || 'pendiente_pago';
   if (pay === 'pagado') return '';
+  if (req.status !== 'aprobada') {
+    if (pay === 'pendiente_pago') {
+      return '<span style="font-size:10px;color:var(--muted)">Aprueba la solicitud para habilitar el pago</span>';
+    }
+    return '';
+  }
   const offline = isOfflineRequest(req);
   const registered = req.client_user_registered === true;
   const staffCanRegister = offline || !registered;
   if (pay === 'credito') {
-    if (offline) {
-      return `<span style="font-size:10px;color:var(--muted)">Crédito · venta presencial</span>`;
-    }
-    return `<span style="font-size:10px;color:var(--warn)">En línea: el cliente debe pagar en Mis pedidos</span>`;
+    return `<span style="font-size:10px;color:var(--warn)">Pendiente: registrar pago con tarjeta</span>`;
   }
   if (staffCanRegister) {
     return `
-      <button type="button" class="btn btn-primary btn-ops btn-sm" onclick="openPagoModal(${req.request_id}, { staff: true })">Registrar pago</button>
-      ${offline ? `<button type="button" class="btn btn-ghost btn-ops btn-sm" onclick="setSolicitudPago(${req.request_id},'credito')">Crédito</button>` : ''}`;
+      <button type="button" class="btn btn-primary btn-ops btn-sm" onclick="openPagoModal(${req.request_id}, { staff: true })">Registrar pago (tarjeta)</button>`;
   }
   return `<span style="font-size:10px;color:var(--muted)">Espera pago del cliente (Mis pedidos → Pagar)</span>`;
 }
@@ -102,8 +112,11 @@ function solicitudActions(req) {
     return `${detail} <span style="font-size:10px;color:var(--muted)">Devuelta (${cond}) · apto ${restock} · dañado ${damaged}</span>`;
   }
   if (status === 'enviada') {
+    const payOk = paymentOkForProgress(req);
     return `${detail} ${pay}
-      <button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'entregada')">Marcar entregada</button>`;
+      ${payOk
+        ? `<button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'entregada')">Marcar entregada</button>`
+        : `<span style="font-size:10px;color:var(--muted)">Espera el pago antes de marcar entregada</span>`}`;
   }
   if (status === 'convertida') {
     const payOk = paymentOkForProgress(req);
@@ -111,13 +124,13 @@ function solicitudActions(req) {
       return `${detail} ${pay}
         ${payOk
           ? `<button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'entregada')">Marcar entregada</button>`
-          : `<span style="font-size:10px;color:var(--muted)">Espera pago del cliente o usa crédito</span>`}
+          : `<span style="font-size:10px;color:var(--muted)">Espera pago con tarjeta del cliente</span>`}
         <span style="font-size:10px;color:var(--muted)">${req.order_id || 'Venta presencial'}</span>`;
     }
     return `${detail} ${pay}
       ${payOk
         ? `<button type="button" class="btn btn-primary btn-ops" onclick="setSolicitudEstado(${req.request_id},'enviada')">Marcar enviada</button>`
-        : `<span style="font-size:10px;color:var(--muted)">Espera pago del cliente o usa crédito</span>`}
+        : `<span style="font-size:10px;color:var(--muted)">Espera pago con tarjeta del cliente</span>`}
       <span style="font-size:10px;color:var(--muted)">${req.order_id || ''}</span>`;
   }
   if (status === 'rechazada' || status === 'cancelada') {
@@ -216,7 +229,7 @@ async function loadSolicitudes() {
     let awaitPay = 0, awaitShip = 0, awaitDeliver = 0;
     rows.forEach(req => {
       const pay = req.payment_status || 'pendiente_pago';
-      if (pay === 'pendiente_pago' && ['aprobada', 'en_revision', 'pendiente'].includes(req.status)) awaitPay++;
+      if (pay === 'pendiente_pago' && req.status === 'aprobada') awaitPay++;
       if (req.status === 'convertida' && paymentOkForProgress(req) && !isOfflineRequest(req)) awaitShip++;
       if (req.status === 'enviada') awaitDeliver++;
     });
@@ -413,7 +426,7 @@ async function convertirSolicitud(id) {
   }
   const ok = await opsConfirm({
     title: 'Convertir solicitud',
-    message: '¿Convertir esta solicitud en venta (registros de aterrizaje)? El tablero estratégico se actualiza tras Construir modelo / carga ELT.',
+    message: '¿Convertir esta solicitud en venta? Se registrará en landing y se sincronizará al tablero automáticamente.',
     confirmLabel: 'Convertir',
   });
   if (!ok) return;
@@ -425,27 +438,41 @@ async function convertirSolicitud(id) {
     notifyErr(data.message || 'Error al procesar');
     return;
   }
-  const synced = data.analytics_sync && data.analytics_sync.synced;
+  let synced = data.analytics_sync && data.analytics_sync.synced;
+  let stale = !!data.analytics_stale;
+  if (stale && data.order_id && typeof syncOrderAnalytics === 'function' && hasPermission('elt.run')) {
+    const retry = await syncOrderAnalytics(data.order_id, { silent: true });
+    if (retry && !retry.error && !retry.skipped) {
+      synced = retry.synced || synced;
+      stale = false;
+    }
+  }
   if (data.offline_sale) {
-    const msg = data.analytics_stale
+    const msg = stale
       ? `Venta presencial ${data.order_id} entregada. Sincronización al tablero pendiente.`
       : `Venta presencial ${data.order_id} completada y entregada${synced ? ` (${synced} hechos)` : ''}.`;
-    if (data.analytics_stale) {
+    if (stale) {
       notifyWarn(msg, {
         actionLabel: 'Sincronizar ahora',
-        action: () => { if (typeof syncStaleAnalytics === 'function') syncStaleAnalytics(); },
+        action: () => {
+          if (typeof syncOrderAnalytics === 'function') syncOrderAnalytics(data.order_id);
+          else if (typeof syncStaleAnalytics === 'function') syncStaleAnalytics();
+        },
       });
     } else {
       notifyOk(msg);
     }
   } else {
-    const msg = data.analytics_stale
-      ? `Venta ${data.order_id} en capa de aterrizaje. Sincronización al tablero pendiente.`
+    const msg = stale
+      ? `Venta ${data.order_id} en landing. Sincronización al tablero pendiente.`
       : `Venta ${data.order_id} creada${synced ? ` y sincronizada (${synced} hechos)` : ''}.`;
-    if (data.analytics_stale) {
+    if (stale) {
       notifyWarn(msg, {
         actionLabel: 'Sincronizar ahora',
-        action: () => { if (typeof syncStaleAnalytics === 'function') syncStaleAnalytics(); },
+        action: () => {
+          if (typeof syncOrderAnalytics === 'function') syncOrderAnalytics(data.order_id);
+          else if (typeof syncStaleAnalytics === 'function') syncStaleAnalytics();
+        },
       });
     } else {
       notifyOk(msg);
@@ -453,6 +480,7 @@ async function convertirSolicitud(id) {
   }
   await loadSolicitudes();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
+  if (typeof refreshAnalyticsLagBanners === 'function') refreshAnalyticsLagBanners();
 }
 
 async function loadVentasMastersForForm() {

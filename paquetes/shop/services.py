@@ -13,6 +13,130 @@ from shared.audit import log_audit
 from shared.mongo import get_db
 from shared.warehouse import DEFAULT_WAREHOUSE_NAME, ensure_default_warehouse, warehouse_summary
 
+STORE_SALE_PERCENT = 25
+_SALE_PRICING_META = "shop_sale_pricing_v3"
+
+
+def variant_prices_from_base(
+    base_price: float,
+    *,
+    sale_enabled: bool,
+    sale_percent: int = STORE_SALE_PERCENT,
+) -> tuple[float, float]:
+    """Devuelve (precio venta, precio tachado). Sin rebaja: compare_at = 0."""
+    base = max(0.0, float(base_price or 0))
+    if not sale_enabled or base <= 0:
+        return round(base, 2), 0.0
+    pct = max(0.0, min(100.0, float(sale_percent))) / 100.0
+    return round(base * (1.0 - pct), 2), round(base, 2)
+
+
+def _variant_view_from_dim(dim: dict[str, Any], variant: dict[str, Any] | None) -> dict[str, Any]:
+    """Precio de vitrina siempre derivado de dim_producto (unit_price + sale_enabled)."""
+    base = float(dim.get("unit_price") or 0)
+    if base <= 0 and variant:
+        base = float(variant.get("compare_at_price") or variant.get("price") or 0)
+    sale_on = bool(dim.get("sale_enabled"))
+    pct = int(dim.get("sale_percent") or STORE_SALE_PERCENT)
+    price, compare = variant_prices_from_base(base, sale_enabled=sale_on, sale_percent=pct)
+    out = dict(variant or {})
+    out["product_id"] = int(dim.get("product_id") or out.get("product_id") or 0)
+    out["price"] = price
+    out["compare_at_price"] = compare
+    return out
+
+
+def clamp_sale_percent(value: Any, default: int = STORE_SALE_PERCENT) -> int:
+    try:
+        n = int(round(float(value)))
+    except (TypeError, ValueError):
+        n = int(default)
+    return max(1, min(90, n))
+
+
+def apply_variant_sale_for_product(
+    db,
+    product_id: int,
+    *,
+    sale_enabled: bool | None = None,
+    sale_percent: int | None = None,
+) -> dict[str, Any]:
+    prod = db["dim_producto"].find_one({"product_id": int(product_id)}, {"_id": 0})
+    if not prod:
+        raise ValueError("not_found")
+    enabled = bool(prod.get("sale_enabled")) if sale_enabled is None else bool(sale_enabled)
+    pct = clamp_sale_percent(
+        sale_percent if sale_percent is not None else prod.get("sale_percent"),
+    )
+    prod = {**prod, "sale_enabled": enabled, "sale_percent": pct}
+    priced = _variant_view_from_dim(prod, db["product_variants"].find_one({"product_id": int(product_id)}, {"_id": 0}))
+    price = float(priced["price"])
+    compare = float(priced.get("compare_at_price") or 0)
+    db["dim_producto"].update_one(
+        {"product_id": int(product_id)},
+        {"$set": {"sale_enabled": enabled, "sale_percent": pct}},
+    )
+    res = db["product_variants"].update_one(
+        {"product_id": int(product_id)},
+        {"$set": {"price": price, "compare_at_price": compare}},
+    )
+    if res.matched_count == 0:
+        ensure_shop_catalog()
+        db["product_variants"].update_one(
+            {"product_id": int(product_id)},
+            {"$set": {"price": price, "compare_at_price": compare}},
+        )
+    return {
+        "product_id": int(product_id),
+        "sale_enabled": enabled,
+        "sale_percent": pct,
+        "price": price,
+        "compare_at_price": compare,
+    }
+
+
+def set_product_sale(product_id: int, enabled: bool, sale_percent: int | None = None) -> dict[str, Any]:
+    db = get_db()
+    before = db["dim_producto"].find_one({"product_id": int(product_id)}, {"_id": 0})
+    result = apply_variant_sale_for_product(
+        db, product_id, sale_enabled=enabled, sale_percent=sale_percent
+    )
+    from shared.commercial import record_product_terms
+    after = db["dim_producto"].find_one({"product_id": int(product_id)}, {"_id": 0}) or {}
+    record_product_terms(db, product_id=int(product_id), before=before, after=after)
+    log_audit(
+        "product_sale_toggle",
+        entity="dim_producto",
+        entity_id=product_id,
+        details={"sale_enabled": enabled, "sale_percent": result.get("sale_percent")},
+    )
+    return result
+
+
+def apply_all_product_sale_pricing() -> int:
+    db = get_db()
+    updated = 0
+    for p in db["dim_producto"].find({}, {"product_id": 1, "unit_price": 1, "sale_enabled": 1, "_id": 0}):
+        apply_variant_sale_for_product(db, int(p["product_id"]))
+        updated += 1
+    return updated
+
+
+def _migrate_sale_pricing_if_needed(db) -> None:
+    if db["app_meta"].find_one({"_id": _SALE_PRICING_META}):
+        return
+    db["dim_producto"].update_many(
+        {"sale_enabled": {"$exists": False}},
+        {"$set": {"sale_enabled": False}},
+    )
+    db["dim_producto"].update_many(
+        {"sale_percent": {"$exists": False}},
+        {"$set": {"sale_percent": STORE_SALE_PERCENT}},
+    )
+    apply_all_product_sale_pricing()
+    db["app_meta"].update_one({"_id": _SALE_PRICING_META}, {"$set": {"done": True}}, upsert=True)
+
+
 _CATEGORY_WEIGHT_KG: dict[str, tuple[float, float]] = {
     "Baby Food": (0.12, 0.45),
     "Beverages": (0.35, 2.0),
@@ -239,6 +363,7 @@ def reconcile_collections_with_masters(db) -> dict[str, int]:
 def ensure_shop_catalog() -> None:
     """Sincroniza catálogo si falta o si colecciones/productos no coinciden con maestros."""
     db = get_db()
+    _migrate_sale_pricing_if_needed(db)
     has_catalog = db["collections"].count_documents({}) > 0 and db["products"].count_documents({}) > 0
     if has_catalog:
         needs_reconcile = _collections_out_of_sync(db)
@@ -290,15 +415,19 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
             except (TypeError, ValueError, KeyError):
                 continue
 
-    db["shop_settings"].delete_many({})
-    db["shop_settings"].insert_one(
+    prev_settings = db["shop_settings"].find_one({"shop_id": 1}, {"_id": 0}) or {}
+
+    db["shop_settings"].update_one(
+        {"shop_id": 1},
         {
-            "shop_id": 1,
-            "name": "Tienda GLOBTRADE",
-            "currency": "USD",
-            "country_default": "United States of America",
-            "checkout_note": "Gracias por comprar en GLOBTRADE.",
-        }
+            "$set": {
+                "name": prev_settings.get("name") or "Tienda GLOBTRADE",
+                "currency": prev_settings.get("currency") or "USD",
+                "country_default": prev_settings.get("country_default") or "United States of America",
+                "checkout_note": prev_settings.get("checkout_note") or "Gracias por comprar en GLOBTRADE.",
+            }
+        },
+        upsert=True,
     )
     counts["shop_settings"] = 1
     ensure_default_warehouse()
@@ -331,8 +460,11 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     collections = []
     cp_links = []
     cp_id = 1
-    for cat in db["dim_categoria"].find({}, {"_id": 0}).sort("category_id", 1):
+    active_query = {"active": {"$ne": False}}
+    active_category_ids: list[int] = []
+    for cat in db["dim_categoria"].find(active_query, {"_id": 0}).sort("category_id", 1):
         cid = int(cat["category_id"])
+        active_category_ids.append(cid)
         title = _collection_display_title(cid)
         collections.append(
             {
@@ -344,7 +476,7 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
             }
         )
         pos = 1
-        for prod in db["dim_producto"].find({"category_id": cid}, {"product_id": 1}):
+        for prod in db["dim_producto"].find({"category_id": cid, "active": {"$ne": False}}, {"product_id": 1}):
             cp_links.append({"id": cp_id, "collection_id": cid, "product_id": int(prod["product_id"]), "position": pos})
             cp_id += 1
             pos += 1
@@ -362,7 +494,8 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     db["inventory_levels"].delete_many({})
     products, variants, media, inv_items, inv_levels = [], [], [], [], []
     vid = iid = mid = lid = 1
-    for p in db["dim_producto"].find({}, {"_id": 0}).sort("product_id", 1):
+    product_query = {"active": {"$ne": False}, "category_id": {"$in": active_category_ids or [-1]}}
+    for p in db["dim_producto"].find(product_query, {"_id": 0}).sort("product_id", 1):
         pid = int(p["product_id"])
         cid = int(p.get("category_id") or 0)
         cat_label = _collection_display_title(cid) if cid else "General"
@@ -375,10 +508,16 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
                 "status": "active",
                 "product_type": cat_label,
                 "tags": cat_label,
+                "featured": bool(p.get("featured")),
             }
         )
         price = float(p.get("unit_price") or 0)
         cost = float(p.get("unit_cost") or 0)
+        sale_price, compare_at = variant_prices_from_base(
+            price,
+            sale_enabled=bool(p.get("sale_enabled")),
+            sale_percent=int(p.get("sale_percent") or STORE_SALE_PERCENT),
+        )
         default_qty = int(p.get("units") or 100)
         qty = previous_stock.get(pid, default_qty) if not reset_stock else default_qty
         variants.append(
@@ -386,8 +525,8 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
                 "variant_id": vid,
                 "product_id": pid,
                 "sku": f"GT-{pid:05d}",
-                "price": price,
-                "compare_at_price": round(price * 1.15, 2) if price else 0,
+                "price": sale_price,
+                "compare_at_price": compare_at,
                 "cost": cost,
                 "inventory_quantity": qty,
             }
@@ -422,22 +561,34 @@ def _sync_from_masters_unlocked(*, reset_stock: bool = False) -> dict[str, int]:
     counts["inventory_items"] = len(inv_items)
     counts["stock_preserved"] = 0 if reset_stock else len(previous_stock)
 
+    prior_customers = {
+        str(row.get("email") or "").lower(): row
+        for row in db["customers"].find({}, {"_id": 0})
+        if row.get("email")
+    }
     db["customers"].delete_many({})
     db["customer_addresses"].delete_many({})
     customers, addresses = [], []
     aid = 1
-    for c in db["dim_cliente"].find({}, {"_id": 0}).limit(500):
+    for c in db["dim_cliente"].find(active_query, {"_id": 0}).limit(500):
         cid = int(c.get("client_id", aid))
         name = (c.get("name") or f"Customer {cid}").split(" ", 1)
+        email = (c.get("email") or f"customer{cid}@globtrade.com").lower()
+        previous = prior_customers.get(email, {})
         customers.append(
             {
                 "customer_id": cid,
-                "email": c.get("email") or f"customer{cid}@globtrade.com",
+                "email": email,
                 "first_name": name[0],
                 "last_name": name[1] if len(name) > 1 else "",
                 "phone": c.get("phone"),
-                "orders_count": 0,
-                "total_spent": 0.0,
+                "orders_count": int(previous.get("orders_count") or 0),
+                "total_spent": float(previous.get("total_spent") or 0),
+                "segment": c.get("segment") or previous.get("segment") or "nuevo",
+                "purchase_limit": float(c.get("purchase_limit") or previous.get("purchase_limit") or 0),
+                "credit_limit": float(c.get("credit_limit") or previous.get("credit_limit") or 0),
+                "credit_days": int(c.get("credit_days") or previous.get("credit_days") or 30),
+                "credit_enabled": bool(c.get("credit_enabled") if c.get("credit_enabled") is not None else previous.get("credit_enabled", False)),
             }
         )
         pais = db["dim_pais"].find_one({"country_id": c.get("country_id")}, {"name": 1})
@@ -602,6 +753,7 @@ def _enrich_shop_products(db, products: list[dict[str, Any]]) -> None:
         if not dim.get("product_id"):
             dim = {**dim, "product_id": pid, "name": dim.get("name") or p.get("title")}
         variant = variants.get(pid)
+        variant = _variant_view_from_dim(dim, variant) if dim else variant
         p["variant"] = variant
         image = media.get(pid)
         img_src = _product_image_src(dim, pid, p.get("title", ""))
@@ -641,8 +793,9 @@ def _enrich_shop_products(db, products: list[dict[str, Any]]) -> None:
         p["vendor_location"] = vendor_geo or None
         p["warehouse"] = wh_name
         p["line"] = dim.get("line")
+        p["featured"] = bool(dim.get("featured") or p.get("featured"))
         p["margin_pct"] = margin_pct
-        p["unit_price"] = float((variant or {}).get("price") or dim.get("unit_price") or 0)
+        p["unit_price"] = float(dim.get("unit_price") or (variant or {}).get("compare_at_price") or (variant or {}).get("price") or 0)
         p["unit_cost"] = float((variant or {}).get("cost") or dim.get("unit_cost") or 0)
         p.update(specs)
 
@@ -661,7 +814,7 @@ def list_products_shop(*, collection_id: int | None = None, limit: int = 48, off
         query["product_id"] = {"$in": product_ids or [-1]}
     col = db["products"]
     total = col.count_documents(query)
-    products = list(col.find(query, {"_id": 0}).sort("product_id", 1).skip(offset).limit(limit))
+    products = list(col.find(query, {"_id": 0}).sort([("featured", -1), ("product_id", 1)]).skip(offset).limit(limit))
     _enrich_shop_products(db, products)
     return {"total": total, "products": products}
 
@@ -670,7 +823,7 @@ def get_product_shop(product_id: int) -> dict[str, Any] | None:
     """Ficha comercial de un producto para la vitrina."""
     ensure_shop_catalog()
     db = get_db()
-    product = db["products"].find_one({"product_id": int(product_id)}, {"_id": 0})
+    product = db["products"].find_one({"product_id": int(product_id), "status": "active"}, {"_id": 0})
     if not product:
         return None
     _enrich_shop_products(db, [product])
@@ -717,6 +870,13 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
         variant = db["product_variants"].find_one({"variant_id": vid}) or db["product_variants"].find_one({"product_id": vid})
         if not variant:
             raise ValueError("invalid_variant")
+        dim = db["dim_producto"].find_one(
+            {"product_id": int(variant["product_id"]), "active": {"$ne": False}},
+            {"_id": 0, "product_id": 1, "unit_price": 1, "sale_enabled": 1, "sale_percent": 1},
+        )
+        if not dim:
+            raise ValueError("invalid_variant")
+        variant = _variant_view_from_dim(dim, variant)
         available = int(variant.get("inventory_quantity") or 0)
         if available < qty:
             raise ValueError("insufficient_stock")
@@ -734,10 +894,12 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
         )
         lid += 1
 
+    email = (data.get("email") or data.get("client_email") or "").strip()
+    name = (data.get("name") or data.get("client_name") or "Cliente").strip()
     discount_code = (data.get("discount_code") or "").strip().upper()
     discount_amount = 0.0
     if discount_code:
-        discount_amount, _coupon = _apply_coupon(db, discount_code, subtotal)
+        discount_amount, _coupon = _apply_coupon(db, discount_code, subtotal, customer_email=email)
 
     country_id = int(data.get("country_id") or 1)
     channel_id = int(data.get("channel_id") or 1)
@@ -753,55 +915,51 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
 
     total = max(subtotal - discount_amount + shipping_cost, 0.0)
 
-    email = (data.get("email") or data.get("client_email") or "").strip()
-    name = (data.get("name") or data.get("client_name") or "Cliente").strip()
-    db["checkouts"].insert_one(
-        {
-            "checkout_id": checkout_id,
-            "email": email,
-            "status": "open",
-            "subtotal": round(subtotal, 2),
-            "shipping_cost": round(shipping_cost, 2),
-            "discount_code": discount_code or None,
-            "discount_amount": round(discount_amount, 2),
-            "total_price": round(total, 2),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+    from shared.commercial import validate_checkout_policy
+    policy = validate_checkout_policy(
+        db, email=email, subtotal=subtotal, discount=discount_amount, lines=pr_lines,
+        exception_id=int(data.get("commercial_exception_id") or 0) or None,
     )
-    if line_docs:
-        db["checkout_line_items"].insert_many(line_docs)
-
     stock_lines: list[dict[str, Any]] = []
-    for item in lines_in:
-        vid = int(item.get("variant_id") or item.get("product_id") or 0)
-        qty = int(item.get("quantity") or 1)
-        variant = db["product_variants"].find_one({"variant_id": vid}) or db["product_variants"].find_one({"product_id": vid})
-        if variant:
-            stock_lines.append({"variant_id": int(variant["variant_id"]), "quantity": qty})
-        _deduct_stock(db, vid, qty)
+    coupon_claimed = False
+    try:
+        if discount_code:
+            _claim_coupon_usage(db, discount_code)
+            coupon_claimed = True
+        stock_lines = _reserve_stock_lines(db, pr_lines)
 
-    if discount_code:
-        db["discount_codes"].update_one({"code": discount_code}, {"$inc": {"usage_count": 1}})
+        db["checkouts"].insert_one(
+            {
+                "checkout_id": checkout_id, "email": email, "status": "open",
+                "subtotal": round(subtotal, 2), "shipping_cost": round(shipping_cost, 2),
+                "discount_code": discount_code or None, "discount_amount": round(discount_amount, 2),
+                "total_price": round(total, 2), "commercial_policy": policy,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        if line_docs:
+            db["checkout_line_items"].insert_many(line_docs)
 
-    req = ventas.create_request(
-        {
-            "client_name": name,
-            "client_email": email,
-            "client_phone": data.get("phone"),
-            "country_id": country_id,
-            "channel_id": channel_id,
-            "notes": data.get("notes"),
-            "lines": pr_lines,
-            "discount_code": discount_code,
-            "discount_amount": discount_amount,
-            "subtotal": subtotal,
-            "shipping_cost": shipping_cost,
-            "shipping_destination": shipping_destination,
-            "shipping_region": shipping_region,
-            "total": total,
-            "stock_lines": stock_lines,
-        }
-    )
+        req = ventas.create_request(
+            {
+                "client_name": name, "client_email": email, "client_phone": data.get("phone"),
+                "country_id": country_id, "channel_id": channel_id, "notes": data.get("notes"),
+                "lines": pr_lines, "discount_code": discount_code, "discount_amount": discount_amount,
+                "subtotal": subtotal, "shipping_cost": shipping_cost,
+                "shipping_destination": shipping_destination, "shipping_region": shipping_region,
+                "total": total, "commercial_policy": policy, "stock_lines": stock_lines,
+            }
+        )
+    except Exception:
+        for line in reversed(stock_lines):
+            restock(db, int(line["variant_id"]), int(line["quantity"]))
+        db["checkout_line_items"].delete_many({"checkout_id": checkout_id})
+        db["checkouts"].delete_one({"checkout_id": checkout_id})
+        if coupon_claimed:
+            _release_coupon_usage(db, discount_code)
+        raise
+    from shared.commercial import mark_exception_used
+    mark_exception_used(db, policy.get("exception_id"), request_id=int(req["request_id"]))
     db["checkouts"].update_one({"checkout_id": checkout_id}, {"$set": {"status": "submitted", "request_id": req.get("request_id")}})
     return {
         "checkout_id": checkout_id,
@@ -809,14 +967,25 @@ def create_checkout_from_cart(data: dict[str, Any]) -> dict[str, Any]:
         "shipping_cost": round(shipping_cost, 2),
         "discount_amount": round(discount_amount, 2),
         "total_price": round(total, 2),
+        "commercial_policy": policy,
         "request": req,
     }
 
 
-def _apply_coupon(db, code: str, subtotal: float) -> tuple[float, dict]:
+def _apply_coupon(db, code: str, subtotal: float, customer_email: str | None = None) -> tuple[float, dict]:
     doc = db["discount_codes"].find_one({"code": code, "active": True})
     if not doc:
         raise ValueError("invalid_coupon")
+    from shared.commercial import discount_is_active
+    if not discount_is_active(doc):
+        raise ValueError("coupon_not_current")
+    if subtotal < float(doc.get("minimum_order_amount") or 0):
+        raise ValueError("coupon_minimum_order")
+    allowed = [str(x).lower() for x in (doc.get("allowed_segments") or [])]
+    if allowed:
+        customer = db["customers"].find_one({"email": (customer_email or "").strip().lower()}, {"segment": 1}) or {}
+        if str(customer.get("segment") or "nuevo").lower() not in allowed:
+            raise ValueError("coupon_segment_restricted")
     used = int(doc.get("usage_count") or 0)
     limit = int(doc.get("usage_limit") or 0)
     if limit and used >= limit:
@@ -828,19 +997,89 @@ def _apply_coupon(db, code: str, subtotal: float) -> tuple[float, dict]:
     return min(amount, subtotal), doc
 
 
-def _deduct_stock(db, variant_id: int, qty: int) -> None:
-    variant = db["product_variants"].find_one({"variant_id": variant_id}) or db["product_variants"].find_one({"product_id": variant_id})
+def _claim_coupon_usage(db, code: str) -> None:
+    """Consume un uso de cupón de forma atómica para no superar su límite."""
+    doc = db["discount_codes"].find_one({"code": code, "active": True}, {"usage_limit": 1})
+    if not doc:
+        raise ValueError("invalid_coupon")
+    limit = int(doc.get("usage_limit") or 0)
+    query: dict[str, Any] = {"code": code, "active": True}
+    if limit:
+        query["usage_count"] = {"$lt": limit}
+    result = db["discount_codes"].update_one(query, {"$inc": {"usage_count": 1}})
+    if not result.modified_count:
+        raise ValueError("coupon_exhausted")
+
+
+def _release_coupon_usage(db, code: str) -> None:
+    db["discount_codes"].update_one(
+        {"code": code, "usage_count": {"$gt": 0}}, {"$inc": {"usage_count": -1}}
+    )
+
+
+def _reserve_stock(db, variant_id: int, qty: int) -> dict[str, Any]:
+    """Reserva existencias con una única escritura condicional; nunca permite saldo negativo."""
+    from pymongo import ReturnDocument
+
+    if int(qty) < 1:
+        raise ValueError("invalid_quantity")
+    variant = db["product_variants"].find_one({"variant_id": int(variant_id)}) or db["product_variants"].find_one({"product_id": int(variant_id)})
     if not variant:
-        return
+        raise ValueError("invalid_variant")
     vid = int(variant["variant_id"])
-    new_qty = max(int(variant.get("inventory_quantity") or 0) - qty, 0)
-    db["product_variants"].update_one({"variant_id": vid}, {"$set": {"inventory_quantity": new_qty}})
+    before_doc = db["product_variants"].find_one_and_update(
+        {"variant_id": vid, "inventory_quantity": {"$gte": int(qty)}},
+        {"$inc": {"inventory_quantity": -int(qty)}},
+        return_document=ReturnDocument.BEFORE,
+    )
+    if not before_doc:
+        raise ValueError("insufficient_stock")
+    before = int(before_doc.get("inventory_quantity") or 0)
+    new_qty = before - int(qty)
     inv = db["inventory_items"].find_one({"variant_id": vid})
     if inv:
-        db["inventory_levels"].update_one(
-            {"inventory_item_id": inv["inventory_item_id"]},
+        level_result = db["inventory_levels"].update_one(
+            {"inventory_item_id": inv["inventory_item_id"], "available": {"$gte": int(qty)}},
             {"$inc": {"available": -qty, "committed": qty}},
         )
+        if not level_result.modified_count:
+            db["product_variants"].update_one({"variant_id": vid}, {"$inc": {"inventory_quantity": int(qty)}})
+            raise ValueError("insufficient_stock")
+    try:
+        from shared.inventory_ledger import record_movement
+        record_movement(
+            db, variant_id=vid, movement_type="sale_commitment", quantity=new_qty - before,
+            before=before, after=new_qty, reason="Reserva de existencias por pedido",
+        )
+    except Exception:
+        pass
+    try:
+        from shared.stock_alerts import maybe_notify_low_stock
+
+        maybe_notify_low_stock(db, vid, reason="checkout_deduct")
+    except Exception:
+        pass
+    return {"variant_id": vid, "before": before, "after": new_qty, "quantity": int(qty)}
+
+
+def _reserve_stock_lines(db, lines: list[dict[str, Any]]) -> list[dict[str, int]]:
+    """Reserva un conjunto completo o revierte lo ya tomado cuando una línea falla."""
+    reserved_lines: list[dict[str, int]] = []
+    try:
+        for line in lines:
+            quantity = int(line.get("quantity") or 0)
+            reserved = _reserve_stock(db, int(line.get("variant_id") or 0), quantity)
+            reserved_lines.append({"variant_id": int(reserved["variant_id"]), "quantity": quantity})
+        return reserved_lines
+    except Exception:
+        for line in reversed(reserved_lines):
+            restock(db, line["variant_id"], line["quantity"])
+        raise
+
+
+def _deduct_stock(db, variant_id: int, qty: int) -> None:
+    """Compatibilidad interna; los checkouts nuevos usan la reserva atómica."""
+    _reserve_stock(db, variant_id, qty)
 
 
 def restock(db, variant_id: int, qty: int) -> None:
@@ -853,6 +1092,7 @@ def restock(db, variant_id: int, qty: int) -> None:
     if not variant:
         return
     vid = int(variant["variant_id"])
+    before = int(variant.get("inventory_quantity") or 0)
     db["product_variants"].update_one(
         {"variant_id": vid},
         {"$inc": {"inventory_quantity": int(qty)}},
@@ -863,6 +1103,14 @@ def restock(db, variant_id: int, qty: int) -> None:
             {"inventory_item_id": inv["inventory_item_id"]},
             {"$inc": {"available": int(qty), "committed": -int(qty)}},
         )
+    try:
+        from shared.inventory_ledger import record_movement
+        record_movement(
+            db, variant_id=vid, movement_type="commitment_release", quantity=int(qty),
+            before=before, after=before + int(qty), reason="Liberación de existencias reservadas",
+        )
+    except Exception:
+        pass
 
 
 def restock_lines(stock_lines: list[dict[str, Any]] | None) -> None:
@@ -908,15 +1156,21 @@ def adjust_variant_stock(variant_id: int, available: int) -> dict[str, Any]:
     if inv:
         db["inventory_levels"].update_one(
             {"inventory_item_id": inv["inventory_item_id"]},
-            {"$set": {"available": qty, "committed": 0}},
+            {"$set": {"available": qty}},
         )
     log_audit("adjust_stock", entity="product_variants", entity_id=vid, details={"available": qty})
+    try:
+        from shared.stock_alerts import maybe_notify_low_stock
+
+        maybe_notify_low_stock(db, vid, reason="adjust_stock")
+    except Exception:
+        pass
     return {"variant_id": vid, "inventory_quantity": qty}
 
 
-def validate_coupon(code: str, subtotal: float) -> dict[str, Any]:
+def validate_coupon(code: str, subtotal: float, customer_email: str | None = None) -> dict[str, Any]:
     db = get_db()
-    amount, doc = _apply_coupon(db, (code or "").strip().upper(), float(subtotal or 0))
+    amount, doc = _apply_coupon(db, (code or "").strip().upper(), float(subtotal or 0), customer_email=customer_email)
     return {
         "code": doc["code"],
         "value_type": doc.get("value_type"),

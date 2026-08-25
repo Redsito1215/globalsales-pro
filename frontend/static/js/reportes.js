@@ -413,6 +413,22 @@ async function downloadPdf(url, fallbackName) {
   URL.revokeObjectURL(a.href);
 }
 
+async function downloadReportFile(url, fallbackName) {
+  const r = await fetch(url, { credentials: 'same-origin' });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.message || 'No se pudo exportar el informe.');
+  }
+  const blob = await r.blob();
+  const disposition = r.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="([^"]+)"/i);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (match && match[1]) || fallbackName;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 async function exportReportePdf() {
   const id = document.getElementById('reportes-select')?.value;
   if (!id) return;
@@ -455,34 +471,40 @@ async function exportRcPdf() {
   }
 }
 
-function exportReporteCsv() {
+async function exportReporteCsv() {
   const grid = lastReporteGrid;
   if (!grid.id || !grid.columns.length) {
     reportNotify('Carga un informe antes de exportar CSV', 'danger');
     return;
   }
-  if (!grid.rows.length) {
-    reportNotify('No hay filas para exportar', 'danger');
-    return;
-  }
-  downloadCsv(`globtrade-${grid.id}.csv`, grid.columns, grid.rows, grid.labels);
-  setExportStatus('reportes-export-status', 'CSV descargado (vista actual).', true);
-  reportNotify('CSV descargado', 'ok');
+  const q = document.getElementById('reportes-q')?.value || '';
+  const thr = document.getElementById('reportes-thr')?.value || '20';
+  let url = `${reportesApiBase()}/reportes/${encodeURIComponent(grid.id)}/csv?limit=2000`;
+  if (q) url += `&q=${encodeURIComponent(q)}`;
+  if (grid.id === 'RS-03') url += `&threshold=${encodeURIComponent(thr)}`;
+  setExportBusy(['reportes-btn-pdf', 'reportes-btn-csv'], true);
+  try {
+    await downloadReportFile(url, `globtrade-${grid.id}.csv`);
+    setExportStatus('reportes-export-status', 'CSV completo descargado.', true);
+    reportNotify('CSV descargado', 'ok');
+  } catch (e) { reportNotify(e.message, 'danger'); }
+  finally { setExportBusy(['reportes-btn-pdf', 'reportes-btn-csv'], false); }
 }
 
-function exportRcCsv() {
+async function exportRcCsv() {
   const grid = lastRcGrid;
   if (!grid.id || !grid.columns.length) {
     reportNotify('Carga un informe antes de exportar CSV', 'danger');
     return;
   }
-  if (!grid.rows.length) {
-    reportNotify('No hay filas para exportar', 'danger');
-    return;
-  }
-  downloadCsv(`globtrade-${grid.id}.csv`, grid.columns, grid.rows, grid.labels);
-  setExportStatus('rc-export-status', 'CSV descargado (vista actual).', true);
-  reportNotify('CSV descargado', 'ok');
+  const url = `${reportesApiBase()}/compuestos/${encodeURIComponent(grid.id)}/csv?limit=2000`;
+  setExportBusy(['rc-btn-pdf', 'rc-btn-csv'], true);
+  try {
+    await downloadReportFile(url, `globtrade-${grid.id}.csv`);
+    setExportStatus('rc-export-status', 'CSV completo descargado.', true);
+    reportNotify('CSV descargado', 'ok');
+  } catch (e) { reportNotify(e.message, 'danger'); }
+  finally { setExportBusy(['rc-btn-pdf', 'rc-btn-csv'], false); }
 }
 
 let reportesAiState = {

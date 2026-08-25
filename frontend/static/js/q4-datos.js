@@ -1,5 +1,7 @@
-/* Q4 Datos — maestras CRUD */
-let datosState = { table: '', rows: [], total: 0, offset: 0, limit: 50 };
+/* Q4 Gestión — CRUD por entidad (listado + modal) */
+let datosState = { table: 'dim_producto', rows: [], total: 0, offset: 0, limit: 10, search: '', activeFilter: '', fieldLabels: {}, columns: [] };
+let gestionSearchTimer = null;
+let gestionTablesCache = [];
 
 const MASTER_PK = {
   dim_region: 'region_id',
@@ -16,60 +18,204 @@ function masterPk(row) {
   return k ? row[k] : null;
 }
 
-async function loadDatosPage() {
-  await loadMasterTablesList();
-  if (!datosState.table) {
-    const sel = document.getElementById('datos-table-select');
-    if (sel) {
-      const preferred = Array.from(sel.options).find(o => o.value === 'dim_producto');
-      if (preferred) {
-        sel.value = 'dim_producto';
-        datosState.table = 'dim_producto';
-      } else if (sel.options.length > 1) {
-        sel.selectedIndex = 1;
-        datosState.table = sel.value;
-      }
-    }
-  }
-  if (datosState.table) await loadMasterRows();
+function labelForField(key) {
+  return datosState.fieldLabels?.[key] || key;
 }
 
-async function loadMasterTablesList() {
-  const sel = document.getElementById('datos-table-select');
-  if (!sel) return;
+function showGestion(table, btn) {
+  const tableName = table || 'dim_producto';
+  datosState.table = tableName;
+  datosState.offset = 0;
+  datosState.search = '';
+  const searchEl = document.getElementById('gestion-search');
+  if (searchEl) searchEl.value = '';
+  if (!canAccessPage('gestion')) {
+    guardPageAccess('gestion');
+    return;
+  }
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-gestion');
+  if (page) page.classList.add('active');
+  const navBtn = btn || document.querySelector(`.nav-item[data-gestion-table="${tableName}"]`);
+  if (navBtn) navBtn.classList.add('active');
+  if (typeof openNavGroupForPage === 'function') openNavGroupForPage('gestion');
+  const meta = gestionTablesCache.find(t => t.name === tableName);
+  const title = meta?.label || tableName;
+  const topbar = document.getElementById('topbar-title');
+  if (topbar) topbar.textContent = title;
+  loadGestionPage(true);
+}
+
+async function loadGestionPage(force) {
+  await loadGestionTablesCache();
+  updateGestionHeader();
+  if (force || datosState.table) await loadMasterRows();
+}
+
+async function loadGestionTablesCache() {
   try {
     const r = await fetch(API + '/master/tables', { credentials: 'same-origin' });
     const data = await r.json();
-    const tables = data.tables || [];
-    const opt = (t) => `<option value="${t.name}">${t.label} · ${t.name} (${t.count})</option>`;
-    sel.innerHTML = '<option value="">— Elegir tabla maestra —</option>' +
-      tables.map(opt).join('');
-    if (datosState.table) sel.value = datosState.table;
+    gestionTablesCache = data.tables || [];
   } catch (e) {
-    sel.innerHTML = '<option>Error al cargar</option>';
-    notifyErr('No se pudo cargar la lista de tablas maestras.');
+    gestionTablesCache = [];
   }
 }
 
-async function onDatosTableChange() {
-  datosState.table = document.getElementById('datos-table-select').value;
-  datosState.offset = 0;
-  if (!datosState.table) {
-    const body = document.getElementById('datos-rows-body');
-    const meta = document.getElementById('datos-rows-meta');
-    const head = document.getElementById('datos-rows-head');
-    if (head) head.innerHTML = '<tr><th>—</th></tr>';
-    if (body) {
-      body.innerHTML = typeof opsEmptyRow === 'function'
-        ? opsEmptyRow(1, { title: 'Elige una tabla', hint: 'Selecciona una dimensión maestra del listado superior.' })
-        : '<tr><td colspan="8">Elige una tabla maestra.</td></tr>';
-    }
-    if (meta) meta.textContent = '';
-    const pager = document.getElementById('datos-pager');
-    if (pager) { pager.hidden = true; pager.innerHTML = ''; }
+function updateGestionHeader() {
+  const meta = gestionTablesCache.find(t => t.name === datosState.table);
+  const titleEl = document.getElementById('gestion-title');
+  const leadEl = document.getElementById('gestion-lead');
+  if (titleEl) titleEl.textContent = meta?.label || datosState.table || 'Gestión';
+  if (leadEl) {
+    const base = meta?.description || 'Administra registros de esta dimensión.';
+    leadEl.textContent = datosState.table === 'dim_producto'
+      ? `${base} Activa rebaja por producto (porcentaje 1–90) con el interruptor de cada fila.`
+      : base;
+  }
+  const createBtn = document.getElementById('gestion-create-btn');
+  if (createBtn) {
+    const creatable = meta?.creatable !== false;
+    createBtn.hidden = !creatable;
+    createBtn.disabled = !creatable;
+  }
+}
+
+function renderProductSaleToggle(row) {
+  const pid = Number(row.product_id);
+  const on = !!row.sale_enabled;
+  const pct = Math.max(1, Math.min(90, Number(row.sale_percent) || 25));
+  const disabled = canWriteMasters() ? '' : 'disabled';
+  return `
+    <div class="sale-toggle-wrap">
+      <input type="number" class="sale-percent-input" min="1" max="90" step="1" value="${pct}" ${disabled}
+        title="Porcentaje de rebaja" aria-label="Porcentaje de rebaja para ${String(row.name || pid).replace(/"/g, '&quot;')}"
+        onchange="changeProductSalePercent(${pid}, this)" onclick="event.stopPropagation()" />
+      <label class="sale-toggle sale-toggle--row ${on ? 'is-on' : ''}" title="Activar o desactivar rebaja">
+        <input type="checkbox" class="sale-toggle-input" ${on ? 'checked' : ''} ${disabled}
+          onchange="toggleProductSale(${pid}, this)" aria-label="Rebaja para ${String(row.name || pid).replace(/"/g, '&quot;')}" />
+        <span class="sale-toggle-track" aria-hidden="true"><span class="sale-toggle-thumb"></span></span>
+      </label>
+    </div>`;
+}
+
+async function patchProductSale(productId, payload) {
+  const r = await fetch(`${API}/shop/products/${productId}/sale`, {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.message || 'Error al actualizar rebaja');
+  return data;
+}
+
+async function toggleProductSale(productId, input) {
+  if (!canWriteMasters()) {
+    notifyErr('No tienes permiso para cambiar rebajas.');
+    input.checked = !input.checked;
     return;
   }
-  await loadMasterRows();
+  const enabled = input.checked;
+  const wrap = input.closest('.sale-toggle-wrap');
+  const label = input.closest('.sale-toggle');
+  const pctEl = wrap?.querySelector('.sale-percent-input');
+  const percent = Number(pctEl?.value) || 25;
+  if (label) label.classList.toggle('is-on', enabled);
+  try {
+    const data = await patchProductSale(productId, { enabled, percent });
+    const row = datosState.rows.find(x => Number(x.product_id) === Number(productId));
+    if (row) {
+      row.sale_enabled = !!data.sale_enabled;
+      row.sale_percent = Number(data.sale_percent) || percent;
+    }
+    if (label) label.classList.toggle('is-on', !!data.sale_enabled);
+    input.checked = !!data.sale_enabled;
+    if (pctEl && data.sale_percent != null) pctEl.value = data.sale_percent;
+    notifyOk(data.message || 'Rebaja actualizada.');
+    refreshTiendaAfterSaleChange(productId, data);
+  } catch (e) {
+    input.checked = !enabled;
+    if (label) label.classList.toggle('is-on', !enabled);
+    notifyErr(e.message || 'No se pudo cambiar la rebaja.');
+  }
+}
+
+async function changeProductSalePercent(productId, input) {
+  if (!canWriteMasters()) {
+    notifyErr('No tienes permiso para cambiar rebajas.');
+    return;
+  }
+  let percent = Number(input.value);
+  if (!Number.isFinite(percent)) percent = 25;
+  percent = Math.max(1, Math.min(90, Math.round(percent)));
+  input.value = percent;
+  const wrap = input.closest('.sale-toggle-wrap');
+  const enabled = !!wrap?.querySelector('.sale-toggle-input')?.checked;
+  try {
+    const data = await patchProductSale(productId, { enabled, percent });
+    const row = datosState.rows.find(x => Number(x.product_id) === Number(productId));
+    if (row) {
+      row.sale_enabled = !!data.sale_enabled;
+      row.sale_percent = Number(data.sale_percent) || percent;
+    }
+    if (data.sale_percent != null) input.value = data.sale_percent;
+    notifyOk(enabled ? `Rebaja del ${data.sale_percent}% actualizada.` : `Porcentaje guardado (${data.sale_percent}%). Activa el interruptor para aplicarlo.`);
+    refreshTiendaAfterSaleChange(productId, data);
+  } catch (e) {
+    notifyErr(e.message || 'No se pudo guardar el porcentaje.');
+  }
+}
+
+window.toggleProductSale = toggleProductSale;
+window.changeProductSalePercent = changeProductSalePercent;
+
+function refreshTiendaAfterSaleChange(productId, data) {
+  const pid = Number(productId);
+  const price = Number(data?.price);
+  const compare = Number(data?.compare_at_price || 0);
+  if (window.tiendaState?.products?.length) {
+    const prod = window.tiendaState.products.find(p => Number(p.product_id) === pid);
+    if (prod) {
+      prod.variant = prod.variant || {};
+      if (Number.isFinite(price)) prod.variant.price = price;
+      prod.variant.compare_at_price = compare > 0 ? compare : 0;
+    }
+    if (typeof filterShopProducts === 'function') filterShopProducts();
+  }
+  if (typeof invalidatePageCache === 'function') invalidatePageCache('tienda');
+  if (typeof loadTiendaProducts === 'function') loadTiendaProducts();
+}
+
+function onGestionSearchInput() {
+  clearTimeout(gestionSearchTimer);
+  gestionSearchTimer = setTimeout(() => {
+    datosState.search = (document.getElementById('gestion-search')?.value || '').trim();
+    datosState.offset = 0;
+    loadMasterRows();
+  }, 320);
+}
+
+function onGestionStatusChange(value) {
+  datosState.activeFilter = value === 'true' || value === 'false' ? value : '';
+  datosState.offset = 0;
+  loadMasterRows();
+}
+
+/** @deprecated usar showGestion / loadGestionPage */
+async function loadDatosPage() {
+  if (!datosState.table) datosState.table = 'dim_producto';
+  await loadGestionPage(true);
+}
+
+async function loadMasterTablesList() {
+  await loadGestionTablesCache();
+}
+
+async function onDatosTableChange() {
+  await loadGestionPage(true);
 }
 
 function datosCurrentPage() {
@@ -129,6 +275,8 @@ async function loadMasterRows() {
   if (!table || !body) return;
   body.innerHTML = '<tr><td colspan="8">Cargando…</td></tr>';
   const q = new URLSearchParams({ limit: datosState.limit, offset: datosState.offset });
+  if (datosState.search) q.set('search', datosState.search);
+  if (datosState.activeFilter) q.set('active', datosState.activeFilter);
   const r = await fetch(API + '/master/' + encodeURIComponent(table) + '?' + q, { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) {
@@ -139,6 +287,8 @@ async function loadMasterRows() {
   datosState.rows = data.rows || [];
   datosState.total = data.total || 0;
   datosState.editable = data.editable === true;
+  datosState.fieldLabels = data.field_labels || {};
+  datosState.columns = data.columns || (datosState.rows[0] ? Object.keys(datosState.rows[0]) : []);
   const pages = datosTotalPages();
   if (datosState.total && datosCurrentPage() >= pages) {
     datosState.offset = Math.max(pages - 1, 0) * datosState.limit;
@@ -167,28 +317,41 @@ async function loadMasterRows() {
     }
     return;
   }
-  const keys = Object.keys(datosState.rows[0]);
+  const isProducts = datosState.table === 'dim_producto';
+  let keys = datosState.columns.length
+    ? datosState.columns.filter(k => datosState.rows.length ? k in datosState.rows[0] : true)
+    : Object.keys(datosState.rows[0]);
+  if (isProducts) keys = keys.filter(k => k !== 'sale_enabled' && k !== 'sale_percent');
+  const saleHeader = isProducts ? '<th class="sale-toggle-col">Rebaja %</th>' : '';
   document.getElementById('datos-rows-head').innerHTML =
-    keys.map(k => `<th>${k}</th>`).join('') + '<th>Acciones</th>';
+    keys.map(k => `<th>${labelForField(k)}</th>`).join('') + '<th>Acciones</th>' + saleHeader;
   body.innerHTML = datosState.rows.map(row => {
     const pk = masterPk(row) ?? row[keys[0]];
     const img = row.image_url || row.src
       ? `<br><img class="master-thumb" src="${row.image_url || row.src}" alt="" />`
       : '';
+    const isActive = row.active !== false;
     const actions = canWriteMasters()
       ? `<div class="master-actions table-actions">
           <button type="button" class="btn btn-ghost btn-sm" onclick="openMasterEdit('${pk}')">Editar</button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="deleteMasterRow('${pk}')">Eliminar</button>
+          <button type="button" class="btn btn-ghost btn-sm ${isActive ? 'master-disable-btn' : 'master-enable-btn'}"
+            onclick="toggleMasterActive('${pk}', ${isActive ? 'false' : 'true'})">${isActive ? 'Inhabilitar' : 'Habilitar'}</button>
         </div>`
       : '<span class="master-note">Sin permiso de escritura</span>';
+    const saleCell = isProducts ? `<td class="sale-toggle-cell">${renderProductSaleToggle(row)}</td>` : '';
     return `<tr>${keys.map(k => `<td>${formatCell(row[k])}${k === 'name' || k === 'title' ? img : ''}</td>`).join('')}
-      <td>${actions}</td></tr>`;
+      <td>${actions}</td>${saleCell}</tr>`;
   }).join('');
   renderDatosPager();
 }
 
 function formatCell(v) {
   if (v == null) return '—';
+  if (typeof v === 'boolean') {
+    return v
+      ? '<span class="badge badge--ok master-status-badge">Activo</span>'
+      : '<span class="badge badge--muted master-status-badge">Inactivo</span>';
+  }
   if (typeof v === 'number') return Number(v).toLocaleString('es-EC');
   return String(v);
 }
@@ -206,13 +369,18 @@ function canReadAudit() {
 }
 
 function openMasterCreate() {
-  if (!canWriteMasters()) { notifyErr('No tienes permiso para editar maestros.'); return; }
+  if (!canWriteMasters()) { notifyErr('No tienes permiso para editar registros de gestión.'); return; }
   if (!datosState.table) {
-    notifyWarn('Elige primero una tabla maestra.');
+    notifyWarn('Elige primero una entidad en el menú Gestión.');
     return;
   }
   if (datosState.editable === false) {
     notifyWarn('Esta tabla no admite edición manual desde aquí.');
+    return;
+  }
+  const meta = gestionTablesCache.find(t => t.name === datosState.table);
+  if (meta?.creatable === false) {
+    notifyWarn('Este catálogo es fijo. Puedes editar o inhabilitar sus registros, pero no agregar nuevos.');
     return;
   }
   document.getElementById('master-form-title').textContent = 'Nuevo registro';
@@ -253,7 +421,7 @@ function buildMasterFormFields(row) {
     const inputType = intFields.has(f) || moneyFields.has(f) ? 'number' : 'text';
     const minAttr = intFields.has(f) ? ' min="1" step="1"' : (moneyFields.has(f) ? ' min="0.01" step="0.01"' : '');
     return `
-    <div class="fg"><label>${f}</label>
+    <div class="fg"><label for="mf-${f}">${labelForField(f)}</label>
     <input id="mf-${f}" type="${inputType}"${minAttr} value="${row[f] != null ? row[f] : ''}" /></div>`;
   }).join('');
 }
@@ -344,9 +512,9 @@ async function uploadProductImage(productId, file) {
   else notifyOk('Imagen del producto actualizada.');
 }
 
-async function deleteMasterRow(pk) {
+async function toggleMasterActive(pk, active) {
   if (!canWriteMasters()) {
-    notifyErr('No tienes permiso para eliminar registros maestros.');
+    notifyErr('No tienes permiso para cambiar el estado de registros maestros.');
     return;
   }
   if (typeof opsConfirm !== 'function') {
@@ -354,18 +522,23 @@ async function deleteMasterRow(pk) {
     return;
   }
   const ok = await opsConfirm({
-    title: 'Eliminar registro',
-    message: '¿Eliminar este registro de la tabla maestra? Esta acción no se puede deshacer.',
-    confirmLabel: 'Eliminar',
-    danger: true,
+    title: active ? 'Habilitar registro' : 'Inhabilitar registro',
+    message: active
+      ? 'El registro volverá a estar disponible para operaciones nuevas.'
+      : 'El registro dejará de estar disponible para operaciones nuevas, pero conservará todo su historial.',
+    confirmLabel: active ? 'Habilitar' : 'Inhabilitar',
+    danger: !active,
   });
   if (!ok) return;
-  const r = await fetch(`${API}/master/${datosState.table}/${pk}`, {
-    method: 'DELETE', credentials: 'same-origin',
+  const r = await fetch(`${API}/master/${datosState.table}/${pk}/status`, {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active: !!active }),
   });
   const data = await r.json();
   if (!r.ok) { notifyErr(data.message || 'Error al procesar'); return; }
-  notifyOk('Registro eliminado.');
+  notifyOk(data.message || (active ? 'Registro habilitado.' : 'Registro inhabilitado.'));
   await loadMasterRows();
   await loadMasterTablesList();
 }
@@ -529,7 +702,7 @@ async function loadDatasetQ4() {
 }
 
 const AUDIT_PAGE_SIZE = 100;
-let auditState = { page: 0, role: '' };
+let auditState = { page: 0, role: '', module: '', action: '', email: '', dateFrom: '', dateTo: '', rows: [] };
 
 function auditGoPage(page) {
   auditState.page = Math.max(0, page);
@@ -552,6 +725,46 @@ function auditActionBadge(action) {
   return `<span class="${cls}">${action || '—'}</span>`;
 }
 
+function auditReadFilters() {
+  auditState.role = document.getElementById('audit-role-filter')?.value || '';
+  auditState.module = document.getElementById('audit-module-filter')?.value || '';
+  auditState.action = document.getElementById('audit-action-filter')?.value || '';
+  auditState.email = document.getElementById('audit-user-filter')?.value.trim() || '';
+  auditState.dateFrom = document.getElementById('audit-date-from')?.value || '';
+  auditState.dateTo = document.getElementById('audit-date-to')?.value || '';
+}
+
+function auditParams(includePaging = true) {
+  auditReadFilters();
+  const params = new URLSearchParams();
+  if (includePaging) {
+    params.set('limit', String(AUDIT_PAGE_SIZE));
+    params.set('offset', String(auditState.page * AUDIT_PAGE_SIZE));
+  }
+  [['role', auditState.role], ['module', auditState.module], ['action', auditState.action],
+    ['email', auditState.email], ['date_from', auditState.dateFrom], ['date_to', auditState.dateTo]]
+    .forEach(([key, value]) => { if (value) params.set(key, value); });
+  return params;
+}
+
+async function showAuditDetail(index) {
+  const row = auditState.rows[index] || {};
+  const changes = row.changes || {};
+  const lines = Object.entries(changes).map(([field, values]) =>
+    `${field}: ${JSON.stringify(values.before ?? null)} → ${JSON.stringify(values.after ?? null)}`
+  );
+  const fallback = Object.keys(row.details || {}).length ? JSON.stringify(row.details, null, 2) : 'Sin información adicional.';
+  const message = lines.length ? lines.join('\n') : fallback;
+  if (typeof opsConfirm === 'function') {
+    await opsConfirm({ title: `${row.action || 'Acción'} · ${row.entity || 'registro'}`, message, confirmLabel: 'Cerrar' });
+  } else window.alert(message);
+}
+
+function exportAuditLog() {
+  const api = window.API || (window.location.origin + '/api');
+  window.location.assign(`${api}/audit_log/export?${auditParams(false)}`);
+}
+
 async function loadAuditPage() {
   const body = document.getElementById('audit-body');
   const meta = document.getElementById('audit-meta');
@@ -559,7 +772,7 @@ async function loadAuditPage() {
   const roleSel = document.getElementById('audit-role-filter');
   if (!body) return;
   const api = window.API || (window.location.origin + '/api');
-  const cols = 6;
+  const cols = 8;
   if (!window._authUser) {
     body.innerHTML = typeof opsEmptyRow === 'function'
       ? opsEmptyRow(cols, { title: 'Sesión requerida', hint: 'Inicia sesión para consultar el registro de acciones.' })
@@ -576,15 +789,11 @@ async function loadAuditPage() {
     if (pager) pager.hidden = true;
     return;
   }
-  if (roleSel) auditState.role = roleSel.value || '';
+  auditReadFilters();
   body.innerHTML = `<tr><td colspan="${cols}">Cargando auditoría…</td></tr>`;
   if (meta) meta.textContent = 'Cargando…';
   if (pager) pager.innerHTML = '';
-  const params = new URLSearchParams({
-    limit: String(AUDIT_PAGE_SIZE),
-    offset: String(auditState.page * AUDIT_PAGE_SIZE),
-  });
-  if (auditState.role) params.set('role', auditState.role);
+  const params = auditParams(true);
   try {
     const r = await fetch(`${api}/audit_log?${params}`, { credentials: 'same-origin' });
     const data = await r.json().catch(() => ({}));
@@ -600,7 +809,16 @@ async function loadAuditPage() {
         `<option value="${role}" ${role === current ? 'selected' : ''}>${role}</option>`
       ).join('')}`;
     }
+    const fillAuditSelect = (id, values, current, emptyLabel) => {
+      const select = document.getElementById(id);
+      if (!select || !Array.isArray(values)) return;
+      select.innerHTML = `<option value="">${emptyLabel}</option>${values.map(value =>
+        `<option value="${value}" ${value === current ? 'selected' : ''}>${value}</option>`).join('')}`;
+    };
+    fillAuditSelect('audit-module-filter', data.modules, auditState.module, 'Todos');
+    fillAuditSelect('audit-action-filter', data.actions, auditState.action, 'Todas');
     const rows = data.entries || [];
+    auditState.rows = rows;
     const total = Number(data.total) || 0;
     const offset = Number(data.offset) || 0;
     const limit = Number(data.limit) || AUDIT_PAGE_SIZE;
@@ -628,11 +846,13 @@ async function loadAuditPage() {
       body.innerHTML = rows.map(e => `
     <tr>
       <td class="audit-cell-mono">${auditFormatAt(e.at)}</td>
+      <td>${e.module || 'gestión'}</td>
       <td>${auditActionBadge(e.action)}</td>
       <td>${e.entity || '—'}</td>
       <td class="audit-cell-user">${e.email || '—'}</td>
       <td><code>${e.role || '—'}</code></td>
       <td class="audit-cell-id">${e.entity_id ?? '—'}</td>
+      <td><button type="button" class="btn btn-ghost btn-sm" onclick="showAuditDetail(${auditState.rows.indexOf(e)})">Ver cambios</button></td>
     </tr>`).join('');
     }
     if (pager) {
@@ -652,6 +872,11 @@ async function loadAuditPage() {
   }
 }
 
+window.showGestion = showGestion;
+window.loadGestionPage = loadGestionPage;
+window.onGestionSearchInput = onGestionSearchInput;
+window.showAuditDetail = showAuditDetail;
+window.exportAuditLog = exportAuditLog;
 window.auditGoPage = auditGoPage;
 window.loadAuditPage = loadAuditPage;
 window.datosGoPage = datosGoPage;

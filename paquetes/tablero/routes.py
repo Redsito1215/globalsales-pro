@@ -1,9 +1,12 @@
 """Rutas Flask — paquete Q1 Tablero."""
+from pathlib import Path
+
 from flask import Blueprint, jsonify, request
 
 from auth.decorators import admin_required
 from config.settings import settings
 from paquetes.tablero import catalogo, generar_ventas, queries
+from shared.mongo import get_db, mongo_topology
 
 tablero_bp = Blueprint("tablero", __name__, url_prefix="/api")
 
@@ -43,9 +46,46 @@ def health():
     ), (200 if ok else 503)
 
 
+@tablero_bp.get("/health/details")
+@admin_required
+def health_details():
+    ok = queries.ping_mongo()
+    db = get_db()
+    open_errors = db["system_errors"].count_documents({"resolved": False}) if ok else None
+    from shared.backup_status import list_backup_manifests
+
+    root = Path(__file__).resolve().parents[2]
+    backups = list_backup_manifests(root / "backups", limit=5)
+    return jsonify({
+        "status": "ok" if ok else "error", "mongo": {"reachable": ok, **mongo_topology()},
+        "open_errors": open_errors, "latest_backup": backups[0] if backups else None,
+        "checks": {
+            "database": "ok" if ok else "error",
+            "backup": "ok" if backups and backups[0].get("verified") else "warning",
+            "errors": "ok" if open_errors == 0 else "warning",
+        },
+    }), (200 if ok else 503)
+
+
+@tablero_bp.get("/backups")
+@admin_required
+def backups_list():
+    from shared.backup_status import list_backup_manifests
+
+    root = Path(__file__).resolve().parents[2]
+    rows = list_backup_manifests(root / "backups", limit=min(int(request.args.get("limit", 20)), 100))
+    return jsonify({"status": "ok", "backups": rows, "count": len(rows)})
+
+
 @tablero_bp.get("/summary")
 def summary():
     return jsonify(queries.get_summary(**_filters_from_request()))
+
+
+@tablero_bp.get("/dashboard")
+def dashboard():
+    """Resumen y gráficos en una sola consulta para historiales grandes."""
+    return jsonify(queries.dashboard_bundle(top=int(request.args.get("top", 10)), **_filters_from_request()))
 
 
 @tablero_bp.get("/regions")

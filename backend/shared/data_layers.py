@@ -13,6 +13,8 @@ LAYER_MAP: dict[str, str] = {
     "purchase_request_lines": "operativo",
     "purchase_orders": "operativo",
     "purchase_order_lines": "operativo",
+    "purchase_requisitions": "operativo",
+    "purchase_requisition_lines": "operativo",
     "products": "operativo",
     "product_variants": "operativo",
     "product_media": "operativo",
@@ -23,6 +25,8 @@ LAYER_MAP: dict[str, str] = {
     "inventory_items": "operativo",
     "inventory_levels": "operativo",
     "inventory_scrapped": "operativo",
+    "inventory_movements": "operativo",
+    "inventory_counts": "operativo",
     "customers": "operativo",
     "customer_addresses": "operativo",
     "checkouts": "operativo",
@@ -31,6 +35,17 @@ LAYER_MAP: dict[str, str] = {
     "shop_settings": "operativo",
     "support_messages": "operativo",
     "user_notifications": "operativo",
+    "cash_movements": "operativo",
+    "invoices": "operativo",
+    "credit_notes": "operativo",
+    "accounting_periods": "gobernanza",
+    "payment_attempts": "operativo",
+    "request_events": "operativo",
+    "report_exports": "gobernanza",
+    "system_errors": "gobernanza",
+    "product_price_history": "gobernanza",
+    "discount_history": "gobernanza",
+    "commercial_exceptions": "gobernanza",
     # Landing (staging / CSV / post-convertir)
     "sales_records": "landing",
     "orders": "landing",
@@ -115,7 +130,7 @@ def _last_build_at(db) -> str | None:
 
 
 def layers_overview() -> dict[str, Any]:
-    """Resumen para meta API / demo académica."""
+    """Resumen de capas para la API de metadatos."""
     by_layer: dict[str, list[dict[str, Any]]] = {k: [] for k in LAYER_LABELS}
     for coll, layer in sorted(LAYER_MAP.items()):
         try:

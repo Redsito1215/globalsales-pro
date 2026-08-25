@@ -94,7 +94,7 @@
   }
 
   function popBadges() {
-    document.querySelectorAll('#notif-badge, #notif-nav-badge').forEach(el => {
+    document.querySelectorAll('#notif-badge, #notif-nav-badge, #shop-header-notif-badge').forEach(el => {
       el.classList.remove('notif-badge--pop');
       void el.offsetWidth;
       el.classList.add('notif-badge--pop');
@@ -103,16 +103,20 @@
 
   function updateBadges(unread) {
     const text = unread > 99 ? '99+' : String(unread || 0);
-    ['notif-badge', 'notif-nav-badge'].forEach(id => {
+    ['notif-badge', 'notif-nav-badge', 'shop-header-notif-badge'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       el.textContent = text;
       el.hidden = unread <= 0;
     });
     const btn = document.getElementById('btn-notifications');
+    const shopNotif = document.getElementById('shop-header-notifications');
     if (btn) {
       if (window._authUser) btn.hidden = false;
       btn.classList.toggle('notif-btn--has-unread', unread > 0);
+    }
+    if (shopNotif) {
+      shopNotif.classList.toggle('shop-madson-notif-btn--has-unread', unread > 0);
     }
   }
 

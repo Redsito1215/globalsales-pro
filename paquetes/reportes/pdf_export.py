@@ -165,7 +165,7 @@ def generate_report_pdf(
     story.append(Spacer(1, 0.4 * cm))
     story.append(
         Paragraph(
-            _pdf_text("Documento generado por GLOBTRADE (demo academica)."),
+            _pdf_text("Documento generado por GLOBTRADE."),
             styles["Italic"],
         )
     )

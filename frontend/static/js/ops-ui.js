@@ -64,10 +64,12 @@
   window.notifyWarn = function (msg, opts) { window.notify(msg, 'warn', opts); };
 
   window.goConstruirModelo = function goConstruirModelo() {
-    const nav = document.querySelector('.nav-item[data-page="datos"]');
-    if (typeof showPage === 'function') showPage('datos', nav || undefined);
+    const nav = document.querySelector('.nav-item[data-gestion-table="dim_producto"]')
+      || document.querySelector('.nav-item[data-page="gestion"]');
+    if (typeof showGestion === 'function') showGestion('dim_producto', nav || undefined);
+    else if (typeof showPage === 'function') showPage('gestion', nav || undefined);
     setTimeout(() => {
-      const btn = document.querySelector('#page-datos button[onclick="runBuildModel()"]');
+      const btn = document.querySelector('#page-gestion button[onclick="runBuildModel()"]');
       if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 120);
   };
@@ -81,6 +83,7 @@
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 50 }),
+        signal: AbortSignal.timeout(25000),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -100,11 +103,73 @@
         if (typeof clearAnalyticsCache === 'function') clearAnalyticsCache();
         loadDashboard(true);
       }
+      if (typeof refreshAnalyticsLagBanners === 'function') refreshAnalyticsLagBanners();
       return data;
     } catch (e) {
       if (!silent) notifyErr(e.message || 'Error al sincronizar');
       return null;
     }
+  };
+
+  window.syncOrderAnalytics = async function syncOrderAnalytics(orderId, opts) {
+    const silent = !!(opts && opts.silent);
+    if (!orderId) return null;
+    const API = (window.location.origin || 'http://127.0.0.1:5001') + '/api';
+    try {
+      const r = await fetch(API + '/analytics/sync-order', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: String(orderId) }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (!silent) notifyWarn(data.message || 'No se pudo sincronizar el pedido al tablero.');
+        return data;
+      }
+      if (!silent) {
+        const n = data.synced || 0;
+        notifyOk(n ? `Pedido ${orderId} sincronizado (${n} hecho(s)).` : `Pedido ${orderId} ya estaba en fact_ventas.`);
+      }
+      if (typeof refreshAnalyticsLagBanners === 'function') refreshAnalyticsLagBanners();
+      if (!silent && typeof loadDashboard === 'function') {
+        if (typeof clearAnalyticsCache === 'function') clearAnalyticsCache();
+        loadDashboard(true);
+      }
+      return data;
+    } catch (e) {
+      if (!silent) notifyErr(e.message || 'Error al sincronizar pedido');
+      return null;
+    }
+  };
+
+  window.refreshAnalyticsLagBanners = async function refreshAnalyticsLagBanners() {
+    const API = (window.location.origin || 'http://127.0.0.1:5001') + '/api';
+    let lagging = false;
+    try {
+      const r = await fetch(API + '/meta/data-layers', { credentials: 'same-origin' });
+      const data = await r.json().catch(() => ({}));
+      lagging = !!(data.strategic_lagging || (data.bridge && data.bridge.strategic_lagging));
+    } catch { /* ignore */ }
+    const html = lagging
+      ? `<p>Hay ventas nuevas pendientes de actualizar en el tablero estratégico.</p>
+        <div class="dash-lag-actions">
+          <button type="button" class="btn btn-primary btn-sm" data-require-perm="elt.run" onclick="syncStaleAnalytics()">Sincronizar ahora</button>
+        </div>`
+      : '';
+    ['dash-lag-banner', 'ventas-lag-banner'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (lagging) {
+        el.hidden = false;
+        el.innerHTML = html;
+        if (typeof applyPermissionUi === 'function') applyPermissionUi();
+      } else {
+        el.hidden = true;
+        el.innerHTML = '';
+      }
+    });
+    return lagging;
   };
 
   window.opsEmpty = function opsEmpty(opts) {
@@ -126,20 +191,303 @@
   };
 
   window.PAYMENT_METHOD_OPTIONS = {
-    offline: [
-      { value: 'tarjeta', label: 'Tarjeta' },
-      { value: 'efectivo_tarjeta', label: 'Efectivo y tarjeta bancaria' },
-    ],
-    online: [
-      { value: 'tarjeta', label: 'Tarjeta' },
-      { value: 'credito', label: 'Crédito' },
-      { value: 'cuenta_bancaria', label: 'Cuenta bancaria' },
-    ],
+    card: [{ value: 'tarjeta', label: 'Tarjeta' }],
   };
 
-  window.fillPaymentMethodSelect = function fillPaymentMethodSelect(selectEl, offline) {
+  window.resetPagoCardForm = function resetPagoCardForm() {
+    ['pago-card-name', 'pago-card-number', 'pago-card-exp', 'pago-card-cvv'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    if (typeof clearPagoFieldErrors === 'function') clearPagoFieldErrors();
+    if (typeof updatePagoCardPreview === 'function') updatePagoCardPreview();
+    const proc = document.getElementById('pago-processing');
+    const actions = document.getElementById('pago-actions');
+    const card = document.querySelector('.modal-card--pago');
+    if (proc) proc.hidden = true;
+    if (actions) actions.hidden = false;
+    if (card) card.classList.remove('is-processing');
+    const formErr = document.getElementById('pago-form-error');
+    if (formErr) {
+      formErr.hidden = true;
+      formErr.textContent = '';
+    }
+  };
+
+  window.formatPagoCardNumber = function formatPagoCardNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+  };
+
+  window.formatPagoCardExpiry = function formatPagoCardExpiry(value) {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  };
+
+  window.parseCardExpiry = function parseCardExpiry(exp) {
+    const trimmed = String(exp || '').trim();
+    if (!/^\d{2}\/\d{2}$/.test(trimmed)) {
+      return { ok: false, reason: 'format' };
+    }
+    const mm = parseInt(trimmed.slice(0, 2), 10);
+    const yy = parseInt(trimmed.slice(3, 5), 10);
+    if (!Number.isFinite(mm) || !Number.isFinite(yy) || mm < 1 || mm > 12) {
+      return { ok: false, reason: 'month' };
+    }
+    const year = 2000 + yy;
+    const expiresAt = new Date(year, mm, 0, 23, 59, 59, 999);
+    return { ok: true, mm, yy, year, expiresAt };
+  };
+
+  window.isCardExpiryPast = function isCardExpiryPast(expiresAt) {
+    return expiresAt.getTime() < Date.now();
+  };
+
+  window.validatePagoCardExpiryField = function validatePagoCardExpiryField() {
+    const exp = (document.getElementById('pago-card-exp')?.value || '').trim();
+    if (!exp) {
+      setPagoFieldError('exp', '');
+      return true;
+    }
+    const parsed = parseCardExpiry(exp);
+    if (!parsed.ok) {
+      if (parsed.reason === 'month') {
+        setPagoFieldError('exp', 'Mes de vencimiento no válido (MM/AA).');
+      } else {
+        setPagoFieldError('exp', 'Usa el formato MM/AA.');
+      }
+      return false;
+    }
+    if (isCardExpiryPast(parsed.expiresAt)) {
+      setPagoFieldError('exp', 'La tarjeta está vencida.');
+      return false;
+    }
+    setPagoFieldError('exp', '');
+    return true;
+  };
+
+  window.detectPagoCardBrand = function detectPagoCardBrand(number) {
+    const digits = String(number || '').replace(/\D/g, '');
+    if (/^4/.test(digits)) return 'VISA';
+    if (/^(5[1-5]|2[2-7])/.test(digits)) return 'MASTERCARD';
+    if (/^3[47]/.test(digits)) return 'AMEX';
+    if (/^6/.test(digits)) return 'DISCOVER';
+    return 'TARJETA';
+  };
+
+  window.maskPagoCardNumber = function maskPagoCardNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '•••• •••• •••• ••••';
+    const padded = (digits + '••••••••••••••••').slice(0, 16);
+    return padded.replace(/(.{4})/g, '$1 ').trim();
+  };
+
+  window.updatePagoCardPreview = function updatePagoCardPreview() {
+    const name = (document.getElementById('pago-card-name')?.value || '').trim();
+    const number = document.getElementById('pago-card-number')?.value || '';
+    const exp = (document.getElementById('pago-card-exp')?.value || '').trim();
+    const brand = document.getElementById('pago-card-brand');
+    const numEl = document.getElementById('pago-card-preview-number');
+    const nameEl = document.getElementById('pago-card-preview-name');
+    const expEl = document.getElementById('pago-card-preview-exp');
+    const digits = String(number).replace(/\D/g, '');
+    if (brand) brand.textContent = detectPagoCardBrand(digits);
+    if (numEl) numEl.textContent = maskPagoCardNumber(number);
+    if (nameEl) nameEl.textContent = (name || 'NOMBRE APELLIDO').toUpperCase();
+    if (expEl) expEl.textContent = exp || 'MM/AA';
+  };
+
+  window.clearPagoFieldErrors = function clearPagoFieldErrors() {
+    document.querySelectorAll('.pago-field.is-invalid').forEach((el) => el.classList.remove('is-invalid'));
+    document.querySelectorAll('.pago-field-error').forEach((el) => {
+      el.hidden = true;
+      el.textContent = '';
+    });
+    const formErr = document.getElementById('pago-form-error');
+    if (formErr) {
+      formErr.hidden = true;
+      formErr.textContent = '';
+    }
+  };
+
+  window.setPagoFieldError = function setPagoFieldError(field, message) {
+    const wrap = document.querySelector(`.pago-field[data-pago-field="${field}"]`);
+    const err = document.getElementById(`pago-error-${field}`);
+    if (wrap) wrap.classList.toggle('is-invalid', !!message);
+    if (err) {
+      err.hidden = !message;
+      err.textContent = message || '';
+    }
+  };
+
+  window.luhnCheck = function luhnCheck(number) {
+    const digits = String(number || '').replace(/\D/g, '');
+    if (digits.length < 13) return false;
+    let sum = 0;
+    let alt = false;
+    for (let i = digits.length - 1; i >= 0; i -= 1) {
+      let n = parseInt(digits[i], 10);
+      if (alt) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+      alt = !alt;
+    }
+    return sum % 10 === 0;
+  };
+
+  window.isPagoCardNumberFormatValid = function isPagoCardNumberFormatValid(number) {
+    const digits = String(number || '').replace(/\D/g, '');
+    return digits.length >= 13 && digits.length <= 19;
+  };
+
+  window.validatePagoCardForm = function validatePagoCardForm() {
+    clearPagoFieldErrors();
+    const name = (document.getElementById('pago-card-name')?.value || '').trim();
+    const number = String(document.getElementById('pago-card-number')?.value || '').replace(/\D/g, '');
+    const exp = (document.getElementById('pago-card-exp')?.value || '').trim();
+    const cvv = String(document.getElementById('pago-card-cvv')?.value || '').replace(/\D/g, '');
+    let ok = true;
+    if (!name || name.length < 3) {
+      setPagoFieldError('name', 'Indica el nombre del titular.');
+      ok = false;
+    }
+    if (!isPagoCardNumberFormatValid(number)) {
+      setPagoFieldError('number', 'Ingresa un número de tarjeta de 13 a 19 dígitos.');
+      ok = false;
+    }
+    if (!/^\d{2}\/\d{2}$/.test(exp)) {
+      setPagoFieldError('exp', 'Usa el formato MM/AA.');
+      ok = false;
+    } else {
+      const parsed = parseCardExpiry(exp);
+      if (!parsed.ok) {
+        setPagoFieldError(
+          'exp',
+          parsed.reason === 'month' ? 'Mes de vencimiento no válido (MM/AA).' : 'Usa el formato MM/AA.',
+        );
+        ok = false;
+      } else if (isCardExpiryPast(parsed.expiresAt)) {
+        setPagoFieldError('exp', 'La tarjeta está vencida.');
+        ok = false;
+      }
+    }
+    if (cvv.length < 3) {
+      setPagoFieldError('cvv', 'Ingresa el CVV (3 o 4 dígitos).');
+      ok = false;
+    }
+    if (!ok) {
+      const formErr = document.getElementById('pago-form-error');
+      if (formErr) {
+        formErr.hidden = false;
+        formErr.textContent = 'Revisa los datos de la tarjeta antes de continuar.';
+      }
+      return 'Revisa los datos de la tarjeta.';
+    }
+    return '';
+  };
+
+  window.setPagoProcessing = function setPagoProcessing(active, text) {
+    const card = document.querySelector('.modal-card--pago');
+    const proc = document.getElementById('pago-processing');
+    const actions = document.getElementById('pago-actions');
+    const textEl = document.getElementById('pago-processing-text');
+    if (card) card.classList.toggle('is-processing', !!active);
+    if (proc) proc.hidden = !active;
+    if (actions) actions.hidden = !!active;
+    if (textEl && text) textEl.textContent = text;
+  };
+
+  window.simulateCardAuthorization = function simulateCardAuthorization(cardNumber) {
+    const n = String(cardNumber || '').replace(/\D/g, '');
+    if (!n) {
+      return { ok: false, code: 'invalid_card', message: 'Número de tarjeta no válido.' };
+    }
+    if (n.endsWith('0002') || n === '4000000000000002') {
+      return {
+        ok: false,
+        code: 'card_declined',
+        message: 'La tarjeta fue rechazada por el emisor.',
+      };
+    }
+    if (n.endsWith('9999')) {
+      return {
+        ok: false,
+        code: 'insufficient_funds',
+        message: 'Fondos insuficientes.',
+      };
+    }
+    return { ok: true };
+  };
+
+  window.simulatePagoCardCharge = function simulatePagoCardCharge() {
+    const validationMsg = validatePagoCardForm();
+    if (validationMsg) {
+      return Promise.reject(new Error(validationMsg));
+    }
+    const number = document.getElementById('pago-card-number')?.value || '';
+    const auth = simulateCardAuthorization(number);
+    if (!auth.ok) {
+      setPagoProcessing(false);
+      const formErr = document.getElementById('pago-form-error');
+      if (formErr) {
+        formErr.hidden = false;
+        formErr.textContent = auth.message;
+      }
+      return Promise.reject(new Error(auth.message || 'card_declined'));
+    }
+    const steps = [
+      { text: 'Validando tarjeta…', ms: 700 },
+      { text: 'Autorizando pago…', ms: 900 },
+      { text: 'Confirmando transacción…', ms: 650 },
+    ];
+    setPagoProcessing(true, steps[0].text);
+    let chain = Promise.resolve();
+    steps.forEach((step) => {
+      chain = chain.then(() => new Promise((resolve) => {
+        setPagoProcessing(true, step.text);
+        setTimeout(resolve, step.ms);
+      }));
+    });
+    return chain;
+  };
+
+  window.renderAuditTrail = function renderAuditTrail(entries, opts) {
+    const o = opts || {};
+    const rows = Array.isArray(entries) ? entries : [];
+    if (!rows.length) {
+      return `<p class="modal-sub">${o.empty || 'Sin eventos registrados en auditoría.'}</p>`;
+    }
+  const label = (action) => {
+      const map = {
+        update_payment: 'Pago actualizado',
+        convert_request: 'Convertida a venta',
+        return_request: 'Devolución',
+        create_request: 'Solicitud creada',
+        update_order: 'Pedido histórico editado',
+        adjust_stock: 'Ajuste de stock',
+        receive_po: 'Recepción OC',
+        create_po: 'OC creada',
+      };
+      return map[action] || action || '—';
+    };
+    return `<div class="audit-trail">
+      <div class="detail-label" style="margin-bottom:6px">${o.title || 'Historial de auditoría'}</div>
+      <ul class="audit-trail-list">
+        ${rows.map((e) => `<li>
+          <span class="audit-trail-at">${(e.at || '').replace('T', ' ').slice(0, 19) || '—'}</span>
+          <strong>${label(e.action)}</strong>
+          <span class="audit-trail-meta">${e.email || e.role || ''}${e.entity_id != null ? ` · #${e.entity_id}` : ''}</span>
+        </li>`).join('')}
+      </ul>
+    </div>`;
+  };
+
+  window.fillPaymentMethodSelect = function fillPaymentMethodSelect(selectEl) {
     if (!selectEl) return;
-    const opts = offline ? PAYMENT_METHOD_OPTIONS.offline : PAYMENT_METHOD_OPTIONS.online;
+    const opts = PAYMENT_METHOD_OPTIONS.card;
     selectEl.innerHTML = opts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
   };
 

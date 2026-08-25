@@ -29,6 +29,13 @@ def _slugify(text: str) -> str:
 def ensure_roles_seed() -> None:
     """Siembra roles por defecto sin pisar páginas/permisos ya personalizados."""
     col = _col()
+    for row in col.find({"pages": "datos"}, {"_id": 1, "pages": 1}):
+        pages = [_normalize_page_id(p) for p in (row.get("pages") or [])]
+        deduped: list[str] = []
+        for p in pages:
+            if p in PAGE_CATALOG and p not in deduped:
+                deduped.append(p)
+        col.update_one({"_id": row["_id"]}, {"$set": {"pages": deduped}})
     for role in DEFAULT_ROLES:
         slug = role["slug"]
         existing = col.find_one({"slug": slug}, {"active": 1})
@@ -84,6 +91,10 @@ def role_exists(slug: str) -> bool:
     return _col().count_documents({"slug": slug}) > 0
 
 
+def _normalize_page_id(page_id: str) -> str:
+    return "gestion" if page_id == "datos" else page_id
+
+
 def pages_for_role(slug: str | None) -> list[str]:
     if not slug:
         return list(PUBLIC_PAGES)
@@ -92,7 +103,8 @@ def pages_for_role(slug: str | None) -> list[str]:
     role = get_role(slug)
     if not role or not _role_is_active(role):
         return list(PUBLIC_PAGES)
-    pages = role.get("pages") or []
+    pages = [_normalize_page_id(p) for p in (role.get("pages") or [])]
+    pages = [p for p in pages if p in PAGE_CATALOG]
     return pages if pages else list(PUBLIC_PAGES)
 
 
@@ -128,7 +140,11 @@ def access_payload(role_slug: str | None) -> dict[str, Any]:
 
 def _validate_pages(pages: list[str]) -> list[str]:
     valid = set(PAGE_CATALOG.keys())
-    out = [p for p in pages if p in valid]
+    out: list[str] = []
+    for p in pages:
+        p = _normalize_page_id(p)
+        if p in valid and p not in out:
+            out.append(p)
     if not out:
         raise ValueError("pages_required")
     return out

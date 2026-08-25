@@ -3,12 +3,12 @@
 :root,
 html[data-theme="light"],
 html.theme-light {
-  --gt-grid: rgba(15, 20, 25, 0.05);
+  --gt-grid: rgba(26, 35, 50, 0.05);
   --gt-radius: 6px;
   --gt-radius-md: 10px;
-  --gt-signal: #c44536;
-  --hero-bg: #0f1419;
-  --hero-shadow: 0 8px 28px rgba(15, 20, 25, 0.12);
+  --gt-signal: var(--danger, #c44536);
+  --hero-bg: var(--gt-brand-ink, #1a2332);
+  --hero-shadow: 0 8px 28px rgba(26, 35, 50, 0.1);
   --innovate-radius-xl: 10px;
   --innovate-radius-pill: 6px;
 }
@@ -16,7 +16,7 @@ html.theme-light {
 html[data-theme="dark"],
 html.theme-dark {
   --gt-grid: rgba(232, 228, 220, 0.04);
-  --hero-bg: #0a0e12;
+  --hero-bg: var(--gt-brand-parchment, #0c1014);
   --hero-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
 }
 
@@ -204,15 +204,16 @@ html.theme-dark .btn-topbar--ghost {
   margin-bottom: 0.5rem;
 }
 
-/* Heroes internos — siguen el tema claro/oscuro */
+/* Heroes internos — título plano, sin tarjeta (la barra de filtros y la tabla sí son cards) */
 .page-hero:not(.page-hero--showcase),
 .page-body > .page-hero:not(.page-hero--showcase) {
-  background: var(--surface) !important;
+  background: transparent !important;
   color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--gt-radius-md) !important;
-  box-shadow: var(--shadow-sm) !important;
-  padding: 1.35rem 1.5rem !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 0 0.15rem !important;
+  margin-bottom: 1rem !important;
 }
 
 .page-hero:not(.page-hero--showcase)::before,
@@ -242,7 +243,7 @@ html.theme-dark .btn-topbar--ghost {
   border-radius: var(--gt-radius-md) !important;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)) !important;
   box-shadow: var(--hero-shadow) !important;
-  background: linear-gradient(135deg, #0f1419 0%, #1a2830 55%, #1a5c52 100%) !important;
+  background: linear-gradient(135deg, var(--gt-brand-ink) 0%, color-mix(in srgb, var(--accent) 38%, var(--gt-brand-ink)) 58%, var(--accent) 100%) !important;
   color: #fff;
   overflow: hidden;
 }
@@ -295,7 +296,7 @@ html.theme-dark .btn-topbar--ghost {
 }
 
 /* Paneles */
-.filters,
+.filters:not(.filters--flat),
 .filter-box,
 .table-box,
 .chart-box,
@@ -304,6 +305,14 @@ html.theme-dark .btn-topbar--ghost {
   border: 1px solid var(--border) !important;
   box-shadow: var(--shadow-sm) !important;
   background: var(--surface);
+}
+
+.filters--flat {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 input,
@@ -635,7 +644,9 @@ tbody tr:hover td {
 .table-sub,
 .catalog-meta,
 .dash-records-meta,
-.admin-page-meta {
+.admin-page-meta,
+.table-pager-info {
+  font-family: var(--font) !important;
   color: var(--muted) !important;
 }
 
@@ -725,11 +736,29 @@ tbody tr:hover td {
 
 /* Soporte */
 .soporte-inbox,
-.soporte-chat,
-.soporte-inbox-list {
+.chat-panel {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
   color: var(--text);
+}
+.soporte-inbox-list {
+  background: transparent !important;
+  border: none !important;
+}
+.chat-bubble,
+.chat-body {
+  color: var(--text) !important;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+  white-space: normal;
+}
+.chat-body {
+  white-space: pre-wrap !important;
+}
+.soporte-thread-btn {
+  overflow: hidden;
+  white-space: normal !important;
 }
 
 /* Chips / badges estado */
@@ -756,7 +785,7 @@ html.theme-dark .badge-Online {
 html[data-theme="dark"] .badge-Offline,
 html.theme-dark .badge-Offline {
   background: rgba(91, 163, 201, 0.2);
-  color: #93c5fd;
+  color: var(--gt-brand-sky, var(--info));
 }
 
 html[data-theme="dark"] .badge-C,
@@ -774,7 +803,7 @@ html.theme-dark .badge-H {
 html[data-theme="dark"] .badge-M,
 html.theme-dark .badge-M {
   background: rgba(91, 163, 201, 0.2);
-  color: #93c5fd;
+  color: var(--gt-brand-sky, var(--info));
 }
 
 html[data-theme="dark"] .badge-L,

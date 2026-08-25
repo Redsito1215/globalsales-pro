@@ -27,10 +27,17 @@ def reset_clients() -> None:
     _read_client = None
 
 
+def _mongo_timeout_kwargs() -> dict[str, Any]:
+    return {
+        "serverSelectionTimeoutMS": int(settings.mongo_server_selection_timeout_ms or 5000),
+        "connectTimeoutMS": int(settings.mongo_connect_timeout_ms or 5000),
+    }
+
+
 def mongo_client() -> MongoClient:
     global _client
     if _client is None:
-        kwargs: dict[str, Any] = {}
+        kwargs: dict[str, Any] = _mongo_timeout_kwargs()
         if settings.mongo_replica_set:
             kwargs["replicaSet"] = settings.mongo_replica_set
         _client = MongoClient(settings.mongo_uri, **kwargs)
@@ -64,6 +71,7 @@ def get_read_dw_db():
         global _read_client
         if _read_client is None:
             kwargs: dict[str, Any] = {
+                **_mongo_timeout_kwargs(),
                 "readPreference": ReadPreference.SECONDARY_PREFERRED,
             }
             if settings.mongo_replica_set:

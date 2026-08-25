@@ -114,6 +114,30 @@ REPORTS: list[dict] = [
         "quien": "Jefe comercial, administrador",
         "columns": ["request_id", "client_name", "status", "reviewed_by", "created_at", "total"],
     },
+    {
+        "id": "RS-13",
+        "name": "Libro de caja (entradas y salidas)",
+        "objetivo": "OT2",
+        "para_que": "Ver movimientos de pago y devolución registrados en caja.",
+        "quien": "Gerente comercial, administrador",
+        "columns": ["movement_id", "created_at", "movement_type", "amount", "request_id", "order_id", "reference"],
+    },
+    {
+        "id": "RS-14",
+        "name": "Resumen ventas vs devoluciones",
+        "objetivo": "OT2",
+        "para_que": "Comparar ingresos por pagos con salidas por devoluciones y pedidos devueltos.",
+        "quien": "Gerente comercial, administrador, analista",
+        "columns": ["concepto", "monto", "cantidad", "periodo"],
+    },
+    {
+        "id": "RS-15",
+        "name": "Inventario valorizado por SKU",
+        "objetivo": "OT3",
+        "para_que": "Ver el valor del stock en bodega (cantidad × costo unitario).",
+        "quien": "Jefe de inventario, comprador, administrador",
+        "columns": ["sku", "product_name", "inventory_quantity", "unit_cost", "stock_value"],
+    },
 ]
 
 REPORT_BY_ID = {r["id"]: r for r in REPORTS}

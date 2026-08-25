@@ -18,6 +18,10 @@ def _ops_needs_bootstrap() -> bool:
     """True si split activo, ops vacío y DW aún tiene colecciones operativas."""
     if not split_enabled():
         return False
+    try:
+        mongo_client().admin.command("ping")
+    except Exception:
+        return False
     ops = get_ops_db()
     if ops["users"].count_documents({}, limit=1) or ops["purchase_requests"].count_documents({}, limit=1):
         return False

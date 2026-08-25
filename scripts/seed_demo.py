@@ -14,21 +14,50 @@ sys.path.insert(0, str(ROOT))
 from auth import roles_service, users as user_store  # noqa: E402
 
 DEMO_USERS = [
-    ("admin@globtrade.demo", "Administrador Demo", "administrador"),
-    ("vendedor@globtrade.demo", "Vendedor Demo", "vendedor"),
-    ("analista@globtrade.demo", "Analista Demo", "analista"),
-    ("cliente@globtrade.demo", "Cliente Demo", "cliente"),
+    ("admin@globtrade.demo", "Administrador", "administrador"),
+    ("vendedor@globtrade.demo", "Vendedor", "vendedor"),
+    ("analista@globtrade.demo", "Analista", "analista"),
+    ("cliente@globtrade.demo", "Cliente", "cliente"),
 ]
 DEFAULT_PASSWORD = "Demo1234!"
 
 
+def ensure_demo_roles_ready() -> list[str]:
+    """Reactiva roles de sistema demo que hayan quedado inhabilitados."""
+    from shared.roles_registry import ADMIN_ROLE, DEFAULT_ROLES
+
+    fixed = []
+    col = roles_service._col()
+    for role in DEFAULT_ROLES:
+        slug = role["slug"]
+        if slug == ADMIN_ROLE:
+            continue
+        doc = col.find_one({"slug": slug}, {"active": 1})
+        if doc and doc.get("active") is False:
+            roles_service.enable_role(slug)
+            fixed.append(slug)
+    return fixed
+
+
 def seed_users(password: str, force: bool) -> list[str]:
     roles_service.ensure_roles_seed()
+    ensure_demo_roles_ready()
     created = []
     for email, name, role in DEMO_USERS:
         existing = user_store.find_by_email(email)
         if existing and not force:
-            print(f"  · {email} ({role}) — ya existe, omitido")
+            if (
+                existing.get("role") != role
+                or existing.get("active") is False
+                or existing.get("name") != name
+            ):
+                user_store._col().update_one(
+                    {"email": email},
+                    {"$set": {"role": role, "active": True, "name": name}},
+                )
+                print(f"  ~ {email} ({role}) — cuenta sincronizada")
+            else:
+                print(f"  · {email} ({role}) — ya existe, omitido")
             continue
         if existing and force:
             from auth import users as us

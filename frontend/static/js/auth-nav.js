@@ -13,6 +13,7 @@ function setAccess(access) {
 }
 
 function canAccessPage(pageId) {
+  if (pageId === 'datos') pageId = 'gestion';
   if (!window._authUser) return pageId === 'tienda';
   if (window._authUser?.role === 'administrador' || window._access?.role === 'administrador') {
     return true;
@@ -32,14 +33,21 @@ function defaultPageForUser() {
   const role = window._authUser?.role || window._access?.role || null;
   const pick = (id) => (pages.includes(id) || role === 'administrador' ? id : null);
 
-  if (role === 'cliente') return pick('tienda') || pages[0] || 'tienda';
-  if (role === 'vendedor') return pick('ventas') || pick('tienda') || pages[0] || 'tienda';
-  if (role === 'analista') return pick('dashboard') || pick('decisiones') || pages[0] || 'tienda';
-  if (role === 'administrador') return 'dashboard';
-
+  // Inicio unificado: Tienda (diseño storefront) si el rol puede verla
   if (pick('tienda')) return 'tienda';
+
+  if (role === 'cliente') return pages[0] || 'tienda';
+  if (role === 'vendedor') return pick('ventas') || pages[0] || 'tienda';
+  if (role === 'analista') return pick('dashboard') || pick('decisiones') || pages[0] || 'tienda';
+
   if (pick('dashboard')) return 'dashboard';
   return pages[0] || 'tienda';
+}
+
+function pageAfterAuth() {
+  const currentId = document.querySelector('.page.active')?.id?.replace('page-', '');
+  if (currentId && canAccessPage(currentId)) return currentId;
+  return defaultPageForUser();
 }
 
 function toggleNavGroup(btn) {
@@ -92,6 +100,8 @@ function applyNavAccess() {
 
   const ordersBtn = document.getElementById('shop-hero-orders-btn');
   if (ordersBtn) ordersBtn.hidden = !canAccessPage('mis-pedidos');
+
+  if (typeof renderShopHeaderNav === 'function') renderShopHeaderNav();
 
   applyPermissionUi();
 }

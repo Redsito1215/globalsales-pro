@@ -5,6 +5,8 @@ __pycache__/
 .env
 .mongo-data/
 data/parquet/*.parquet
+data/sales.csv
+data/etl_run.log
 data/raw/*
 !data/raw/.gitkeep
 !data/.gitkeep

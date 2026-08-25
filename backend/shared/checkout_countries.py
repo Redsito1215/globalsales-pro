@@ -35,7 +35,7 @@ def _ensure_region(db, name: str) -> int:
         return int(doc["region_id"])
     rid = _next_id(db["dim_region"], "region_id")
     db["dim_region"].insert_one(
-        {"region_id": rid, "name": name, "description": f"Zona comercial: {name}"}
+        {"region_id": rid, "name": name, "description": f"Zona comercial: {name}", "active": True}
     )
     return rid
 
@@ -56,6 +56,7 @@ def ensure_checkout_countries() -> int:
                 "country_id": cid,
                 "name": country_name,
                 "region_id": region_ids[region_name],
+                "active": True,
             }
         )
         added += 1
@@ -66,9 +67,10 @@ def list_checkout_countries(*, limit: int = 500) -> dict[str, Any]:
     ensure_checkout_countries()
     db = get_db()
     col = db["dim_pais"]
-    total = col.count_documents({})
+    query = {"active": {"$ne": False}}
+    total = col.count_documents(query)
     rows = list(
-        col.find({}, {"_id": 0, "country_id": 1, "name": 1, "region_id": 1})
+        col.find(query, {"_id": 0, "country_id": 1, "name": 1, "region_id": 1})
         .sort("name", 1)
         .limit(limit)
     )

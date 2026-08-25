@@ -11,9 +11,74 @@ let tiendaState = {
   shippingRegion: '',
   priceMax: null,
 };
+window.tiendaState = tiendaState;
 
 function shopMoney(n) {
   return '$' + Number(n || 0).toFixed(2);
+}
+
+function applyTiendaMode(mode) {
+  const catalog = mode === 'catalog';
+  const hero = document.getElementById('shop-storefront-hero');
+  if (hero) hero.hidden = catalog;
+  document.body.classList.toggle('shop-tienda-catalog', catalog);
+  if (catalog) {
+    requestAnimationFrame(() => {
+      document.getElementById('shop-catalog-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+window.applyTiendaMode = applyTiendaMode;
+
+function ensureShopPageActive(then) {
+  const tiendaPage = document.getElementById('page-tienda');
+  if (tiendaPage?.classList.contains('active')) {
+    if (typeof applyTiendaMode === 'function') applyTiendaMode('catalog');
+    if (typeof then === 'function') then();
+    return;
+  }
+  const navBtn = document.querySelector('[data-page="tienda"]');
+  if (typeof showPage === 'function') showPage('tienda', navBtn, { tiendaMode: 'catalog' });
+  window.setTimeout(() => {
+    if (typeof then === 'function') then();
+  }, 80);
+}
+
+function submitShopHeaderSearch() {
+  ensureShopPageActive(() => applyShopFilters());
+}
+
+let shopHeaderSearchTimer = null;
+function onShopHeaderSearchInput() {
+  window.clearTimeout(shopHeaderSearchTimer);
+  shopHeaderSearchTimer = window.setTimeout(() => {
+    const page = document.getElementById('page-tienda');
+    if (!page?.classList.contains('active')) return;
+    applyTiendaMode('catalog');
+    applyShopFilters();
+  }, 220);
+}
+
+function clearShopSearch() {
+  const input = document.getElementById('shop-search');
+  if (input) input.value = '';
+  applyShopFilters();
+  input?.focus();
+}
+
+function scrollShopToCatalog() {
+  ensureShopPageActive(() => {
+    document.getElementById('shop-catalog-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+function scrollShopToCart() {
+  ensureShopPageActive(() => {
+    document.querySelector('.shop-cart--classic')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
 }
 
 function parsePositiveQty(raw, opts) {
@@ -38,10 +103,40 @@ function clampQtyInput(el) {
 }
 
 async function loadTiendaPage() {
-  await Promise.all([loadShopCollections(), loadTiendaProducts()]);
+  await Promise.all([loadStorefrontHero(), loadShopCollections(), loadTiendaProducts()]);
   updateShopHighlights();
   renderTiendaCart();
 }
+
+function applyStorefrontHeroToPage(hero) {
+  if (!hero) return;
+  const img = document.getElementById('shop-hero-img');
+  const kicker = document.getElementById('shop-hero-kicker');
+  const title = document.getElementById('shop-hero-title');
+  const lead = document.getElementById('shop-hero-lead');
+  const cta = document.getElementById('shop-hero-cta');
+  if (img && hero.image_url) {
+    img.src = hero.image_url + (hero.image_url.includes('?') ? '&' : '?') + 't=' + Date.now();
+    img.alt = hero.title || 'Banner GLOBTRADE';
+  }
+  if (kicker) kicker.textContent = hero.kicker || '';
+  if (title) title.textContent = hero.title || '';
+  if (lead) lead.textContent = hero.lead || '';
+  if (cta) cta.textContent = hero.cta || 'Ver catálogo';
+}
+
+async function loadStorefrontHero() {
+  try {
+    const r = await fetch(API + '/empresa/storefront-hero');
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || 'Error');
+    applyStorefrontHeroToPage(data.hero || {});
+  } catch (_) {
+    /* defaults en HTML */
+  }
+}
+
+window.applyStorefrontHeroToPage = applyStorefrontHeroToPage;
 
 function updateShopHighlights() {
   const products = tiendaState.products || [];
@@ -172,7 +267,7 @@ async function loadTiendaProducts() {
   if (!grid) return;
   if (meta) meta.textContent = 'Cargando catálogo…';
   grid.innerHTML = '<div class="shop-cart-empty" style="grid-column:1/-1">Cargando productos…</div>';
-  const q = new URLSearchParams({ limit: 100 });
+  const q = new URLSearchParams({ limit: 200 });
   if (tiendaState.collectionId != null) q.set('collection_id', tiendaState.collectionId);
   let r;
   let data = {};
@@ -214,12 +309,14 @@ function filterShopProducts() {
   tiendaState.filtered = sortShopProducts(list);
   if (!grid) return;
   if (!tiendaState.filtered.length) {
-    grid.innerHTML = typeof opsEmpty === 'function'
-      ? `<div style="grid-column:1/-1">${opsEmpty({
-          title: 'Catálogo en preparación',
-          hint: 'Pronto tendremos productos disponibles para ti. Vuelve a visitarnos.',
-        })}</div>`
-      : '<div class="shop-cart-empty" style="grid-column:1/-1">Catálogo en preparación. Vuelve pronto.</div>';
+    const searching = !!term;
+    grid.innerHTML = `<div class="shop-cart-empty" style="grid-column:1/-1">
+      <strong>${searching ? 'No encontramos productos' : 'No hay productos disponibles'}</strong>
+      <p>${searching ? `Prueba otro nombre, categoría o código.` : 'Vuelve a consultar más tarde.'}</p>
+      ${searching ? '<button type="button" class="btn btn-ghost btn-sm" onclick="clearShopSearch()">Limpiar búsqueda</button>' : ''}
+    </div>`;
+    const meta = document.getElementById('shop-results-range');
+    if (meta) meta.textContent = searching ? `0 resultados para “${term}”` : '0 productos disponibles';
     return;
   }
   grid.innerHTML = tiendaState.filtered.map(p => {
@@ -234,6 +331,7 @@ function filterShopProducts() {
         onclick="event.stopPropagation(); openProductDetail(${pid})" onkeydown="if(event.key==='Enter'){event.preventDefault();openProductDetail(${pid})}">
         ${img ? `<img src="${img}" alt="${p.image?.alt || p.title || ''}">` : '<div class="shop-product-media--empty" aria-hidden="true"></div>'}
         ${compare ? '<span class="shop-product-badge shop-product-badge--sale">¡Rebajado!</span>' : ''}
+        ${p.featured ? '<span class="shop-product-badge shop-product-badge--featured">Destacado</span>' : ''}
       </div>
       <div class="shop-product-body shop-product-body--classic">
         <button type="button" class="shop-product-title shop-product-title--link" onclick="event.stopPropagation(); openProductDetail(${pid})">${p.title}</button>
@@ -268,6 +366,7 @@ function tiendaAddProductToCart(prod, qty) {
       sku: v.sku,
       quantity: qty,
       price,
+      max_quantity: Number.isFinite(Number(v.inventory_quantity)) ? Math.max(0, Number(v.inventory_quantity)) : null,
     });
   }
 }
@@ -328,6 +427,8 @@ function renderTiendaCart() {
   const items = tiendaState.cart.reduce((s, c) => s + c.quantity, 0);
   const subtotal = tiendaState.cart.reduce((s, c) => s + c.price * c.quantity, 0);
   if (badge) badge.textContent = items;
+  const headerBadge = document.getElementById('shop-header-cart-badge');
+  if (headerBadge) headerBadge.textContent = items;
   if (totalEl) totalEl.textContent = shopMoney(subtotal);
   if (btn) btn.disabled = !tiendaState.cart.length;
   if (!el) return;
@@ -339,13 +440,33 @@ function renderTiendaCart() {
     <div class="shop-cart-line">
       <div class="shop-cart-line-info">
         <div class="shop-cart-line-title">${c.title}</div>
-        <div class="shop-cart-line-meta">${c.sku || ''} × ${c.quantity}</div>
+        <div class="shop-cart-line-meta">${c.sku || ''}</div>
+        <div class="shop-cart-quantity" role="group" aria-label="Cantidad de ${c.title}">
+          <button type="button" class="shop-cart-quantity-btn" onclick="tiendaChangeCartQty(${c.variant_id}, -1)"
+            aria-label="Disminuir cantidad de ${c.title}" ${c.quantity <= 1 ? 'disabled' : ''}>−</button>
+          <output class="shop-cart-quantity-value" aria-live="polite">${c.quantity}</output>
+          <button type="button" class="shop-cart-quantity-btn" onclick="tiendaChangeCartQty(${c.variant_id}, 1)"
+            aria-label="Aumentar cantidad de ${c.title}" ${c.max_quantity != null && c.quantity >= c.max_quantity ? 'disabled' : ''}>+</button>
+        </div>
       </div>
-      <div>
+      <div class="shop-cart-line-summary">
         <div class="shop-cart-line-price">${shopMoney(c.price * c.quantity)}</div>
-        <button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:10px;margin-top:4px" onclick="tiendaRemoveFromCart(${c.variant_id})">Quitar</button>
+        <button type="button" class="shop-cart-remove" onclick="tiendaRemoveFromCart(${c.variant_id})">Quitar</button>
       </div>
     </div>`).join('');
+}
+
+function tiendaChangeCartQty(variantId, delta) {
+  const item = tiendaState.cart.find(c => c.variant_id === variantId);
+  if (!item || !Number.isInteger(delta) || delta === 0) return;
+  const next = item.quantity + delta;
+  if (next < 1) return;
+  if (item.max_quantity != null && next > item.max_quantity) {
+    notifyWarn('No hay más unidades disponibles de este producto.');
+    return;
+  }
+  item.quantity = next;
+  renderTiendaCart();
 }
 
 function tiendaRemoveFromCart(variantId) {

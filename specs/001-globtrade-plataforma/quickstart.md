@@ -89,6 +89,7 @@ docker compose --profile airflow up -d --build
 ```
 
 1. Open http://localhost:8080 (admin / admin).
-2. Unpause and Trigger DAG `globtrade_strategic_etl`.
-3. Confirm tasks extract → load → transform → validate succeed.
-4. Open Informes compuestos RC in the web app and verify RC-08 / RC-01.
+2. Active y ejecute manualmente el DAG `globtrade_strategic_etl`.
+3. Confirme en verde: inspeccionar landing → preservar landing → sincronizar capa estratégica → validar.
+4. El DAG usa los registros actuales de Mongo; no carga el CSV antiguo ni vacía colecciones.
+5. Open Informes compuestos RC in the web app and verify RC-08 / RC-01.

@@ -71,22 +71,39 @@ En **Informes simples** e **Informes compuestos** → botón **Asistente IA**:
 
 Los informes **RS** (simples) y **RC** (compuestos) se eligen por separado en el asistente.
 
-## Flujo comercial (demo)
+## Flujo comercial
+
+**Carga inicial recomendada** (usuarios, datos históricos si están vacíos, catálogo y escenarios de validación):
+
+```powershell
+python scripts/bootstrap_demo.py
+# Cuenta inicial: admin@globtrade.demo / Demo1234!
+```
 
 1. Admin: Maestros → Sync catálogo (tienda) / Carga ELT, Construir modelo, o DAG Airflow `globtrade_strategic_etl` si el Tablero (`fact_ventas`) está vacío  
-2. Cliente: Vitrina → checkout (sesión) → Mis pedidos (pago simulado + tracking)  
+2. Cliente: Vitrina → checkout (sesión) → Mis pedidos (autorización interna de tarjeta + seguimiento)  
 3. Vendedor/Admin: Solicitudes → aprobar → cliente paga (o crédito) → convertir → enviar → entregar  
 4. Devolución: solo pedidos **entregados**; inspección (**apto / dañado / mixto**). Solo lo apto reingresa; dañado = merma.  
-5. Compras/Stock (admin o vendedor): inventario, proveedores, OC **borrador → Enviar → Recibir** (parcial OK)  
+5. Compras/Stock: inventario, **requisiciones internas** (borrador → aprobada → OC), proveedores, OC **borrador → Enviar → Recibir** (parcial OK), **libro de caja** y merma  
 6. Decisiones → stock bajo → **Crear OC** (prellena Compras). Sync catálogo **no** borra proveedores.  
+
+### Contabilidad
+
+- Al pagar una solicitud se registra un movimiento `payment_in` en `cash_movements`; devoluciones generan `refund_out`.  
+- Convertir a venta exige pago completo (salvo canal Offline).  
+- Consulta el libro en Compras → **Libro de caja** o reporte **RS-13**.
 
 ### Capas de datos
 
-- **Operativo**: vitrina, solicitudes, compras, soporte, **Reportes simples (RS-01…12)**  
+- **Operativo**: vitrina, solicitudes, compras, soporte, **Reportes simples (RS-01…15)**  
 - **Landing**: `sales_records` (CSV, generate, post-convertir; Explorar ventas / export)  
 - **Estratégico**: Tablero (Workpanel), **Informes compuestos (RC-01…08)** sobre `fact_ventas` + dims; tras convertir hay sync incremental. El rebuild programado puede orquestarse con **Airflow** (`globtrade_strategic_etl`).  
 
-Pago y correo son **simulados** (inbox in-app); suficientes para demo académica.
+El pago usa autorización interna y no existe integración con banco, pasarela externa ni servicios de correo.
+
+### Vista histórica (sem1)
+
+Solo administradores: Perfil → **Vista histórica** o `/sem1`. La SPA principal es la operación diaria.
 
 ## ETL orquestado por Airflow (capa estratégica)
 
@@ -103,7 +120,7 @@ docker compose --profile airflow up -d --build
 ```
 
 1. Abre http://localhost:8080 (`admin` / `admin`)
-2. Unpause + Trigger DAG: `globtrade_strategic_etl`
+2. Trigger manual del DAG: `globtrade_strategic_etl`. No tiene programación automática porque reemplaza completamente el histórico.
 3. Ver Informes compuestos RC en http://127.0.0.1:5001
 
 Detalle del pipeline: [`etl_proceso/README.md`](etl_proceso/README.md).
@@ -115,6 +132,15 @@ pip install -r requirements.txt
 $env:PYTHONPATH="C:\proyect6softwa\backend;C:\proyect6softwa"
 .\.venv\Scripts\pytest.exe -q
 ```
+
+Con Docker y verificación final:
+
+```powershell
+docker compose exec web python scripts/verify_release.py
+docker compose run --rm -T -v C:/proyect6softwa/tests:/app/tests:ro web python -m pytest -q
+```
+
+Manual de operación y entrega: [`docs/manual-operacion.md`](docs/manual-operacion.md).
 
 ## Estructura
 

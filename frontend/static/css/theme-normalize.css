@@ -10,91 +10,154 @@ html.theme-light {
   --mono: "IBM Plex Mono", ui-monospace, monospace;
   --radius: 10px;
   --radius-lg: 12px;
-  --bg: #f4efe4;
-  --surface: #fffcf7;
-  --surface2: #ebe4d6;
+
+  /* ── Paleta GLOBTRADE Meridian (claro) ── */
+  --gt-brand-ink: #1a2332;
+  --gt-brand-slate: #3d4d5c;
+  --gt-brand-muted: #5c6470;
+  --gt-brand-gold: #c9a227;
+  --gt-brand-gold-soft: #ddb94a;
+  --gt-brand-teal: #1a5c52;
+  --gt-brand-teal-hover: #134a42;
+  --gt-brand-teal-mid: #2a7a6d;
+  --gt-brand-sky: #5a8fa8;
+  --gt-brand-parchment: #f4efe4;
+  --gt-brand-ivory: #fffcf7;
+  --gt-brand-sand: #ebe4d6;
+  --gt-brand-line: #d4cbb8;
+
+  --bg: var(--gt-brand-parchment);
+  --surface: var(--gt-brand-ivory);
+  --surface2: var(--gt-brand-sand);
   --surface-2: var(--surface2);
-  --border: #d4cbb8;
-  --text: #0f1419;
-  --muted: #5c564c;
-  --accent: #1a5c52;
-  --accent-hover: #134a42;
-  --accent2: #2a7a6d;
-  --accent3: #b8922e;
+  --border: var(--gt-brand-line);
+  --text: var(--gt-brand-ink);
+  --muted: var(--gt-brand-muted);
+  --accent: var(--gt-brand-teal);
+  --accent-hover: var(--gt-brand-teal-hover);
+  --accent2: var(--gt-brand-teal-mid);
+  --accent3: var(--gt-brand-gold);
   --danger: #c44536;
-  --info: #2a6f97;
-  --warn: #b8922e;
-  --ok: #1a5c52;
+  --info: var(--gt-brand-sky);
+  --warn: var(--gt-brand-gold);
+  --ok: var(--gt-brand-teal);
   --topbar-bg: rgba(255, 252, 247, 0.96);
-  --topbar-text: #0f1419;
-  --topbar-border: #d4cbb8;
-  --topbar-control-bg: #ebe4d6;
-  --topbar-control-border: #d4cbb8;
-  --topbar-control-text: #0f1419;
-  --input-bg: #fffcf7;
-  --input-border: #d4cbb8;
+  --topbar-text: var(--gt-brand-ink);
+  --topbar-border: var(--gt-brand-line);
+  --topbar-control-bg: var(--gt-brand-sand);
+  --topbar-control-border: var(--gt-brand-line);
+  --topbar-control-text: var(--gt-brand-ink);
+  --input-bg: var(--gt-brand-ivory);
+  --input-border: var(--gt-brand-line);
   --btn-primary-text: #ffffff;
   --chart-grid: #e5e0d6;
-  --chart-text: #5c564c;
-  --shadow: 0 2px 10px rgba(15, 20, 25, 0.07);
-  --shadow-sm: 0 1px 4px rgba(15, 20, 25, 0.05);
+  --chart-text: var(--gt-brand-muted);
+  --shadow: 0 2px 10px rgba(26, 35, 50, 0.07);
+  --shadow-sm: 0 1px 4px rgba(26, 35, 50, 0.05);
   --panel-highlight-bg: rgba(26, 92, 82, 0.08);
   --panel-highlight-border: rgba(26, 92, 82, 0.22);
   --bg-glow: none;
-  --shop-sidebar-bg: #fffcf7;
-  --shop-sidebar-text: #0f1419;
-  --shop-sidebar-muted: #5c564c;
-  --shop-sidebar-border: #d4cbb8;
-  --shop-sidebar-hover: #ebe4d6;
+
+  /* Header / tienda — alias de marca */
+  --madson-navy: var(--gt-brand-slate);
+  --madson-navy-dark: var(--gt-brand-ink);
+  --madson-navy-deep: #141c24;
+  --madson-gold: var(--gt-brand-gold);
+  --madson-gold-soft: var(--gt-brand-gold-soft);
+  --madson-sky: var(--gt-brand-sky);
+  --madson-cream: var(--gt-brand-parchment);
+  --madson-header-bg: var(--surface);
+  --madson-header-border: var(--border);
+  --madson-header-text: var(--text);
+  --madson-header-muted: var(--muted);
+
+  --shop-green: var(--accent);
+  --shop-green-dark: var(--accent-hover);
+  --shop-green-light: rgba(26, 92, 82, 0.1);
+  --shop-landing-bg: linear-gradient(165deg, #134a42 0%, var(--gt-brand-teal) 46%, var(--gt-brand-teal-mid) 100%);
+  --shop-sidebar-bg: var(--gt-brand-ivory);
+  --shop-sidebar-text: var(--gt-brand-ink);
+  --shop-sidebar-muted: var(--gt-brand-muted);
+  --shop-sidebar-border: var(--gt-brand-line);
+  --shop-sidebar-hover: var(--gt-brand-sand);
   --shop-sidebar-active-bg: rgba(26, 92, 82, 0.1);
   --shop-sidebar-active-border: rgba(26, 92, 82, 0.35);
-  --shop-green-light: rgba(26, 92, 82, 0.1);
-  --shop-green-dark: #134a42;
 }
 
 html[data-theme="dark"],
 html.theme-dark {
   color-scheme: dark;
-  --bg: #0c1014;
-  --surface: #141a22;
-  --surface2: #1c2430;
+
+  /* ── Paleta GLOBTRADE Meridian (oscuro) ── */
+  --gt-brand-ink: #e8e4dc;
+  --gt-brand-slate: #a8b4c0;
+  --gt-brand-muted: #8a919c;
+  --gt-brand-gold: #d4b04a;
+  --gt-brand-gold-soft: #e8c86a;
+  --gt-brand-teal: #3d9a8a;
+  --gt-brand-teal-hover: #2f7f72;
+  --gt-brand-teal-mid: #4db5a4;
+  --gt-brand-sky: #6a9fb8;
+  --gt-brand-parchment: #0c1014;
+  --gt-brand-ivory: #141a22;
+  --gt-brand-sand: #1c2430;
+  --gt-brand-line: #2d3844;
+
+  --bg: var(--gt-brand-parchment);
+  --surface: var(--gt-brand-ivory);
+  --surface2: var(--gt-brand-sand);
   --surface-2: var(--surface2);
-  --border: #2d3844;
-  --text: #e8e4dc;
-  --muted: #9a9488;
-  --accent: #3d9a8a;
-  --accent-hover: #2f7f72;
-  --accent2: #4db5a4;
-  --accent3: #d4b04a;
+  --border: var(--gt-brand-line);
+  --text: var(--gt-brand-ink);
+  --muted: var(--gt-brand-muted);
+  --accent: var(--gt-brand-teal);
+  --accent-hover: var(--gt-brand-teal-hover);
+  --accent2: var(--gt-brand-teal-mid);
+  --accent3: var(--gt-brand-gold);
   --danger: #e57373;
-  --info: #5ba3c9;
-  --warn: #d4b04a;
-  --ok: #4db5a4;
+  --info: var(--gt-brand-sky);
+  --warn: var(--gt-brand-gold);
+  --ok: var(--gt-brand-teal-mid);
   --topbar-bg: rgba(12, 16, 20, 0.96);
-  --topbar-text: #e8e4dc;
-  --topbar-border: #2d3844;
-  --topbar-control-bg: #1c2430;
-  --topbar-control-border: #2d3844;
-  --topbar-control-text: #e8e4dc;
-  --input-bg: #1c2430;
-  --input-border: #2d3844;
+  --topbar-text: var(--gt-brand-ink);
+  --topbar-border: var(--gt-brand-line);
+  --topbar-control-bg: var(--gt-brand-sand);
+  --topbar-control-border: var(--gt-brand-line);
+  --topbar-control-text: var(--gt-brand-ink);
+  --input-bg: var(--gt-brand-sand);
+  --input-border: var(--gt-brand-line);
   --btn-primary-text: #ffffff;
-  --chart-grid: #2d3844;
-  --chart-text: #9a9488;
+  --chart-grid: var(--gt-brand-line);
+  --chart-text: var(--gt-brand-muted);
   --shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.28);
   --panel-highlight-bg: rgba(61, 154, 138, 0.12);
   --panel-highlight-border: rgba(61, 154, 138, 0.28);
   --bg-glow: none;
-  --shop-sidebar-bg: #141a22;
-  --shop-sidebar-text: #e8e4dc;
-  --shop-sidebar-muted: #9a9488;
-  --shop-sidebar-border: #2d3844;
-  --shop-sidebar-hover: #1c2430;
+
+  --madson-navy: var(--gt-brand-slate);
+  --madson-navy-dark: var(--text);
+  --madson-navy-deep: #0a0e12;
+  --madson-gold: var(--gt-brand-gold);
+  --madson-gold-soft: var(--gt-brand-gold-soft);
+  --madson-sky: var(--gt-brand-sky);
+  --madson-cream: var(--gt-brand-sand);
+  --madson-header-bg: var(--surface);
+  --madson-header-border: var(--border);
+  --madson-header-text: var(--text);
+  --madson-header-muted: var(--muted);
+
+  --shop-green: var(--accent);
+  --shop-green-dark: var(--accent-hover);
+  --shop-green-light: rgba(61, 154, 138, 0.16);
+  --shop-landing-bg: linear-gradient(180deg, #0a1218 0%, var(--bg) 92%);
+  --shop-sidebar-bg: var(--gt-brand-ivory);
+  --shop-sidebar-text: var(--gt-brand-ink);
+  --shop-sidebar-muted: var(--gt-brand-muted);
+  --shop-sidebar-border: var(--gt-brand-line);
+  --shop-sidebar-hover: var(--gt-brand-sand);
   --shop-sidebar-active-bg: rgba(61, 154, 138, 0.16);
   --shop-sidebar-active-border: rgba(61, 154, 138, 0.4);
-  --shop-green-light: rgba(61, 154, 138, 0.16);
-  --shop-green-dark: #6ee7b7;
 }
 
 /* Superficies principales */
@@ -175,7 +238,7 @@ html.theme-light .sidebar .nav-item.active .nav-icon {
 
 html[data-theme="dark"] .sidebar .nav-item.active .nav-icon,
 html.theme-dark .sidebar .nav-item.active .nav-icon {
-  color: #6ee7b7;
+  color: var(--accent2);
 }
 
 html[data-theme="light"] .sidebar-user-card,
@@ -197,7 +260,7 @@ html.theme-dark .sidebar-user-card {
 
 html[data-theme="dark"] .sidebar-user-name,
 html.theme-dark .sidebar-user-name {
-  color: #fff;
+  color: var(--text);
 }
 
 html[data-theme="light"] .sidebar-btn--outline,
@@ -270,6 +333,24 @@ html.theme-light .sidebar-btn--logout {
 }
 .shop-catalog-wrap {
   background-color: transparent !important;
+}
+
+/* Shell con header fijo — fondo unificado */
+body.shop-page-active .main,
+body.shop-page-active .content > .page.active:not(#page-tienda),
+body.shop-page-active #page-tienda .shop-storefront,
+body.shop-page-active #page-tienda .shop-classic,
+body.shop-page-active #page-tienda .shop-catalog-wrap {
+  background: var(--bg) !important;
+}
+
+body.shop-page-active .shop-madson-header {
+  background: var(--madson-header-bg) !important;
+  border-bottom-color: var(--madson-gold) !important;
+}
+
+body.shop-page-active .content > .page.active:not(#page-tienda) {
+  min-height: calc(100vh - 8rem);
 }
 
 .shop-cart-foot,
