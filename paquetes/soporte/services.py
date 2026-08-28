@@ -5,10 +5,12 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from shared.mongo import get_db
 
 COLLECTION = "support_messages"
+EC_TZ = ZoneInfo("America/Guayaquil")
 
 
 def _col():
@@ -101,7 +103,7 @@ def post_message(
     if staff and thread and thread != author_email:
         notify_user(
             recipient_email=thread,
-            subject="Respuesta de soporte GLOBTRADE",
+            subject="Respuesta de soporte Altavia Trade",
             body=f"{doc['author_name']}: {body[:240]}",
             category="soporte",
             meta={"thread_email": thread},
@@ -138,6 +140,10 @@ def _format_invoice_date(value: Any) -> str:
     try:
         if "T" in raw:
             dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=EC_TZ)
+            else:
+                dt = dt.astimezone(EC_TZ)
         else:
             dt = datetime.strptime(raw[:10], "%Y-%m-%d")
     except ValueError:
@@ -156,6 +162,8 @@ def _format_invoice_date(value: Any) -> str:
         "noviembre",
         "diciembre",
     )
+    if "T" in raw:
+        return f"{dt.day} de {months[dt.month - 1]} de {dt.year}, {dt:%H:%M}"
     return f"{dt.day} de {months[dt.month - 1]} de {dt.year}"
 
 
@@ -305,7 +313,7 @@ def _draw_company_brand(c, x: float, y: float, profile: dict[str, Any]) -> None:
 
     from shared.company_profile import static_path_from_url
 
-    name = _pdf_text(profile.get("legal_name") or profile.get("name") or "GLOBTRADE")
+    name = _pdf_text(profile.get("legal_name") or profile.get("name") or "Altavia Trade")
     tagline = _pdf_text(profile.get("tagline") or "")
     text_x = x
     logo_path = static_path_from_url(profile.get("logo_url"))
@@ -346,7 +354,7 @@ def _draw_logo_mark(c, x: float, y: float) -> None:
     c.circle(x + 7, y + 2, 3.5, fill=1, stroke=0)
     c.setFillColor(colors.HexColor("#1a1f4b"))
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(x + 16, y, "GLOBTRADE")
+    c.drawString(x + 16, y, "ALTAVIA TRADE")
     c.setFont("Helvetica", 8)
     c.setFillColor(colors.HexColor("#64748b"))
     c.drawString(x + 16, y - 11, "S.A.")
@@ -595,7 +603,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     c.setStrokeColor(colors.black)
     c.line(margin_x, footer_y + 0.55 * cm, margin_x + 5.5 * cm, footer_y + 0.55 * cm)
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin_x, footer_y + 0.15 * cm, _pdf_text(profile.get("invoice_signer") or "Equipo Comercial GLOBTRADE"))
+    c.drawString(margin_x, footer_y + 0.15 * cm, _pdf_text(profile.get("invoice_signer") or "Equipo Comercial Altavia Trade"))
 
     info_x = w - margin_x - 6.8 * cm
     c.setFont("Helvetica-Bold", 9)
@@ -606,7 +614,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     info_lines = [inv_no, f"Solicitud #{request.get('request_id', '—')}"]
     if request.get("order_id"):
         info_lines.append(f"Pedido venta {request.get('order_id')}")
-    info_lines.append(_pdf_text(profile.get("legal_name") or "GLOBTRADE S.A.") + " — plataforma comercial")
+    info_lines.append(_pdf_text(profile.get("legal_name") or "Altavia Trade") + " — plataforma comercial")
     iy = footer_y + 0.62 * cm
     for line in info_lines:
         c.drawString(info_x, iy, line)
@@ -617,7 +625,7 @@ def generate_invoice_pdf(request: dict[str, Any]) -> bytes:
     c.drawCentredString(
         w / 2,
         1.15 * cm,
-        _pdf_text(profile.get("invoice_footer") or "Factura comercial GLOBTRADE. Conserve este documento."),
+        _pdf_text(profile.get("invoice_footer") or "Factura comercial Altavia Trade. Conserve este documento."),
     )
 
     c.showPage()

@@ -19,7 +19,7 @@ def ensure_default_warehouse() -> dict[str, Any]:
         "warehouse_id": DEFAULT_WAREHOUSE_ID,
         "name": DEFAULT_WAREHOUSE_NAME,
         "code": DEFAULT_WAREHOUSE_CODE,
-        "address": "Centro logístico GLOBTRADE — ubicación única",
+        "address": "Centro logístico Altavia Trade — ubicación única",
         "is_default": True,
         "active": True,
     }
@@ -43,5 +43,5 @@ def warehouse_summary() -> dict[str, Any]:
         "warehouse_id": DEFAULT_WAREHOUSE_ID,
         "name": DEFAULT_WAREHOUSE_NAME,
         "code": DEFAULT_WAREHOUSE_CODE,
-        "address": "Centro logístico GLOBTRADE — ubicación única",
+        "address": "Centro logístico Altavia Trade — ubicación única",
     }

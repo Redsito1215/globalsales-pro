@@ -1,0 +1,54 @@
+openapi: 3.0.3
+info:
+  title: Altavia Trade Professional Center API
+  version: 1.0.0
+paths:
+  /api/profesional/resumen:
+    get: {summary: Inicio personalizado, responses: {'200': {description: Resumen}}}
+  /api/profesional/alertas:
+    get: {summary: Alertas accionables, responses: {'200': {description: Alertas}}}
+  /api/profesional/productos/{product_id}:
+    get: {summary: Ficha integral de producto, responses: {'200': {description: Ficha}, '404': {description: No encontrado}}}
+  /api/profesional/clientes/{client_id}:
+    get: {summary: Ficha integral de cliente, responses: {'200': {description: Ficha}, '404': {description: No encontrado}}}
+  /api/profesional/proveedores:
+    get: {summary: Evaluación de proveedores, responses: {'200': {description: Evaluación}}}
+  /api/profesional/metas:
+    get: {summary: Listar metas, responses: {'200': {description: Metas}}}
+    post: {summary: Crear meta, responses: {'201': {description: Meta creada}, '400': {description: Validación}}}
+  /api/profesional/aprobaciones:
+    get: {summary: Listar aprobaciones, responses: {'200': {description: Solicitudes}}}
+    post: {summary: Crear aprobación, responses: {'201': {description: Solicitud creada}}}
+  /api/profesional/aprobaciones/{approval_id}/decision:
+    post: {summary: Resolver aprobación, responses: {'200': {description: Resuelta}, '409': {description: Ya resuelta}}}
+  /api/profesional/historial:
+    get: {summary: Historial filtrable, responses: {'200': {description: Eventos}}}
+  /api/profesional/calidad:
+    get: {summary: Estado de fuentes, responses: {'200': {description: Fuentes}}}
+  /api/profesional/operacion-avanzada:
+    get: {summary: Logística, demanda, rentabilidad y fidelización, responses: {'200': {description: Resumen avanzado}}}
+  /api/profesional/logistica/{request_id}:
+    patch: {summary: Actualizar transportista, guía y entrega estimada, responses: {'200': {description: Seguimiento actualizado}, '400': {description: Datos inválidos}}}
+  /api/profesional/pronostico/requisicion:
+    post: {summary: Crear requisición desde una reposición sugerida, responses: {'201': {description: Requisición creada}}}
+  /api/profesional/fidelizacion/campana:
+    post: {summary: Crear campaña para un segmento, responses: {'201': {description: Campaña creada}}}
+  /api/profesional/operacion-avanzada.pdf:
+    get: {summary: Exportar resumen ejecutivo PDF, responses: {'200': {description: Documento PDF}}}
+  /api/profesional/buscar:
+    get: {summary: Búsqueda global, responses: {'200': {description: Resultados agrupados}}}
+  /api/profesional/clickhouse:
+    get: {summary: Estado, última carga y conteos de ClickHouse, responses: {'200': {description: Monitor analítico}}}
+  /api/profesional/lotes:
+    get: {summary: Listar lotes y caducidad, responses: {'200': {description: Lotes}}}
+    post: {summary: Registrar lote, responses: {'201': {description: Lote registrado}, '400': {description: Validación}}}
+  /api/profesional/lotes/{lot_code}/trazabilidad:
+    get: {summary: Trazabilidad completa de un lote, responses: {'200': {description: Movimientos}}}
+  /api/profesional/listas-precios:
+    get: {summary: Listar precios por cliente o canal, responses: {'200': {description: Listas}}}
+    post: {summary: Crear o actualizar lista de precios, responses: {'201': {description: Lista guardada}, '400': {description: Validación}}}
+  /api/profesional/vendedores:
+    get: {summary: Metas, ventas netas y comisiones, responses: {'200': {description: Desempeño}}}
+    post: {summary: Crear meta y porcentaje de comisión, responses: {'201': {description: Meta guardada}}}
+  /api/profesional/usabilidad/opinion:
+    post: {summary: Registrar una prueba guiada de uso, responses: {'201': {description: Opinión guardada}}}

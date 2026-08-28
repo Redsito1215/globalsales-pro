@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     mongo_replica_uri: str | None = None
     mongo_replica_set: str | None = None
 
+    clickhouse_host: str = "localhost"
+    clickhouse_port: int = 8123
+    clickhouse_user: str = "default"
+    clickhouse_password: str = ""
+    clickhouse_database: str = "globtrade_analytics"
+    clickhouse_secure: bool = False
+
     api_host: str = "0.0.0.0"
     api_port: int = 8001
     web_port: int = 5001
@@ -51,7 +58,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
-    ai_model: str = "gpt-4o-mini"
+    ai_model: str = "gpt-5-mini"
+    ai_timeout_seconds: int = 60
 
 
 settings = Settings()

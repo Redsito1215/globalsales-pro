@@ -4,7 +4,11 @@ Pipeline **Extract → Load → Transform → Validate** que alimenta la capa es
 (`sales_records` landing → `fact_ventas` + `dim_*`) usada por:
 
 - Tablero (KPIs / gráficos)
-- **Informes compuestos RC-01…RC-08** (estratégicos, sin IA)
+- **Informes compuestos RC-01…RC-08**, publicados en ClickHouse
+
+Después de validar el modelo estrella, el DAG ejecuta `steps/sync_clickhouse.py`. Este paso
+crea el esquema `globtrade_analytics`, reemplaza sus tablas analíticas y registra el resultado
+en `etl_runs`. Los RC consultan únicamente ClickHouse; no regresan silenciosamente a MongoDB.
 
 ## ¿Agregar registros o borrar y recrear?
 
@@ -50,6 +54,8 @@ docker compose run --rm -v "${PWD}\scripts:/app/scripts" web python scripts/expo
 Luego **Trigger DAG** `globtrade_strategic_etl` en http://localhost:8080.
 
 ## Airflow
+
+El DAG estratégico se ejecuta automáticamente todos los días a las **02:00** y también puede iniciarse manualmente desde Airflow.
 
 Un solo compose (`docker-compose.yml`), profile `airflow`:
 

@@ -91,6 +91,17 @@ def _next_id(col, pk: str) -> int:
     return int(row[pk]) + 1
 
 
+def _next_product_line(category_id: int, *, exclude_product_id: int | None = None) -> int:
+    """Asigna una posición estable dentro de la categoría; nunca se solicita al usuario."""
+    query: dict[str, Any] = {"category_id": int(category_id)}
+    if exclude_product_id is not None:
+        query["product_id"] = {"$ne": int(exclude_product_id)}
+    row = get_db()["dim_producto"].find_one(
+        query, {"line": 1, "_id": 0}, sort=[("line", -1)]
+    )
+    return max(int((row or {}).get("line") or 0) + 1, 1)
+
+
 def list_rows(
     name: str,
     *,
@@ -98,14 +109,22 @@ def list_rows(
     offset: int = 0,
     search: str | None = None,
     active: bool | None = None,
+    category_id: int | None = None,
+    vendor_id: int | None = None,
 ) -> dict[str, Any]:
     meta = _table_meta(name)
     if not meta:
         raise ValueError("unknown_table")
-    col = get_db()[name]
+    db = get_db()
+    col = db[name]
     query: dict[str, Any] = {}
     if name in EDITABLE_MASTERS and active is not None:
         query["active"] = {"$ne": False} if active else False
+    if name == "dim_producto" and category_id is not None:
+        query["category_id"] = int(category_id)
+    if name == "dim_producto" and vendor_id is not None:
+        vendor_products = db["products"].distinct("product_id", {"vendor_id": int(vendor_id)})
+        query["product_id"] = {"$in": [int(pid) for pid in vendor_products if pid is not None]}
     if search:
         or_clauses: list[dict[str, Any]] = [{"name": {"$regex": re.escape(search), "$options": "i"}}]
         if name == "dim_producto":
@@ -126,7 +145,7 @@ def list_rows(
         for row in rows:
             row.setdefault("sale_enabled", False)
             row.setdefault("sale_percent", 25)
-    return {
+    result = {
         "name": name,
         "label": meta["label"],
         "description": meta.get("description", ""),
@@ -140,6 +159,21 @@ def list_rows(
         "field_labels": {f: field_label(f) for f in (meta.get("fields") or [])},
         "rows": rows,
     }
+    if name == "dim_producto":
+        categories = list(
+            db["dim_categoria"].find(
+                {"active": {"$ne": False}}, {"_id": 0, "category_id": 1, "name": 1}
+            ).sort("name", 1)
+        )
+        vendors = list(
+            db["vendors"].find(
+                {"active": {"$ne": False}},
+                {"_id": 0, "vendor_id": 1, "name": 1, "country": 1, "region_name": 1},
+            ).sort("name", 1)
+        )
+        result["filter_options"] = {"categories": categories, "vendors": vendors}
+        result["applied_filters"] = {"category_id": category_id, "vendor_id": vendor_id}
+    return result
 
 
 def get_row(name: str, row_id: str) -> dict[str, Any] | None:
@@ -246,6 +280,14 @@ def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
         doc[pk] = _next_id(col, pk)
     else:
         doc[pk] = int(data[pk]) if str(data[pk]).isdigit() else data[pk]
+    if name == "dim_producto":
+        category_id = int(doc.get("category_id") or 0)
+        category = get_db()["dim_categoria"].find_one(
+            {"category_id": category_id, "active": {"$ne": False}}, {"_id": 1}
+        )
+        if category_id < 1 or not category:
+            raise ValueError("inactive_relation")
+        doc["line"] = _next_product_line(category_id)
     _validate_master_row(name, doc)
     _check_master_duplicates(name, doc)
     if col.find_one({pk: doc[pk]}):
@@ -256,7 +298,7 @@ def create_row(name: str, data: dict[str, Any]) -> dict[str, Any]:
         doc.setdefault("units", 0)
         doc.setdefault("orders", 0)
         doc.setdefault("revenue", 0.0)
-        doc.setdefault("line", int(doc.get("line") or 1))
+        doc["line"] = int(doc.get("line") or 1)
         doc.setdefault("image_url", None)
         doc.setdefault("sale_enabled", False)
         doc.setdefault("sale_percent", 25)
@@ -287,6 +329,16 @@ def update_row(name: str, row_id: str, data: dict[str, Any]) -> dict[str, Any]:
     if not existing:
         raise ValueError("not_found")
     patch = {k: data[k] for k in meta["fields"] if k in data and k != pk}
+    if name == "dim_producto":
+        patch.pop("line", None)
+        next_category = int(patch.get("category_id") or existing.get("category_id") or 0)
+        category = get_db()["dim_categoria"].find_one(
+            {"category_id": next_category, "active": {"$ne": False}}, {"_id": 1}
+        )
+        if not category:
+            raise ValueError("inactive_relation")
+        if next_category != int(existing.get("category_id") or 0):
+            patch["line"] = _next_product_line(next_category, exclude_product_id=int(key))
     _validate_master_row(name, patch, partial=True)
     _check_master_duplicates(name, patch, exclude_key=key)
     if name == "dim_producto" and ("unit_price" in patch or "unit_cost" in patch or "sale_enabled" in patch):

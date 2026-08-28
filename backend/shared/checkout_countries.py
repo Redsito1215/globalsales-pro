@@ -74,4 +74,14 @@ def list_checkout_countries(*, limit: int = 500) -> dict[str, Any]:
         .sort("name", 1)
         .limit(limit)
     )
+    region_ids = {int(row["region_id"]) for row in rows if row.get("region_id") is not None}
+    region_names = {
+        int(row["region_id"]): row.get("name") or "Sin región"
+        for row in db["dim_region"].find(
+            {"region_id": {"$in": list(region_ids)}},
+            {"_id": 0, "region_id": 1, "name": 1},
+        )
+    } if region_ids else {}
+    for row in rows:
+        row["region_name"] = region_names.get(int(row["region_id"])) if row.get("region_id") is not None else "Sin región"
     return {"total": total, "limit": limit, "countries": rows}

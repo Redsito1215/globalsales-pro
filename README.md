@@ -1,6 +1,6 @@
-# GLOBTRADE
+# Altavia Trade
 
-Plataforma web comercial-analítica (Flask + MongoDB): tablero, análisis, decisiones, ventas B2B, compras/stock y maestros.
+Plataforma web comercial-analítica (Flask + MongoDB + ClickHouse): tablero, análisis, decisiones, ventas B2B, compras/stock y maestros.
 
 ## Requisitos
 
@@ -45,7 +45,9 @@ El **primer usuario** registrado queda como **administrador**.
 .\scripts\docker-up.cmd
 ```
 
-Servicios: web `:5001`, API auxiliar `:8001`, Mongo `:27017`.
+Servicios: web `:5001`, API auxiliar `:8001`, Mongo `:27017` y ClickHouse HTTP `:8123`.
+
+Para comprobar ClickHouse sin usar comandos, abre **Táctico → Gestión profesional → Experiencia** y pulsa **Verificar ahora**. Ahí se muestran conexión, última carga y filas por tabla. Para revisar ejecuciones del proceso abre Airflow en `http://localhost:8080` (`admin` / `admin`). ClickHouse no incluye una interfaz gráfica en este proyecto; su endpoint HTTP es `http://localhost:8123` y la base usada es `globtrade_analytics`.
 
 Por defecto Docker usa **dos bases** en el mismo Mongo:
 
@@ -66,8 +68,7 @@ Detalle: [`scripts/README-mongo-ha.md`](scripts/README-mongo-ha.md).
 
 En **Informes simples** e **Informes compuestos** → botón **Asistente IA**:
 
-- **Motor local** (por defecto): interpreta consultas en español, sin API key.
-- **OpenAI** (opcional): define `OPENAI_API_KEY` en `.env` para textos más contextuales.
+- **OpenAI Responses API**: define `OPENAI_API_KEY` en `.env` para activar el asistente de informes. El navegador nunca recibe la clave y el sistema muestra un error claro si falta configuración, autenticación o cuota. Sin una API configurada, el asistente permanece deshabilitado y no simula respuestas locales.
 
 Los informes **RS** (simples) y **RC** (compuestos) se eligen por separado en el asistente.
 
@@ -97,17 +98,25 @@ python scripts/bootstrap_demo.py
 
 - **Operativo**: vitrina, solicitudes, compras, soporte, **Reportes simples (RS-01…15)**  
 - **Landing**: `sales_records` (CSV, generate, post-convertir; Explorar ventas / export)  
-- **Estratégico**: Tablero (Workpanel), **Informes compuestos (RC-01…08)** sobre `fact_ventas` + dims; tras convertir hay sync incremental. El rebuild programado puede orquestarse con **Airflow** (`globtrade_strategic_etl`).  
+- **Estratégico**: Tablero sobre `fact_ventas` + dimensiones en Mongo; **Informes compuestos (RC-01…08)** publicados y consultados en ClickHouse mediante Airflow (`globtrade_strategic_etl`).
 
 El pago usa autorización interna y no existe integración con banco, pasarela externa ni servicios de correo.
 
-### Vista histórica (sem1)
+### Niveles del sistema
 
-Solo administradores: Perfil → **Vista histórica** o `/sem1`. La SPA principal es la operación diaria.
+- **Operativo**: tienda, pedidos, ventas, compras, inventario, notificaciones y soporte.
+- **Táctico**: informes operativos, exploración detallada, catálogo analítico, exportaciones y maestros.
+- **Estratégico**: tablero ejecutivo, decisiones, informes compuestos y tendencias agregadas.
+- **Administración**: configuración, carga de datos, modelo, auditoría, usuarios y roles.
+
+El **Centro de decisiones** clasifica el portafolio por producto (estrella, oportunidad,
+volumen con margen débil o revisar), calcula cobertura, inventario estancado y una reposición
+sugerida con 14 días de entrega más 7 días de seguridad. Cada señal incluye la cifra que la
+origina y una decisión recomendada; la fuente analítica es ClickHouse.
 
 ## ETL orquestado por Airflow (capa estratégica)
 
-Alimenta `fact_ventas` + dims para Tablero e **Informes compuestos RC** (sin IA). Estrategia del DAG: **truncate + reload** (no append). El sync incremental post-convertir en la app **convive** y no forma parte del DAG.
+Alimenta `fact_ventas` + dimensiones para el Tablero y publica ventas, compras, inventario, logística y cupones en ClickHouse para los **Informes compuestos RC**. La publicación es idempotente mediante **truncate + reload**.
 
 Todo va en el **mismo** `docker-compose.yml` (profile `airflow`):
 
@@ -120,7 +129,7 @@ docker compose --profile airflow up -d --build
 ```
 
 1. Abre http://localhost:8080 (`admin` / `admin`)
-2. Trigger manual del DAG: `globtrade_strategic_etl`. No tiene programación automática porque reemplaza completamente el histórico.
+2. El DAG `globtrade_strategic_etl` se ejecuta diariamente a las 02:00 y también permite ejecución manual. La carga idempotente reemplaza de forma controlada la publicación estratégica.
 3. Ver Informes compuestos RC en http://127.0.0.1:5001
 
 Detalle del pipeline: [`etl_proceso/README.md`](etl_proceso/README.md).

@@ -83,6 +83,11 @@ html.theme-dark .dash-badge {
   min-width: 0;
 }
 
+/* La conversación del cliente debe sentirse como un chat, no ocupar todo el lienzo. */
+#page-soporte.soporte-page--user .page-shell {
+  max-width: 68rem;
+}
+
 .catalog-meta,
 .dash-records-meta {
   font-family: var(--font);
@@ -327,3 +332,12 @@ html.theme-dark .dash-badge {
     padding-right: 0.75rem;
   }
 }
+.rc-chart-card{margin:16px 0;border:1px solid var(--border,#dfe6ec);border-radius:16px;background:var(--surface,#fff);overflow:hidden}
+.rc-chart{min-height:340px;padding:16px;display:flex;align-items:center;justify-content:center;overflow:auto}
+.rc-chart svg{width:100%;min-width:640px;height:320px;display:block}
+.rc-chart-empty{color:var(--text-muted,#667085);text-align:center;padding:72px 20px}
+.rc-source-badge{font-size:.75rem;font-weight:700;color:#0e7490;background:#cffafe;border-radius:999px;padding:5px 10px}
+.rc-chart-status{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.rc-chart-status article{padding:18px;border:1px solid var(--border,#dfe6ec);border-radius:12px;background:#f8fafc}
+.rc-chart-status strong,.rc-chart-status span{display:block}.rc-chart-status strong{margin:8px 0;font-size:1.25rem}.rc-chart-status span{font-size:.78rem;color:#047857;font-weight:700}
+@media(max-width:760px){.rc-chart{justify-content:flex-start}.rc-chart-card{border-radius:12px}}

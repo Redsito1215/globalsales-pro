@@ -126,6 +126,13 @@ def shop_checkout():
             "client_required": "Inicia sesión para completar la compra.",
             "destination_required": "Indica el destino de entrega (ciudad, dirección o ruta).",
             "invalid_quantity": "Cada producto debe tener al menos 1 unidad.",
+            "invalid_phone": "El teléfono no puede ser negativo ni contener solo signos.",
+            "invalid_unit_price": "El precio debe ser mayor a 0.",
+            "invalid_unit_cost": "El costo no puede ser negativo.",
+            "invalid_discount_amount": "El descuento no puede ser negativo.",
+            "invalid_shipping_cost": "El envío no puede ser negativo.",
+            "invalid_total": "El total no puede ser negativo.",
+            "invalid_subtotal": "El subtotal no puede ser negativo.",
         }.get(code, code)
         return jsonify({"status": "error", "message": msg, "code": code}), 400
 
@@ -197,6 +204,31 @@ def shop_product_sale(product_id: int):
         else "Rebaja desactivada para este producto."
     )
     return jsonify({"status": "ok", "message": msg, **data})
+
+
+@shop_bp.patch("/categories/<int:category_id>/sale")
+@login_required
+@permission_required("masters.write")
+def shop_category_sale(category_id: int):
+    body = request.get_json(silent=True) or {}
+    if "enabled" not in body:
+        return jsonify({"status": "error", "message": "Indica si la rebaja debe activarse."}), 400
+    try:
+        percent = int(body.get("percent", body.get("sale_percent", 25)))
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "El porcentaje debe ser un número entre 1 y 90."}), 400
+    try:
+        data = services.set_category_sale(category_id, bool(body.get("enabled")), percent)
+    except ValueError as exc:
+        if str(exc) == "not_found":
+            return jsonify({"status": "error", "message": "Categoría no encontrada."}), 404
+        raise
+    action = "activada" if data["sale_enabled"] else "desactivada"
+    return jsonify({
+        "status": "ok",
+        "message": f"Rebaja del {data['sale_percent']}% {action} en {data['products_updated']} productos.",
+        **data,
+    })
 
 
 @shop_bp.get("/stats")

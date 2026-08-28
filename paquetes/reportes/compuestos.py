@@ -1,525 +1,434 @@
 # -*- coding: utf-8 -*-
-"""Informes compuestos RC-01…RC-08 (agregaciones / ELT / estrella)."""
+"""Informes compuestos RC-01…RC-13 consultados exclusivamente en ClickHouse."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date
 from typing import Any, Callable
 
+from shared.clickhouse import ensure_database_and_schema, ping_clickhouse, query_rows
 from paquetes.tablero import catalogo_nombres as nom
-from shared.data_layers import analytics_fact, strategic_ready
-from shared.mongo import get_db
+
 
 COMPLEX_REPORTS: list[dict[str, Any]] = [
-    {
-        "id": "RC-01",
-        "name": "Ventas por mes y por categoría de producto",
-        "objetivo": "OT1, OT7, OT10, OT12",
-        "para_que": "Ver cómo evolucionan las ventas por categoría en el tiempo.",
-        "quien": "Gerente general, analista",
-        "columns": ["mes", "categoria", "pedidos", "unidades", "ingresos", "utilidad"],
-    },
-    {
-        "id": "RC-02",
-        "name": "Top 10 productos que más se venden y top 10 que menos se venden",
-        "objetivo": "OT7, OT10, OT12",
-        "para_que": "Comparar categorías/productos líderes y rezagados por ingresos.",
-        "quien": "Gerente comercial, analista",
-        "columns": ["ranking", "categoria", "pedidos", "unidades", "ingresos", "grupo"],
-    },
-    {
-        "id": "RC-03",
-        "name": "Balanza interna: cuánto se vendió frente a cuánto se compró",
-        "objetivo": "OT4",
-        "para_que": "Comparar ventas frente a compras recibidas en el mismo periodo.",
-        "quien": "Jefe de compras, gerencia",
-        "columns": ["concepto", "monto", "detalle"],
-    },
-    {
-        "id": "RC-04",
-        "name": "Qué tan rápido rota el inventario por categoría",
-        "objetivo": "OT3",
-        "para_que": "Cruzar unidades vendidas con stock actual por categoría.",
-        "quien": "Jefe de inventario",
-        "columns": ["categoria", "unidades_vendidas", "stock_actual", "rotacion_aprox"],
-    },
-    {
-        "id": "RC-05",
-        "name": "Tiempo promedio entre pedir y enviar, por país o región",
-        "objetivo": "OT5",
-        "para_que": "Medir demora logística promedio por región.",
-        "quien": "Jefe de logística",
-        "columns": ["region", "pedidos", "dias_promedio"],
-    },
-    {
-        "id": "RC-06",
-        "name": "Cuánto se usan los cupones y cómo afectan las ventas",
-        "objetivo": "OT6, OT9",
-        "para_que": "Medir uso de cupones e impacto en ingresos del periodo.",
-        "quien": "Gerente comercial",
-        "columns": ["cupon", "usos_landing", "ingresos_con_cupon", "descuento_total", "activo"],
-    },
-    {
-        "id": "RC-07",
-        "name": "Ganancia (margen) por categoría de producto en el tiempo",
-        "objetivo": "OT2, OT12",
-        "para_que": "Ver margen % por categoría y mes.",
-        "quien": "Gerente, analista",
-        "columns": ["mes", "categoria", "ingresos", "costos", "utilidad", "margen_pct"],
-    },
-    {
-        "id": "RC-08",
-        "name": "Estado de la carga de datos para informes",
-        "objetivo": "OT11, OT12",
-        "para_que": "Verificar si los datos de ventas están listos para análisis.",
-        "quien": "Administrador, analista",
-        "columns": ["indicador", "valor", "estado"],
-    },
+    {"id": "RC-01", "name": "Ventas por mes y categoría", "objetivo": "OT1, OT7, OT10, OT12", "para_que": "Ver la evolución de ingresos, utilidad y stock por categoría.", "quien": "Gerencia, analista", "columns": ["mes", "categoria", "pedidos", "unidades", "ingresos", "utilidad", "stock_actual"], "chart": {"type": "line", "x": "mes", "series": ["ingresos", "utilidad"], "group": "categoria"}},
+    {"id": "RC-02", "name": "Productos más y menos vendidos", "objetivo": "OT7, OT10, OT12", "para_que": "Detectar productos líderes y rezagados por ingresos, cruzados con inventario.", "quien": "Gerencia comercial, analista", "columns": ["ranking", "producto", "categoria", "unidades", "ingresos", "stock_actual", "grupo"], "chart": {"type": "bar", "x": "producto", "series": ["ingresos"], "group": "grupo"}},
+    {"id": "RC-03", "name": "Ventas frente a compras recibidas", "objetivo": "OT4", "para_que": "Comparar, dentro del mismo periodo, ventas y compras recibidas.", "quien": "Compras, gerencia", "columns": ["mes", "ventas", "compras", "diferencia"], "chart": {"type": "bar", "x": "mes", "series": ["ventas", "compras", "diferencia"]}},
+    {"id": "RC-04", "name": "Rotación y cobertura de inventario por categoría", "objetivo": "OT3", "para_que": "Relacionar ventas con el inventario disponible y detectar riesgo.", "quien": "Inventario", "columns": ["categoria", "unidades_vendidas", "stock_actual", "rotacion_aprox", "dias_cobertura"], "chart": {"type": "bar", "x": "categoria", "series": ["unidades_vendidas", "stock_actual"]}},
+    {"id": "RC-05", "name": "Cumplimiento logístico por región", "objetivo": "OT5", "para_que": "Medir tiempo promedio, cumplimiento e ingresos asociados por región.", "quien": "Logística", "columns": ["region", "pedidos", "dias_promedio", "mediana_dias", "cumplimiento_pct", "ingresos"], "chart": {"type": "bar", "x": "region", "series": ["dias_promedio", "mediana_dias"]}},
+    {"id": "RC-06", "name": "Uso y rentabilidad de cupones", "objetivo": "OT6, OT9", "para_que": "Medir ingresos, descuento y resultado de promociones.", "quien": "Gerencia comercial", "columns": ["cupon", "usos", "ingresos_con_cupon", "descuento_total", "ingreso_neto", "activo"], "chart": {"type": "bar", "x": "cupon", "series": ["ingresos_con_cupon", "descuento_total", "ingreso_neto"]}},
+    {"id": "RC-07", "name": "Margen por categoría en el tiempo", "objetivo": "OT2, OT12", "para_que": "Comparar utilidad, margen e inventario por categoría y mes.", "quien": "Gerencia, analista", "columns": ["mes", "categoria", "ingresos", "costos", "utilidad", "margen_pct", "stock_actual"], "chart": {"type": "line", "x": "mes", "series": ["margen_pct"], "group": "categoria"}},
+    {"id": "RC-08", "name": "Estado de la carga analítica", "objetivo": "OT11, OT12", "para_que": "Comprobar carga, cobertura y consistencia entre tablas ClickHouse.", "quien": "Administración, analista", "columns": ["indicador", "valor", "estado"], "chart": {"type": "status", "x": "indicador", "series": ["valor"]}},
+    {"id": "RC-09", "name": "Compras mayoristas por proveedor", "objetivo": "OT4, OT12", "para_que": "Identificar proveedores con más compras y su utilidad asociada.", "quien": "Gerencia, compras", "columns": ["proveedor", "compras", "ordenes", "utilidad", "participacion_pct", "ticket_promedio"], "chart": {"type": "bar", "x": "proveedor", "series": ["compras"]}},
+    {"id": "RC-10", "name": "Dependencia estratégica por proveedor", "objetivo": "OT4, OT12", "para_que": "Detectar concentración de abastecimiento y riesgo por dependencia.", "quien": "Gerencia, compras", "columns": ["proveedor", "compras", "participacion_pct", "riesgo", "decision"], "chart": {"type": "bar", "x": "proveedor", "series": ["participacion_pct"]}},
+    {"id": "RC-11", "name": "Rentabilidad por proveedor", "objetivo": "OT2, OT4, OT12", "para_que": "Saber de qué proveedores salen los productos que dejan más utilidad y cuánto se les compra.", "quien": "Gerencia, compras, analista", "columns": ["proveedor", "pedidos", "unidades", "compras", "ingresos", "costos", "utilidad", "margen_pct"], "chart": {"type": "bar", "x": "proveedor", "series": ["utilidad", "ingresos"]}},
+    {"id": "RC-12", "name": "Compras vs utilidad por proveedor", "objetivo": "OT4, OT12", "para_que": "Comparar cuánto se invierte comprando a cada proveedor frente a la utilidad generada por sus productos.", "quien": "Gerencia, compras", "columns": ["proveedor", "compras", "ingresos", "utilidad", "retorno_pct", "decision"], "chart": {"type": "bar", "x": "proveedor", "series": ["compras", "utilidad"]}},
+    {"id": "RC-13", "name": "Productos más rentables por proveedor", "objetivo": "OT2, OT4, OT10", "para_que": "Encontrar qué productos conviene negociar, impulsar o reponer según proveedor y stock.", "quien": "Gerencia comercial, compras", "columns": ["proveedor", "producto", "categoria", "stock_actual", "ingresos", "utilidad", "margen_pct", "decision"], "chart": {"type": "bar", "x": "producto", "series": ["utilidad"], "group": "proveedor"}},
 ]
-
-COMPLEX_BY_ID = {r["id"]: r for r in COMPLEX_REPORTS}
-
-
-def _localize_category_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for row in rows:
-        item = dict(row)
-        if "categoria" in item:
-            item["categoria"] = nom.category_label_from_name(item.get("categoria"))
-        out.append(item)
-    return out
+COMPLEX_BY_ID = {report["id"]: report for report in COMPLEX_REPORTS}
 
 
-def list_complex_catalog() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": r["id"],
-            "name": r["name"],
-            "objetivo": r["objetivo"],
-            "para_que": r["para_que"],
-            "quien": r["quien"],
-            "tipo": "compuesto",
-            "columns": r["columns"],
-            "data_layer": "estrategico",
-        }
-        for r in COMPLEX_REPORTS
-    ]
+def _meta(report: dict[str, Any]) -> dict[str, Any]:
+    return {**report, "tipo": "compuesto", "data_layer": "clickhouse", "source_tables": _SOURCE_TABLES.get(report["id"], [])}
 
 
-def _cat_lookup_pipe(local: str = "category_id") -> list[dict[str, Any]]:
-    return [
-        {
-            "$lookup": {
-                "from": "dim_categoria",
-                "localField": local,
-                "foreignField": "category_id",
-                "as": "_cat",
-            }
-        },
-        {"$addFields": {"categoria": {"$ifNull": [{"$arrayElemAt": ["$_cat.name", 0]}, "Sin categoría"]}}},
-        {"$project": {"_cat": 0}},
-    ]
-
-
-def rc01(*, limit: int = 200) -> dict[str, Any]:
-    if not strategic_ready():
-        return {"rows": [], "total": 0, "message": "fact_ventas vacío — ejecuta Construir modelo o el DAG Airflow globtrade_strategic_etl."}
-    pipe = [
-        {
-            "$group": {
-                "_id": {"mes": {"$substr": ["$fecha_id", 0, 7]}, "category_id": "$category_id"},
-                "pedidos": {"$sum": 1},
-                "unidades": {"$sum": "$units_sold"},
-                "ingresos": {"$sum": "$total_revenue"},
-                "utilidad": {"$sum": "$total_profit"},
-            }
-        },
-        {"$sort": {"_id.mes": -1, "ingresos": -1}},
-        {"$limit": limit},
-        {
-            "$lookup": {
-                "from": "dim_categoria",
-                "localField": "_id.category_id",
-                "foreignField": "category_id",
-                "as": "_cat",
-            }
-        },
-        {
-            "$project": {
-                "_id": 0,
-                "mes": "$_id.mes",
-                "categoria": {"$ifNull": [{"$arrayElemAt": ["$_cat.name", 0]}, "—"]},
-                "pedidos": 1,
-                "unidades": 1,
-                "ingresos": {"$round": ["$ingresos", 2]},
-                "utilidad": {"$round": ["$utilidad", 2]},
-            }
-        },
-    ]
-    rows = _localize_category_rows(list(analytics_fact().aggregate(pipe, allowDiskUse=True)))
-    return {"rows": rows, "total": len(rows)}
-
-
-def rc02(*, limit: int = 10) -> dict[str, Any]:
-    if not strategic_ready():
-        return {"rows": [], "total": 0, "message": "fact_ventas vacío — Construir modelo o DAG Airflow globtrade_strategic_etl."}
-    base = [
-        {
-            "$group": {
-                "_id": "$category_id",
-                "pedidos": {"$sum": 1},
-                "unidades": {"$sum": "$units_sold"},
-                "ingresos": {"$sum": "$total_revenue"},
-            }
-        },
-        {
-            "$lookup": {
-                "from": "dim_categoria",
-                "localField": "_id",
-                "foreignField": "category_id",
-                "as": "_cat",
-            }
-        },
-        {
-            "$project": {
-                "categoria": {"$ifNull": [{"$arrayElemAt": ["$_cat.name", 0]}, "—"]},
-                "pedidos": 1,
-                "unidades": 1,
-                "ingresos": {"$round": ["$ingresos", 2]},
-            }
-        },
-    ]
-    top = list(
-        analytics_fact().aggregate(
-            base + [{"$sort": {"ingresos": -1}}, {"$limit": limit}],
-            allowDiskUse=True,
-        )
-    )
-    bottom = list(
-        analytics_fact().aggregate(
-            base + [{"$sort": {"ingresos": 1}}, {"$limit": limit}],
-            allowDiskUse=True,
-        )
-    )
-    rows = []
-    for i, r in enumerate(top, 1):
-        rows.append(
-            {
-                "ranking": i,
-                "categoria": nom.category_label_from_name(r.get("categoria")),
-                "pedidos": r.get("pedidos"),
-                "unidades": r.get("unidades"),
-                "ingresos": r.get("ingresos"),
-                "grupo": "Top ventas",
-            }
-        )
-    for i, r in enumerate(bottom, 1):
-        rows.append(
-            {
-                "ranking": i,
-                "categoria": nom.category_label_from_name(r.get("categoria")),
-                "pedidos": r.get("pedidos"),
-                "unidades": r.get("unidades"),
-                "ingresos": r.get("ingresos"),
-                "grupo": "Menor ventas",
-            }
-        )
-    return {"rows": rows, "total": len(rows)}
-
-
-def rc03(*, limit: int = 20) -> dict[str, Any]:
-    db = get_db()
-    ventas = 0.0
-    if strategic_ready():
-        agg = list(
-            analytics_fact().aggregate(
-                [{"$group": {"_id": None, "r": {"$sum": "$total_revenue"}}}],
-                allowDiskUse=True,
-            )
-        )
-        ventas = float((agg[0]["r"] if agg else 0) or 0)
-    compras = 0.0
-    for po in db["purchase_orders"].find(
-        {"status": {"$in": ["recibida", "parcial", "enviada"]}},
-        {"_id": 0, "total": 1, "lines": 1},
-    ):
-        if po.get("total") is not None:
-            compras += float(po.get("total") or 0)
-        else:
-            for ln in po.get("lines") or []:
-                compras += float(ln.get("quantity_ordered") or 0) * float(ln.get("unit_cost") or 0)
-    rows = [
-        {"concepto": "Ventas (fact_ventas ingresos)", "monto": round(ventas, 2), "detalle": "Capa estratégica"},
-        {
-            "concepto": "Compras (OC enviada/parcial/recibida)",
-            "monto": round(compras, 2),
-            "detalle": "Capa operativa",
-        },
-        {
-            "concepto": "Balanza (ventas − compras)",
-            "monto": round(ventas - compras, 2),
-            "detalle": "Positivo = más vendido que comprado (aprox.)",
-        },
-    ]
-    return {"rows": rows[:limit], "total": len(rows)}
-
-
-def rc04(*, limit: int = 50) -> dict[str, Any]:
-    db = get_db()
-    sold: dict[int, float] = {}
-    if strategic_ready():
-        for r in analytics_fact().aggregate(
-            [{"$group": {"_id": "$category_id", "u": {"$sum": "$units_sold"}}}],
-            allowDiskUse=True,
-        ):
-            cid = r.get("_id")
-            if cid is None:
-                continue
-            sold[int(cid)] = float(r.get("u") or 0)
-
-    stock: dict[int, float] = {}
-    for v in db["product_variants"].find({}, {"_id": 0, "product_id": 1, "inventory_quantity": 1}):
-        p = db["products"].find_one({"product_id": v.get("product_id")}, {"_id": 0, "product_id": 1})
-        cid = None
-        if p:
-            link = db["collection_products"].find_one({"product_id": p.get("product_id")}, {"_id": 0})
-            if link and link.get("collection_id") is not None:
-                cid = int(link["collection_id"])
-        if cid is None:
-            continue
-        stock[cid] = stock.get(cid, 0) + float(v.get("inventory_quantity") or 0)
-
-    cats = sorted(set(sold) | set(stock))
-    rows = []
-    for cid in cats:
-        u = sold.get(cid, 0)
-        s = stock.get(cid, 0)
-        rot = round(u / s, 2) if s else None
-        rows.append(
-            {
-                "categoria": nom.category_display_name(cid),
-                "unidades_vendidas": int(u),
-                "stock_actual": int(s),
-                "rotacion_aprox": rot if rot is not None else "Sin stock",
-            }
-        )
-    rows.sort(key=lambda x: float(x["rotacion_aprox"]) if isinstance(x["rotacion_aprox"], (int, float)) else -1, reverse=True)
-    return {"rows": rows[:limit], "total": len(rows)}
-
-
-def rc05(*, limit: int = 50) -> dict[str, Any]:
-    db = get_db()
-    rows_out: list[dict[str, Any]] = []
-    pipe = [
-        {
-            "$match": {
-                "shipped_at": {"$nin": [None, ""]},
-                "created_at": {"$nin": [None, ""]},
-            }
-        },
-        {"$project": {"country_id": 1, "created_at": 1, "shipped_at": 1}},
-    ]
-    by_region: dict[str, list[float]] = {}
-    for r in db["purchase_requests"].aggregate(pipe):
-        try:
-            c0 = str(r.get("created_at"))[:10]
-            s0 = str(r.get("shipped_at"))[:10]
-            d0 = datetime.fromisoformat(c0)
-            d1 = datetime.fromisoformat(s0)
-            days = (d1 - d0).days
-        except Exception:
-            continue
-        country = db["dim_pais"].find_one({"country_id": r.get("country_id")}, {"_id": 0})
-        region = "—"
-        if country:
-            reg = db["dim_region"].find_one({"region_id": country.get("region_id")}, {"_id": 0, "name": 1})
-            region = (reg or {}).get("name") or "—"
-        by_region.setdefault(region, []).append(float(days))
-    for region, vals in sorted(by_region.items()):
-        rows_out.append(
-            {
-                "region": region,
-                "pedidos": len(vals),
-                "dias_promedio": round(sum(vals) / len(vals), 1) if vals else 0,
-            }
-        )
-    rows_out.sort(key=lambda x: x["dias_promedio"], reverse=True)
-    return {"rows": rows_out[:limit], "total": len(rows_out)}
-
-
-def rc06(*, limit: int = 50) -> dict[str, Any]:
-    db = get_db()
-    codes = {c.get("code"): c for c in db["discount_codes"].find({}, {"_id": 0})}
-    agg = list(
-        db["sales_records"].aggregate(
-            [
-                {"$match": {"discount_code": {"$nin": [None, ""]}}},
-                {
-                    "$group": {
-                        "_id": "$discount_code",
-                        "usos": {"$sum": 1},
-                        "ingresos": {"$sum": "$total_revenue"},
-                        "descuento": {"$sum": {"$ifNull": ["$discount_alloc", 0]}},
-                    }
-                },
-                {"$sort": {"usos": -1}},
-                {"$limit": limit},
-            ],
-            allowDiskUse=True,
-        )
-    )
-    rows = []
-    for a in agg:
-        code = a.get("_id")
-        meta = codes.get(code) or {}
-        rows.append(
-            {
-                "cupon": code,
-                "usos_landing": a.get("usos"),
-                "ingresos_con_cupon": round(float(a.get("ingresos") or 0), 2),
-                "descuento_total": round(float(a.get("descuento") or 0), 2),
-                "activo": bool(meta.get("active", True)) if meta else "—",
-            }
-        )
-    if not rows:
-        for code, meta in list(codes.items())[:limit]:
-            rows.append(
-                {
-                    "cupon": code,
-                    "usos_landing": meta.get("uses") or meta.get("used_count") or 0,
-                    "ingresos_con_cupon": 0,
-                    "descuento_total": 0,
-                    "activo": bool(meta.get("active", True)),
-                }
-            )
-    return {"rows": rows, "total": len(rows)}
-
-
-def rc07(*, limit: int = 200) -> dict[str, Any]:
-    if not strategic_ready():
-        return {"rows": [], "total": 0, "message": "fact_ventas vacío — Construir modelo o DAG Airflow globtrade_strategic_etl."}
-    pipe = [
-        {
-            "$group": {
-                "_id": {"mes": {"$substr": ["$fecha_id", 0, 7]}, "category_id": "$category_id"},
-                "ingresos": {"$sum": "$total_revenue"},
-                "costos": {"$sum": "$total_cost"},
-                "utilidad": {"$sum": "$total_profit"},
-            }
-        },
-        {"$sort": {"_id.mes": -1, "utilidad": -1}},
-        {"$limit": limit},
-        {
-            "$lookup": {
-                "from": "dim_categoria",
-                "localField": "_id.category_id",
-                "foreignField": "category_id",
-                "as": "_cat",
-            }
-        },
-        {
-            "$project": {
-                "_id": 0,
-                "mes": "$_id.mes",
-                "categoria": {"$ifNull": [{"$arrayElemAt": ["$_cat.name", 0]}, "—"]},
-                "ingresos": {"$round": ["$ingresos", 2]},
-                "costos": {"$round": ["$costos", 2]},
-                "utilidad": {"$round": ["$utilidad", 2]},
-                "margen_pct": {
-                    "$cond": [
-                        {"$gt": ["$ingresos", 0]},
-                        {"$round": [{"$multiply": [{"$divide": ["$utilidad", "$ingresos"]}, 100]}, 2]},
-                        0,
-                    ]
-                },
-            }
-        },
-    ]
-    rows = _localize_category_rows(list(analytics_fact().aggregate(pipe, allowDiskUse=True)))
-    return {"rows": rows, "total": len(rows)}
-
-
-def rc08(*, limit: int = 20) -> dict[str, Any]:
-    db = get_db()
-    landing = db["sales_records"].estimated_document_count()
-    fact = db["fact_ventas"].estimated_document_count()
-    ready = strategic_ready()
-    lag = False
-    try:
-        from shared.analytics_sync import get_strategic_lag
-
-        lag = bool(get_strategic_lag().get("strategic_lagging"))
-    except Exception:
-        pass
-    last_build = None
-    try:
-        from shared.data_layers import layers_overview
-
-        last_build = layers_overview().get("last_build")
-    except Exception:
-        pass
-    rows = [
-        {
-            "indicador": "sales_records (landing)",
-            "valor": f"{landing:,}",
-            "estado": "OK" if landing else "Vacío",
-        },
-        {
-            "indicador": "fact_ventas (estratégico)",
-            "valor": f"{fact:,}",
-            "estado": "OK" if ready else "Vacío — Construir modelo o DAG Airflow",
-        },
-        {
-            "indicador": "Alineación landing ↔ fact",
-            "valor": f"Δ docs ≈ {landing - fact:,}",
-            "estado": "Desfasado" if lag or (landing and not fact) else "Alineado / aceptable",
-        },
-        {
-            "indicador": "Último build_model / ELT / Airflow",
-            "valor": last_build or "—",
-            "estado": "Registrado" if last_build else "Sin auditoría de build (el DAG Airflow también puede poblar la capa)",
-        },
-        {
-            "indicador": "Orquestación Airflow",
-            "valor": "globtrade_strategic_etl",
-            "estado": "UI http://localhost:8080 — rebuild diario (truncate+reload)",
-        },
-        {
-            "indicador": "strategic_ready",
-            "valor": str(ready),
-            "estado": "Listo para Tablero / RC" if ready else "Bloqueado",
-        },
-    ]
-    return {"rows": rows[:limit], "total": len(rows)}
-
-
-_RUNNERS: dict[str, Callable[..., dict[str, Any]]] = {
-    "RC-01": rc01,
-    "RC-02": rc02,
-    "RC-03": rc03,
-    "RC-04": rc04,
-    "RC-05": rc05,
-    "RC-06": rc06,
-    "RC-07": rc07,
-    "RC-08": rc08,
+_SOURCE_TABLES: dict[str, list[str]] = {
+    "RC-01": ["fact_sales", "inventory_snapshot"],
+    "RC-02": ["fact_sales", "inventory_snapshot"],
+    "RC-03": ["fact_sales", "fact_purchases"],
+    "RC-04": ["fact_sales", "inventory_snapshot"],
+    "RC-05": ["fact_logistics", "fact_sales"],
+    "RC-06": ["fact_sales", "coupon_catalog"],
+    "RC-07": ["fact_sales", "inventory_snapshot"],
+    "RC-08": ["etl_runs", "fact_sales", "fact_purchases", "inventory_snapshot", "fact_logistics"],
+    "RC-09": ["fact_purchases", "fact_sales"],
+    "RC-10": ["fact_purchases", "fact_sales"],
+    "RC-11": ["fact_sales", "fact_purchases"],
+    "RC-12": ["fact_sales", "fact_purchases"],
+    "RC-13": ["fact_sales", "inventory_snapshot"],
 }
 
 
-def run_complex_report(report_id: str, *, limit: int = 100) -> dict[str, Any]:
+def list_complex_catalog() -> list[dict[str, Any]]:
+    return [_meta(report) for report in COMPLEX_REPORTS]
+
+
+def _localize_category_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Compatibilidad para consumidores antiguos del catálogo de nombres."""
+    return [
+        {**row, "categoria": nom.category_label_from_name(row.get("categoria"))}
+        if "categoria" in row else dict(row)
+        for row in rows
+    ]
+
+
+def _filters(filters: dict[str, Any], alias: str = "") -> tuple[str, dict[str, Any]]:
+    prefix = f"{alias}." if alias else ""
+    clauses: list[str] = []
+    params: dict[str, Any] = {}
+    if filters.get("start"):
+        clauses.append(f"{prefix}sale_date >= {{start:Date}}")
+        params["start"] = date.fromisoformat(str(filters["start"])[:10])
+    if filters.get("end"):
+        clauses.append(f"{prefix}sale_date <= {{end:Date}}")
+        params["end"] = date.fromisoformat(str(filters["end"])[:10])
+    for key in ("category", "region", "channel"):
+        if filters.get(key):
+            clauses.append(f"{prefix}{key} = {{{key}:String}}")
+            params[key] = str(filters[key])
+    return (" AND " + " AND ".join(clauses)) if clauses else "", params
+
+
+def _sales_query(sql: str, limit: int, filters: dict[str, Any], alias: str = "") -> list[dict[str, Any]]:
+    where, params = _filters(filters, alias)
+    params["limit"] = limit
+    return query_rows(sql.replace("/*filters*/", where), params)
+
+
+def rc01(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = _filters(filters, "fs")
+    params["limit"] = limit
+    return query_rows("""
+      WITH stock AS (
+        SELECT category categoria, round(sum(stock),2) stock_actual
+        FROM inventory_snapshot FINAL GROUP BY categoria
+      )
+      SELECT formatDateTime(toStartOfMonth(fs.sale_date), '%Y-%m') mes, fs.category categoria,
+             uniqExact(fs.order_id) pedidos, round(sum(fs.units), 2) unidades,
+             round(sum(fs.revenue), 2) ingresos, round(sum(fs.profit), 2) utilidad,
+             ifNull(any(stock.stock_actual), 0) stock_actual
+      FROM fact_sales fs LEFT JOIN stock ON fs.category=stock.categoria
+      WHERE 1 /*filters*/ GROUP BY mes, categoria
+      ORDER BY mes, ingresos DESC LIMIT {limit:UInt32}
+    """.replace("/*filters*/", where), params)
+
+
+def rc02(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = _filters(filters)
+    params["limit"] = min(max(limit // 2, 5), 20)
+    return query_rows("""
+      WITH inv AS (
+        SELECT product_id, round(sum(stock),2) stock_actual
+        FROM inventory_snapshot FINAL GROUP BY product_id
+      ), totals AS (
+        SELECT product_id, product producto, category categoria, sum(units) unidades, round(sum(revenue), 2) ingresos
+        FROM fact_sales WHERE 1 /*filters*/ GROUP BY product_id, producto, categoria
+      ), ranked AS (
+        SELECT totals.producto producto, totals.categoria categoria, totals.unidades unidades,
+               totals.ingresos ingresos, ifNull(any(inv.stock_actual),0) stock_actual,
+               row_number() OVER (ORDER BY ingresos DESC) ranking_top,
+               row_number() OVER (ORDER BY ingresos ASC) ranking_bottom
+        FROM totals LEFT JOIN inv ON totals.product_id=inv.product_id
+        GROUP BY producto, categoria, unidades, ingresos
+      )
+      SELECT if(ranking_top <= {limit:UInt32}, ranking_top, ranking_bottom) ranking,
+             producto, categoria, round(unidades, 2) unidades, ingresos, stock_actual,
+             if(ranking_top <= {limit:UInt32}, 'Más vendidos', 'Menos vendidos') grupo
+      FROM ranked WHERE ranking_top <= {limit:UInt32} OR ranking_bottom <= {limit:UInt32}
+      ORDER BY grupo, ranking
+    """.replace("/*filters*/", where), params)
+
+
+def rc03(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"limit": limit}
+    sales_date = purchase_date = ""
+    if filters.get("start"):
+        params["start"] = date.fromisoformat(str(filters["start"])[:10]); sales_date += " AND sale_date >= {start:Date}"; purchase_date += " AND purchase_date >= {start:Date}"
+    if filters.get("end"):
+        params["end"] = date.fromisoformat(str(filters["end"])[:10]); sales_date += " AND sale_date <= {end:Date}"; purchase_date += " AND purchase_date <= {end:Date}"
+    return query_rows(f"""
+      WITH s AS (SELECT toStartOfMonth(sale_date) m, sum(revenue) ventas FROM fact_sales WHERE 1 {sales_date} GROUP BY m),
+           p AS (SELECT toStartOfMonth(purchase_date) m, sum(amount) compras FROM fact_purchases
+                 WHERE lowerUTF8(status) IN ('recibida','recibido','received','parcial') {purchase_date} GROUP BY m),
+           months AS (SELECT m FROM s UNION DISTINCT SELECT m FROM p)
+      SELECT formatDateTime(months.m, '%Y-%m') mes, round(ifNull(ventas,0),2) ventas,
+             round(ifNull(compras,0),2) compras, round(ifNull(ventas,0)-ifNull(compras,0),2) diferencia
+      FROM months LEFT JOIN s ON months.m=s.m LEFT JOIN p ON months.m=p.m
+      ORDER BY mes LIMIT {{limit:UInt32}}
+    """, params)
+
+
+def rc04(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = _filters(filters); params["limit"] = limit
+    return query_rows("""
+      WITH sold AS (SELECT category categoria, sum(units) unidades, dateDiff('day', min(sale_date), max(sale_date))+1 dias
+                    FROM fact_sales WHERE 1 /*filters*/ GROUP BY categoria),
+           stock AS (SELECT category categoria, sum(stock) existencias FROM inventory_snapshot FINAL GROUP BY categoria),
+           categories AS (SELECT categoria FROM sold UNION DISTINCT SELECT categoria FROM stock)
+      SELECT categories.categoria categoria, round(ifNull(unidades,0),2) unidades_vendidas,
+             round(ifNull(existencias,0),2) stock_actual,
+             round(if(existencias>0, unidades/existencias, 0),2) rotacion_aprox,
+             round(if(unidades>0, existencias/(unidades/greatest(dias,1)), 0),1) dias_cobertura
+      FROM categories LEFT JOIN sold ON categories.categoria=sold.categoria
+      LEFT JOIN stock ON categories.categoria=stock.categoria
+      ORDER BY rotacion_aprox DESC LIMIT {limit:UInt32}
+    """.replace("/*filters*/", where), params)
+
+
+def rc05(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    clauses, params = [], {"limit": limit}
+    if filters.get("start"):
+        clauses.append("created_date >= {start:Date}"); params["start"] = date.fromisoformat(str(filters["start"])[:10])
+    if filters.get("end"):
+        clauses.append("created_date <= {end:Date}"); params["end"] = date.fromisoformat(str(filters["end"])[:10])
+    if filters.get("region"):
+        clauses.append("region = {region:String}"); params["region"] = str(filters["region"])
+    where = (" AND " + " AND ".join(clauses)) if clauses else ""
+    return query_rows(f"""
+      WITH sales_region AS (
+        SELECT region, round(sum(revenue),2) ingresos
+        FROM fact_sales GROUP BY region
+      )
+      SELECT l.region region, count() pedidos, round(avg(l.days_to_ship),1) dias_promedio,
+             round(quantileExact(0.5)(days_to_ship),1) mediana_dias,
+             round(countIf(l.days_to_ship <= 3)/count()*100,1) cumplimiento_pct,
+             ifNull(any(sales_region.ingresos),0) ingresos
+      FROM fact_logistics l LEFT JOIN sales_region ON l.region=sales_region.region
+      WHERE l.days_to_ship IS NOT NULL {where}
+      GROUP BY region ORDER BY dias_promedio DESC LIMIT {{limit:UInt32}}
+    """, params)
+
+
+def rc06(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = _filters(filters, "s"); params["limit"] = limit
+    return query_rows("""
+      SELECT s.coupon cupon, uniqExact(s.order_id) usos, round(sum(s.revenue),2) ingresos_con_cupon,
+             round(sum(s.discount),2) descuento_total, round(sum(s.revenue)-sum(s.discount),2) ingreso_neto,
+             ifNull(any(c.active), false) activo
+      FROM fact_sales s LEFT JOIN coupon_catalog c ON s.coupon=c.code
+      WHERE s.coupon != '' /*filters*/ GROUP BY cupon ORDER BY usos DESC LIMIT {limit:UInt32}
+    """.replace("/*filters*/", where), params)
+
+
+def rc07(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = _filters(filters, "fs")
+    params["limit"] = limit
+    return query_rows("""
+      WITH stock AS (
+        SELECT category categoria, round(sum(stock),2) stock_actual
+        FROM inventory_snapshot FINAL GROUP BY categoria
+      )
+      SELECT formatDateTime(toStartOfMonth(fs.sale_date), '%Y-%m') mes, fs.category categoria,
+             round(sum(fs.revenue),2) ingresos, round(sum(fs.cost),2) costos, round(sum(fs.profit),2) utilidad,
+             round(if(sum(fs.revenue)>0,sum(fs.profit)/sum(fs.revenue)*100,0),2) margen_pct,
+             ifNull(any(stock.stock_actual),0) stock_actual
+      FROM fact_sales fs LEFT JOIN stock ON fs.category=stock.categoria
+      WHERE 1 /*filters*/ GROUP BY mes,categoria ORDER BY mes,categoria LIMIT {limit:UInt32}
+    """.replace("/*filters*/", where), params)
+
+
+def rc08(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = query_rows("SELECT loaded_at,status,rows_sales,rows_purchases,rows_inventory,rows_logistics FROM etl_runs ORDER BY loaded_at DESC LIMIT 1")
+    coverage = query_rows("""
+      SELECT
+        (SELECT count() FROM fact_sales) sales_rows,
+        (SELECT count() FROM fact_purchases) purchase_rows,
+        (SELECT count() FROM inventory_snapshot FINAL) inventory_rows,
+        (SELECT count() FROM fact_logistics) logistics_rows,
+        (SELECT uniqExact(product_id) FROM fact_sales WHERE product_id > 0) sold_products,
+        (SELECT uniqExact(product_id) FROM inventory_snapshot FINAL WHERE product_id > 0) stocked_products
+    """)
+    if not rows:
+        stats = coverage[0] if coverage else {}
+        return [
+            {"indicador": "ClickHouse", "valor": "Sin cargas", "estado": "Ejecuta el DAG globtrade_strategic_etl"},
+            {"indicador": "Ventas publicadas", "valor": int(stats.get("sales_rows") or 0), "estado": "Pendiente"},
+            {"indicador": "Inventario publicado", "valor": int(stats.get("inventory_rows") or 0), "estado": "Pendiente"},
+        ][:limit]
+    run = rows[0]
+    stats = coverage[0] if coverage else {}
+    return [
+        {"indicador": "Última carga", "valor": str(run["loaded_at"]), "estado": str(run["status"]).upper()},
+        {"indicador": "Ventas", "valor": int(run["rows_sales"]), "estado": "OK" if run["rows_sales"] else "Vacío"},
+        {"indicador": "Compras", "valor": int(run["rows_purchases"]), "estado": "OK"},
+        {"indicador": "Inventario", "valor": int(run["rows_inventory"]), "estado": "OK"},
+        {"indicador": "Logística", "valor": int(run["rows_logistics"]), "estado": "OK"},
+        {"indicador": "Cobertura ventas ↔ inventario", "valor": f"{int(stats.get('sold_products') or 0)} / {int(stats.get('stocked_products') or 0)} productos", "estado": "OK" if stats.get("sold_products") else "Sin producto"},
+    ][:limit]
+
+
+def rc09(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"limit": limit}
+    purchase_date = ""
+    if filters.get("start"):
+        params["start"] = date.fromisoformat(str(filters["start"])[:10]); purchase_date += " AND purchase_date >= {start:Date}"
+    if filters.get("end"):
+        params["end"] = date.fromisoformat(str(filters["end"])[:10]); purchase_date += " AND purchase_date <= {end:Date}"
+    return query_rows(f"""
+      WITH sales AS (
+        SELECT if(vendor='', 'Sin proveedor', vendor) proveedor, round(sum(profit),2) utilidad
+        FROM fact_sales GROUP BY proveedor
+      ), base AS (
+        SELECT vendor proveedor, round(sum(amount),2) compras, uniqExact(purchase_id) ordenes
+        FROM fact_purchases
+        WHERE lowerUTF8(status) IN ('recibida','recibido','received','parcial','enviada','sent') {purchase_date}
+        GROUP BY proveedor
+      ), total AS (SELECT sum(compras) total_compras FROM base)
+      SELECT base.proveedor proveedor, compras, ordenes, round(ifNull(any(sales.utilidad),0),2) utilidad,
+             round(if(total_compras>0, compras/total_compras*100, 0), 2) participacion_pct,
+             round(if(ordenes>0, compras/ordenes, 0), 2) ticket_promedio
+      FROM base CROSS JOIN total LEFT JOIN sales ON base.proveedor=sales.proveedor
+      GROUP BY proveedor, compras, ordenes, total_compras
+      ORDER BY compras DESC LIMIT {{limit:UInt32}}
+    """, params)
+
+
+def rc10(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = rc09(limit=limit, filters=filters)
+    result = []
+    for row in rows:
+        pct = float(row.get("participacion_pct") or 0)
+        riesgo = "Alto" if pct >= 45 else "Medio" if pct >= 25 else "Controlado"
+        decision = (
+            "Negociar respaldo o proveedor alterno."
+            if riesgo == "Alto"
+            else "Mantener seguimiento y comparar condiciones."
+            if riesgo == "Medio"
+            else "Dependencia saludable."
+        )
+        result.append({**row, "riesgo": riesgo, "decision": decision})
+    return result
+
+
+def rc11(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = _filters(filters, "fs")
+    params["limit"] = limit
+    return query_rows("""
+      WITH purchases AS (
+        SELECT vendor proveedor, round(sum(amount),2) compras
+        FROM fact_purchases
+        WHERE lowerUTF8(status) IN ('recibida','recibido','received','parcial','enviada','sent')
+        GROUP BY proveedor
+      )
+      SELECT if(fs.vendor='', 'Sin proveedor', fs.vendor) proveedor,
+             uniqExact(fs.order_id) pedidos, round(sum(fs.units),2) unidades,
+             ifNull(any(purchases.compras),0) compras,
+             round(sum(fs.revenue),2) ingresos, round(sum(fs.cost),2) costos, round(sum(fs.profit),2) utilidad,
+             round(if(sum(fs.revenue)>0,sum(fs.profit)/sum(fs.revenue)*100,0),2) margen_pct
+      FROM fact_sales fs LEFT JOIN purchases ON if(fs.vendor='', 'Sin proveedor', fs.vendor)=purchases.proveedor
+      WHERE 1 /*filters*/
+      GROUP BY proveedor
+      HAVING ingresos > 0
+      ORDER BY utilidad DESC, ingresos DESC
+      LIMIT {limit:UInt32}
+      SETTINGS prefer_column_name_to_alias = 1
+    """.replace("/*filters*/", where), params)
+
+
+def rc12(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"limit": limit}
+    sales_date = purchase_date = ""
+    if filters.get("start"):
+        params["start"] = date.fromisoformat(str(filters["start"])[:10])
+        sales_date += " AND sale_date >= {start:Date}"
+        purchase_date += " AND purchase_date >= {start:Date}"
+    if filters.get("end"):
+        params["end"] = date.fromisoformat(str(filters["end"])[:10])
+        sales_date += " AND sale_date <= {end:Date}"
+        purchase_date += " AND purchase_date <= {end:Date}"
+    for key in ("category", "region", "channel"):
+        if filters.get(key):
+            sales_date += f" AND {key} = {{{key}:String}}"
+            params[key] = str(filters[key])
+    rows = query_rows(f"""
+      WITH s AS (
+        SELECT if(vendor='', 'Sin proveedor', vendor) proveedor,
+               round(sum(revenue),2) ingresos, round(sum(profit),2) utilidad
+        FROM fact_sales WHERE 1 {sales_date} GROUP BY proveedor
+      ), p AS (
+        SELECT vendor proveedor, round(sum(amount),2) compras
+        FROM fact_purchases
+        WHERE lowerUTF8(status) IN ('recibida','recibido','received','parcial','enviada','sent') {purchase_date}
+        GROUP BY proveedor
+      ), names AS (
+        SELECT proveedor FROM s UNION DISTINCT SELECT proveedor FROM p
+      )
+      SELECT names.proveedor proveedor, round(ifNull(p.compras,0),2) compras,
+             round(ifNull(s.ingresos,0),2) ingresos, round(ifNull(s.utilidad,0),2) utilidad,
+             round(if(ifNull(p.compras,0)>0, ifNull(s.utilidad,0)/p.compras*100, 0),2) retorno_pct
+      FROM names LEFT JOIN s ON names.proveedor=s.proveedor LEFT JOIN p ON names.proveedor=p.proveedor
+      ORDER BY utilidad DESC, ingresos DESC, compras DESC
+      LIMIT {{limit:UInt32}}
+    """, params)
+    result = []
+    for row in rows:
+        retorno = float(row.get("retorno_pct") or 0)
+        utilidad = float(row.get("utilidad") or 0)
+        compras = float(row.get("compras") or 0)
+        if utilidad <= 0 and compras > 0:
+            decision = "Renegociar costo, revisar surtido o pausar compra."
+        elif retorno >= 40:
+            decision = "Proveedor estratégico: asegurar stock y mejores condiciones."
+        elif retorno >= 15:
+            decision = "Mantener y comparar precios con proveedores alternos."
+        elif compras == 0 and utilidad > 0:
+            decision = "Ventas con proveedor no registrado en compras; revisar trazabilidad."
+        else:
+            decision = "Seguimiento: utilidad baja frente a inversión."
+        result.append({**row, "decision": decision})
+    return result
+
+
+def rc13(*, limit: int, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    where, params = _filters(filters, "fs")
+    params["limit"] = limit
+    rows = query_rows("""
+      WITH inv AS (
+        SELECT product_id, round(sum(stock),2) stock_actual
+        FROM inventory_snapshot FINAL GROUP BY product_id
+      )
+      SELECT if(fs.vendor='', 'Sin proveedor', fs.vendor) proveedor, fs.product producto, fs.category categoria,
+             ifNull(any(inv.stock_actual),0) stock_actual,
+             round(sum(fs.revenue),2) ingresos, round(sum(fs.profit),2) utilidad,
+             round(if(sum(fs.revenue)>0,sum(fs.profit)/sum(fs.revenue)*100,0),2) margen_pct
+      FROM fact_sales fs LEFT JOIN inv ON fs.product_id=inv.product_id
+      WHERE fs.product_id > 0 /*filters*/
+      GROUP BY proveedor, producto, categoria
+      HAVING ingresos > 0
+      ORDER BY utilidad DESC, margen_pct DESC
+      LIMIT {limit:UInt32}
+      SETTINGS prefer_column_name_to_alias = 1
+    """.replace("/*filters*/", where), params)
+    result = []
+    for row in rows:
+        margen = float(row.get("margen_pct") or 0)
+        utilidad = float(row.get("utilidad") or 0)
+        if utilidad <= 0:
+            decision = "No reponer sin revisar costo/precio."
+        elif margen >= 35:
+            decision = "Impulsar y proteger inventario."
+        elif margen >= 18:
+            decision = "Mantener; buscar mejora de costo."
+        else:
+            decision = "Renegociar margen antes de escalar ventas."
+        result.append({**row, "decision": decision})
+    return result
+
+
+_RUNNERS: dict[str, Callable[..., list[dict[str, Any]]]] = {
+    "RC-01": rc01, "RC-02": rc02, "RC-03": rc03, "RC-04": rc04, "RC-05": rc05,
+    "RC-06": rc06, "RC-07": rc07, "RC-08": rc08, "RC-09": rc09, "RC-10": rc10,
+    "RC-11": rc11, "RC-12": rc12, "RC-13": rc13,
+}
+
+
+def run_complex_report(report_id: str, *, limit: int = 100, filters: dict[str, Any] | None = None) -> dict[str, Any]:
     rid = (report_id or "").strip().upper()
-    meta = COMPLEX_BY_ID.get(rid)
-    if not meta:
+    report = COMPLEX_BY_ID.get(rid)
+    if not report:
         raise ValueError("unknown_report")
-    data = _RUNNERS[rid](limit=limit)
-    return {
-        "report": {
-            "id": meta["id"],
-            "name": meta["name"],
-            "objetivo": meta["objetivo"],
-            "para_que": meta["para_que"],
-            "quien": meta["quien"],
-            "tipo": "compuesto",
-            "columns": meta["columns"],
-            "data_layer": "estrategico",
-        },
-        **data,
-    }
+    if not ping_clickhouse():
+        message = "ClickHouse no está disponible. Inicia el servicio y ejecuta el DAG globtrade_strategic_etl."
+        rows = []
+        if rid == "RC-08":
+            rows = [
+                {"indicador": "ClickHouse", "valor": "Sin conexión", "estado": "Detenido"},
+                {"indicador": "Publicación de fact_ventas", "valor": "No verificable", "estado": "Pendiente"},
+                {"indicador": "Acción requerida", "valor": "Ejecutar DAG", "estado": "globtrade_strategic_etl"},
+            ]
+        return {"report": _meta(report), "chart": report["chart"], "rows": rows, "total": len(rows), "message": message}
+    ensure_database_and_schema()
+    try:
+        rows = _RUNNERS[rid](limit=max(1, min(int(limit), 2000)), filters=filters or {})
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid_filters") from exc
+    return {"report": _meta(report), "chart": report["chart"], "rows": rows, "total": len(rows), "filters": filters or {}}

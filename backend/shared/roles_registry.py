@@ -5,7 +5,7 @@ from typing import Any
 
 # Páginas SPA (data-page)
 PAGE_CATALOG: dict[str, dict[str, str]] = {
-    "dashboard": {"label": "Tablero", "section": "ops"},
+    "dashboard": {"label": "Tablero estratégico", "section": "q2"},
     "tienda": {"label": "Tienda", "section": "ops"},
     "mis-pedidos": {"label": "Mis pedidos", "section": "ops"},
     "ventas": {"label": "Pedidos y ventas", "section": "ops"},
@@ -14,15 +14,15 @@ PAGE_CATALOG: dict[str, dict[str, str]] = {
     "soporte": {"label": "Soporte", "section": "ops"},
     "decisiones": {"label": "Decisiones", "section": "q2"},
     "reportes-compuestos": {"label": "Informes compuestos", "section": "q2"},
-    "orders": {"label": "Explorar ventas", "section": "q2"},
+    "orders": {"label": "Explorar ventas", "section": "gestion"},
     "trends": {"label": "Tendencia de ventas", "section": "q2"},
     "regions": {"label": "Ventas por región", "section": "q2"},
     "products": {"label": "Ventas por categoría", "section": "q2"},
-    "catalogo": {"label": "Catálogo analítico", "section": "q2"},
-    "reportes": {"label": "Informes simples", "section": "q2"},
-    "export": {"label": "Exportar datos", "section": "q2"},
+    "catalogo": {"label": "Catálogo analítico", "section": "gestion"},
+    "reportes": {"label": "Informes operativos", "section": "gestion"},
+    "export": {"label": "Descargar datos", "section": "gestion"},
     "company": {"label": "Empresa", "section": "admin"},
-    "gestion": {"label": "Gestión", "section": "gestion"},
+    "gestion": {"label": "Maestros tácticos", "section": "gestion"},
     "schema": {"label": "Modelo de datos", "section": "admin"},
     "load": {"label": "Carga de datos", "section": "admin"},
     "audit": {"label": "Auditoría", "section": "admin"},
@@ -30,9 +30,9 @@ PAGE_CATALOG: dict[str, dict[str, str]] = {
 }
 
 SECTION_LABELS: dict[str, str] = {
-    "ops": "Operacionales",
-    "q2": "Estratégicas",
-    "gestion": "Gestión",
+    "ops": "Operativo",
+    "q2": "Estratégico",
+    "gestion": "Táctico",
     "admin": "Administración",
 }
 
@@ -40,7 +40,7 @@ PERMISSION_CATALOG: dict[str, str] = {
     "shop.checkout": "Solicitar compra en vitrina",
     "shop.view": "Ver catálogo tienda",
     "orders.read": "Explorar ventas históricas",
-    "analysis.export": "Exportar CSV",
+    "analysis.export": "Exportar PDF",
     "decisiones.view": "Panel de decisiones de negocio",
     "ventas.manage": "Gestionar solicitudes comerciales",
     "ventas.convert_bypass": "Convertir venta sin aprobación previa",

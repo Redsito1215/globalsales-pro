@@ -42,3 +42,30 @@ def stock():
 def funnel():
     days = int(request.args.get("days", 7) or 7)
     return jsonify({"status": "ok", **services.commercial_funnel(days=days)})
+
+
+@decisiones_bp.get("/portafolio")
+@login_required
+@permission_required("decisiones.view")
+def portafolio():
+    days = int(request.args.get("days", 90) or 90)
+    limit = int(request.args.get("limit", 20) or 20)
+    return jsonify({"status": "ok", **services.product_portfolio(lookback_days=days, limit=limit)})
+
+
+@decisiones_bp.get("/pronostico")
+@login_required
+@permission_required("decisiones.view")
+def pronostico():
+    months = int(request.args.get("months", 12) or 12)
+    horizon = int(request.args.get("horizon", 3) or 3)
+    limit = int(request.args.get("limit", 12) or 12)
+    return jsonify({"status": "ok", **services.demand_forecast(months=months, horizon=horizon, limit=limit)})
+
+
+@decisiones_bp.get("/rentabilidad-real")
+@login_required
+@permission_required("decisiones.view")
+def rentabilidad_real():
+    limit = int(request.args.get("limit", 20) or 20)
+    return jsonify({"status": "ok", **services.true_profitability(limit=limit)})

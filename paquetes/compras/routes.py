@@ -1,7 +1,7 @@
 """Rutas — compras, proveedores e inventario."""
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 
 from auth.decorators import login_required, permission_required
 from paquetes.compras import services
@@ -17,12 +17,17 @@ def _err(exc: ValueError):
         "invalid_vendor": ("Proveedor no válido.", 400),
         "invalid_variant": ("Variante no encontrada.", 404),
         "invalid_line": ("Línea inválida.", 400),
+        "invalid_unit_cost": ("El costo unitario debe ser mayor a 0.", 400),
         "lines_required": ("Indique al menos una línea.", 400),
         "po_closed": ("La orden ya está cerrada.", 409),
         "po_not_draft": ("Solo se puede enviar una OC en borrador.", 409),
         "po_not_sent": ("Envía la OC antes de recibir mercancía.", 409),
         "no_lines": ("La orden no tiene líneas.", 400),
         "nothing_to_receive": ("No hay cantidades pendientes por recibir.", 400),
+        "po_not_received": ("Solo se puede devolver una OC recibida.", 409),
+        "return_exceeds_received": ("La devolución supera la cantidad recibida disponible.", 400),
+        "insufficient_stock_for_return": ("No hay existencias suficientes para devolver al proveedor.", 409),
+        "nothing_to_return": ("Indica al menos una unidad para devolver.", 400),
         "invalid_country": ("País del proveedor no válido.", 400),
         "invalid_region": ("Continente del proveedor no válido.", 400),
         "req_not_draft": ("Solo se puede aprobar una requisición en borrador.", 409),
@@ -45,6 +50,9 @@ def _err(exc: ValueError):
         "client_required": ("Indique el correo del cliente.", 400),
         "invalid_margin_group": ("Agrupación de margen no válida.", 400),
         "invalid_inventory_policy": ("El objetivo debe ser igual o mayor al mínimo.", 400),
+        "invalid_lot": ("Indique código de lote y cantidad válidos.", 400),
+        "invalid_expiry_date": ("La fecha de caducidad no es válida.", 400),
+        "lot_expiry_conflict": ("Ese lote ya existe con otra fecha de caducidad.", 409),
     }
     msg, status = messages.get(code, (code, 400))
     return jsonify({"status": "error", "message": msg, "code": code}), status
@@ -232,8 +240,25 @@ def po_send(po_id: int):
 def po_receive(po_id: int):
     body = request.get_json(silent=True) or {}
     try:
-        row = services.receive_purchase_order(po_id, receipts=body.get("receipts"))
+        row = services.receive_purchase_order(
+            po_id, receipts=body.get("receipts"), actor_email=session.get("email")
+        )
         return jsonify({"status": "ok", "order": row, "message": "Recepción aplicada al inventario."})
+    except ValueError as e:
+        return _err(e)
+
+
+@compras_bp.post("/purchase-orders/<int:po_id>/return")
+@login_required
+@permission_required("compras.manage")
+def po_return(po_id: int):
+    body = request.get_json(silent=True) or {}
+    try:
+        row = services.return_purchase_order(
+            po_id, returns=body.get("returns") or [], reason=body.get("reason") or "",
+            actor_email=session.get("email"),
+        )
+        return jsonify({"status": "ok", "order": row, "message": "Devolución al proveedor registrada."}), 201
     except ValueError as e:
         return _err(e)
 

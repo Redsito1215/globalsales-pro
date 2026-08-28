@@ -477,7 +477,7 @@
       <div class="detail-label" style="margin-bottom:6px">${o.title || 'Historial de auditoría'}</div>
       <ul class="audit-trail-list">
         ${rows.map((e) => `<li>
-          <span class="audit-trail-at">${(e.at || '').replace('T', ' ').slice(0, 19) || '—'}</span>
+          <span class="audit-trail-at">${window.formatBusinessDateTime ? window.formatBusinessDateTime(e.at) : ((e.at || '').replace('T', ' ').slice(0, 19) || '—')}</span>
           <strong>${label(e.action)}</strong>
           <span class="audit-trail-meta">${e.email || e.role || ''}${e.entity_id != null ? ` · #${e.entity_id}` : ''}</span>
         </li>`).join('')}
@@ -531,10 +531,15 @@
       const backdrop = modal.querySelector('[data-ops-confirm-cancel]');
       let settled = false;
 
+      const noticeOnly = opts.notice === true || (opts.confirmLabel || '').trim().toLowerCase() === 'cerrar';
+      modal.classList.toggle('ops-confirm--wide', opts.wide === true);
+
       titleEl.textContent = opts.title || 'Confirmar';
-      msgEl.textContent = opts.message || '';
+      if (opts.html) msgEl.innerHTML = opts.html;
+      else msgEl.textContent = opts.message || '';
       okBtn.textContent = opts.confirmLabel || 'Confirmar';
       cancelBtn.textContent = opts.cancelLabel || 'Cancelar';
+      cancelBtn.hidden = noticeOnly;
       okBtn.className = 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary');
 
       function finish(result) {
@@ -572,6 +577,12 @@
       modal.setAttribute('aria-hidden', 'false');
       requestAnimationFrame(() => okBtn.focus());
     });
+  };
+
+  /** Aviso informativo: una sola acción inequívoca, Cerrar. */
+  window.opsNotice = function opsNotice(opts) {
+    const o = typeof opts === 'string' ? { message: opts } : (opts || {});
+    return window.opsConfirm({ ...o, notice: true, confirmLabel: o.confirmLabel || 'Cerrar' });
   };
 
   function ensurePromptModal() {
@@ -696,4 +707,31 @@
       });
     });
   };
+
+  function enforceNumericMinimum(input, silent) {
+    if (!(input instanceof HTMLInputElement) || input.type !== 'number') return;
+    const minAttr = input.getAttribute('min');
+    if (minAttr == null || minAttr === '') return;
+    const min = Number(minAttr);
+    if (!Number.isFinite(min)) return;
+    const raw = String(input.value || '').trim();
+    if (!raw) return;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < min) {
+      input.value = String(min);
+      if (!silent && typeof window.notifyWarn === 'function') {
+        window.notifyWarn(`El valor mínimo permitido es ${min}.`);
+      }
+    }
+  }
+
+  document.addEventListener('input', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.type !== 'number') return;
+    if (String(input.value || '').startsWith('-')) enforceNumericMinimum(input, true);
+  });
+
+  document.addEventListener('blur', (event) => {
+    enforceNumericMinimum(event.target, false);
+  }, true);
 })();

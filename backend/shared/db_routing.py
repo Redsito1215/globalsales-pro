@@ -47,6 +47,8 @@ OPS_COLLECTIONS: frozenset[str] = frozenset(
         "app_roles",
         "audit_log",
         "app_meta",
+        "management_goals",
+        "management_approvals",
     }
 )
 

@@ -82,6 +82,13 @@ def test_plan_return_stock_apto_danado_mixto():
             inspections=[{"variant_id": 1, "restock_qty": 1, "damaged_qty": 1}, {"variant_id": 2, "restock_qty": 1, "damaged_qty": 1}],
         )
 
+    restock, damaged = plan_return_stock(
+        lines, condition="mixto", partial=True,
+        inspections=[{"variant_id": 2, "restock_qty": 1, "damaged_qty": 0}],
+    )
+    assert restock == [{"variant_id": 2, "quantity": 1}]
+    assert damaged == []
+
 
 def test_compras_po_statuses():
     from paquetes.compras.services import PO_STATUSES
@@ -410,12 +417,12 @@ def test_login_no_muestra_texto_ni_error_vacio():
     assert "display: none" in css.split(".login-error:empty", 1)[1].split("}", 1)[0]
 
 
-def test_airflow_no_sobrescribe_historico_automaticamente():
+def test_airflow_actualiza_clickhouse_diariamente():
     from pathlib import Path
 
     dag = (Path(__file__).resolve().parents[1] / "airflow/dags/globtrade_strategic_etl.py").read_text(encoding="utf-8")
-    assert "schedule=None" in dag
-    assert 'schedule="0 2 * * *"' not in dag
+    assert 'schedule="0 2 * * *"' in dag
+    assert "max_active_runs=1" in dag
 
 
 def test_enable_role_reactiva(monkeypatch):
@@ -963,7 +970,7 @@ def test_compuestos_rc08_estado_elt():
     data = run_complex_report("RC-08")
     assert data["report"]["tipo"] == "compuesto"
     assert data["total"] >= 3
-    assert any("fact_ventas" in str(r.get("indicador")) for r in data["rows"])
+    assert any(str(r.get("indicador")) in {"Ventas", "fact_ventas"} for r in data["rows"])
 
 
 def test_compuestos_categorias_en_espanol():
@@ -1596,26 +1603,6 @@ def test_rebuild_monthly_kpis_for_month(monkeypatch):
     assert kpis[0]["total_revenue"] == 30.0
     assert kpis[0]["year"] == 2024
     assert kpis[0]["month"] == 3
-
-
-def test_sem1_legacy_solo_administrador():
-    from frontend.app import app
-
-    client = app.test_client()
-    r = client.get("/sem1")
-    assert r.status_code == 302
-    assert r.location.endswith("/")
-
-    with client.session_transaction() as sess:
-        sess["role"] = "vendedor"
-    assert client.get("/sem1").status_code == 302
-
-    with client.session_transaction() as sess:
-        sess["role"] = "administrador"
-    r_admin = client.get("/sem1")
-    assert r_admin.status_code == 200
-    assert r_admin.headers.get("X-Globtrade-Legacy") == "sem1"
-    assert r_admin.headers.get("Deprecation") == "true"
 
 
 def test_app_registra_rutas_fase4():

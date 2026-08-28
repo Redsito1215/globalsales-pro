@@ -1,4 +1,4 @@
-"""Catálogo mayorista Q1 — 10 productos por category_id (totales = sales_records)."""
+"""Catálogo analítico Q1 por categoría y producto."""
 from __future__ import annotations
 
 from typing import Any
@@ -36,10 +36,10 @@ def _products_from_mongo(category_id: int) -> list[dict[str, Any]]:
     db = get_db()
     rows = list(
         db["dim_producto"]
-        .find({"category_id": cid}, {"_id": 0})
+        .find({"category_id": cid, "active": {"$ne": False}}, {"_id": 0})
         .sort([("line", 1), ("product_id", 1)])
     )
-    if len(rows) >= modelo.PRODUCTS_PER_CATEGORY:
+    if rows:
         return [_row_from_mongo(r) for r in rows]
 
     name = nombres.category_name(cid)
@@ -58,27 +58,60 @@ def _product_count_by_category() -> dict[int, int]:
     db = get_db()
     counts: dict[int, int] = {}
     for row in db["dim_producto"].aggregate(
-        [{"$group": {"_id": "$category_id", "n": {"$sum": 1}}}]
+        [
+            {"$match": {"active": {"$ne": False}}},
+            {"$group": {"_id": "$category_id", "n": {"$sum": 1}}},
+        ]
     ):
         counts[int(row["_id"])] = int(row["n"])
     return counts
 
 
 def list_categories() -> dict[str, Any]:
-    """12 categorías oficiales (IDs 1–12)."""
+    """Categorías activas con cantidad de productos y totales comerciales."""
+    from shared.mongo import get_db
+
+    db = get_db()
     counts = _product_count_by_category()
+    category_docs = list(
+        db["dim_categoria"].find(
+            {"active": {"$ne": False}},
+            {"_id": 0, "category_id": 1, "name": 1, "description": 1,
+             "sale_enabled": 1, "sale_percent": 1},
+        )
+    )
+    category_by_id = {int(row["category_id"]): row for row in category_docs}
+    totals: dict[int, dict[str, float]] = {}
+    for row in db["dim_producto"].aggregate([
+        {"$match": {"active": {"$ne": False}}},
+        {"$group": {
+            "_id": "$category_id",
+            "revenue": {"$sum": {"$ifNull": ["$revenue", 0]}},
+            "units": {"$sum": {"$ifNull": ["$units", 0]}},
+        }},
+    ]):
+        totals[int(row["_id"])] = {
+            "revenue": float(row.get("revenue") or 0),
+            "units": float(row.get("units") or 0),
+        }
     rows: list[dict[str, Any]] = []
-    for cid in sorted(nombres.CATEGORY_BY_ID.keys()):
-        name = nombres.CATEGORY_BY_ID[cid]
+    has_category_master = db["dim_categoria"].estimated_document_count() > 0
+    category_ids = sorted(category_by_id) if has_category_master else sorted(nombres.CATEGORY_BY_ID)
+    for cid in category_ids:
+        doc = category_by_id.get(cid, {})
+        name = doc.get("name") or nombres.CATEGORY_BY_ID.get(cid, f"Categoría {cid}")
         n = counts.get(cid, modelo.PRODUCTS_PER_CATEGORY)
-        if n < modelo.PRODUCTS_PER_CATEGORY:
-            n = modelo.PRODUCTS_PER_CATEGORY
+        amount = totals.get(cid, {})
         rows.append(
             {
                 "category_id": cid,
                 "name": name,
-                "description": modelo.CATEGORY_DESC.get(name, ""),
+                "description": doc.get("description") or modelo.CATEGORY_DESC.get(name, ""),
                 "product_count": n,
+                "revenue": round(float(amount.get("revenue") or 0), 2),
+                "units": int(amount.get("units") or 0),
+                "sale_enabled": bool(doc.get("sale_enabled")),
+                "sale_percent": int(doc.get("sale_percent") or 25),
             }
         )
     return {"catalog_version": CATALOG_VERSION, "items": rows}
@@ -90,9 +123,15 @@ def list_products_for_category(
     offset: int = 0,
 ) -> dict[str, Any]:
     """Productos de una categoría — siempre desde dim_producto / modelo oficial."""
+    from shared.mongo import get_db
+
     limit = max(1, min(limit, 96))
     offset = max(0, offset)
-    items = _products_from_mongo(int(category_id))
+    db = get_db()
+    category = db["dim_categoria"].find_one(
+        {"category_id": int(category_id)}, {"_id": 0, "active": 1}
+    )
+    items = [] if category and category.get("active") is False else _products_from_mongo(int(category_id))
     total = len(items)
     page = items[offset : offset + limit]
 

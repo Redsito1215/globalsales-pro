@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request, session
+from pathlib import Path
+import uuid
 
 from auth import roles_service, users as user_store
 from auth.decorators import login_required, permission_required
@@ -169,6 +171,15 @@ def me():
     )
 
 
+@auth_bp.get("/profile/suggestions")
+@login_required
+def profile_suggestions():
+    doc = user_store.find_by_id(session["user_id"])
+    if not doc:
+        return jsonify({"status": "error", "message": "Usuario no encontrado."}), 404
+    return jsonify({"status": "ok", "suggestions": user_store.profile_suggestions(doc)})
+
+
 @auth_bp.get("/access")
 def access():
     return jsonify({"status": "ok", **_access_for_session()})
@@ -200,6 +211,8 @@ def profile_update():
         password_confirm=password_confirm,
         email_changed=email_changed,
         password_change=password_change,
+        phone=body.get("phone") or "",
+        language=body.get("language") or "es",
     )
     if errors:
         return jsonify({"status": "error", "message": "Datos inválidos.", "errors": errors}), 400
@@ -211,6 +224,7 @@ def profile_update():
             email=email,
             current_password=current_password or None,
             new_password=new_password or None,
+            profile_data=body,
         )
     except ValueError as e:
         return _profile_error(e)
@@ -225,13 +239,37 @@ def profile_update():
         details={"email_changed": email_changed, "password_change": password_change},
     )
     return jsonify(
-        {
-            "status": "ok",
-            "message": "Perfil actualizado.",
-            "user": user,
-            "access": _access_for_session(),
-        }
+        {"status": "ok", "message": "Perfil actualizado.", "user": user, "access": _access_for_session()}
     )
+
+
+@auth_bp.post("/profile/avatar")
+@login_required
+def profile_avatar():
+    upload = request.files.get("avatar") or request.files.get("file")
+    if not upload or not upload.filename:
+        return jsonify({"status": "error", "message": "Selecciona una imagen."}), 400
+    raw = upload.read()
+    if not raw or len(raw) > 3 * 1024 * 1024:
+        return jsonify({"status": "error", "message": "La imagen debe pesar menos de 3 MB."}), 400
+    signatures = [(b"\x89PNG\r\n\x1a\n", ".png"), (b"\xff\xd8\xff", ".jpg")]
+    suffix = next((ext for signature, ext in signatures if raw.startswith(signature)), None)
+    if suffix is None and raw.startswith(b"RIFF") and raw[8:12] == b"WEBP":
+        suffix = ".webp"
+    if not suffix:
+        return jsonify({"status": "error", "message": "Usa una imagen PNG, JPG o WebP."}), 400
+    root = Path(__file__).resolve().parents[2]
+    directory = root / "frontend" / "static" / "uploads" / "avatars"
+    directory.mkdir(parents=True, exist_ok=True)
+    filename = f"{session['user_id']}_{uuid.uuid4().hex[:10]}{suffix}"
+    (directory / filename).write_bytes(raw)
+    avatar_url = f"/static/uploads/avatars/{filename}"
+    try:
+        user = user_store.update_avatar(session["user_id"], avatar_url)
+    except ValueError:
+        (directory / filename).unlink(missing_ok=True)
+        return jsonify({"status": "error", "message": "Usuario no encontrado."}), 404
+    return jsonify({"status": "ok", "avatar_url": avatar_url, "user": user})
 
 
 @auth_bp.get("/roles")
@@ -484,4 +522,3 @@ def notifications_read_category():
         return jsonify({"status": "ok", "marked": n})
     except ValueError:
         return jsonify({"status": "error", "message": "Indica una categoría.", "code": "category_required"}), 400
-

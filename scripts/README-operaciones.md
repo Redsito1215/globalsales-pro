@@ -36,6 +36,10 @@ Verificación de respaldos existentes:
 
 ```powershell
 python scripts/verify_backups.py
+
+Restauración protegida (crea antes un respaldo preventivo):
+
+`powershell -File .\scripts\restore_mongo.ps1 -BackupId globtrade-AAAAMMDD-HHmmss -Confirm RESTAURAR-globtrade-AAAAMMDD-HHmmss`
 ```
 
 Para automatizarlo diariamente en Windows, crea una tarea en el Programador de tareas que ejecute:
@@ -81,10 +85,6 @@ Con sesión y permiso `elt.run`, `ops-live.js` consulta cada 2 min si hay `strat
 ## ELT con Airflow
 
 DAG `globtrade_strategic_etl` en `airflow/dags/`. UI Airflow en `:8080` cuando el stack Airflow está levantado. Ver `airflow/README.md`.
-
-## Vista histórica sem1
-
-Rutas `/sem1` y `/sem1/master` solo para **administrador** (desde Perfil → Vista histórica). Se conserva como referencia del tablero anterior.
 
 ## CI
 

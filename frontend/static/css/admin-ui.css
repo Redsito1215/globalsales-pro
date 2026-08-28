@@ -18,6 +18,54 @@
   min-width: 640px;
 }
 
+.company-slide-image-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none !important;
+}
+
+input,
+select,
+textarea,
+button,
+.btn,
+.badge,
+.page-panel,
+.table-box,
+.modal-card {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+td,
+th,
+.detail-grid,
+.detail-table,
+.detail-totals,
+.order-actions-cell {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+details > summary {
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
 .table-box--admin td code,
 .table-box--admin th code {
   font-family: var(--mono);
@@ -199,6 +247,11 @@
 
 #ops-confirm-modal .modal-card {
   max-width: 26rem;
+}
+
+#ops-confirm-modal.ops-confirm--wide .modal-card {
+  width: min(94vw, 760px);
+  max-width: min(94vw, 760px);
 }
 
 #ops-confirm-modal .ops-confirm-actions {
@@ -476,17 +529,72 @@
 }
 
 #login-modal .modal-card,
-#register-modal .modal-card,
-#profile-modal .modal-card {
+#register-modal .modal-card {
   max-width: min(92vw, 420px);
 }
+
+#profile-modal .modal-card {
+  max-width: min(94vw, 760px);
+}
+
+.profile-tabs { display:flex; gap:.35rem; overflow-x:auto; margin:0 0 1rem; padding-bottom:.35rem; border-bottom:1px solid var(--border); }
+.profile-tab-btn { flex:0 0 auto; border:0; border-radius:8px; background:transparent; color:var(--muted); padding:.6rem .75rem; font:600 .75rem/1 var(--font-ui); cursor:pointer; }
+.profile-tab-btn.is-active { background:var(--surface2); color:var(--text); box-shadow:inset 0 -2px 0 var(--accent); }
+.profile-tab-panel { min-height:15rem; }
+.profile-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; }
+.profile-avatar-row { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; }
+.profile-avatar-preview { width:5rem; height:5rem; flex:0 0 5rem; display:grid; place-items:center; overflow:hidden; border-radius:50%; background:var(--surface2); border:2px solid var(--accent); color:var(--text); font-size:1.6rem; font-weight:700; }
+.profile-avatar-preview img { width:100%; height:100%; object-fit:cover; }
+.profile-access-summary { padding:1rem; margin-bottom:1rem; border:1px solid var(--border); border-radius:10px; background:var(--surface2); }
+.profile-access-summary > strong { display:block; margin:.25rem 0 .7rem; font-size:1.15rem; }
+.ops-chip[data-order-filter] { cursor:pointer; font:inherit; color:inherit; }
+.ops-chip[data-order-filter].is-active { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 18%,transparent); }
+.order-actions-cell { white-space:normal; min-width:14rem; }
+.password-field { position:relative; width:100%; }
+.password-field > input { width:100%; padding-right:2.75rem !important; }
+.password-toggle { position:absolute; right:.35rem; top:50%; transform:translateY(-50%); width:2.15rem; height:2.15rem; display:grid; place-items:center; border:0; border-radius:7px; background:transparent; color:var(--muted); cursor:pointer; }
+.password-toggle:hover,.password-toggle:focus-visible { color:var(--text); background:var(--surface2); }
+@media(max-width:640px){.profile-form-grid{grid-template-columns:1fr}.profile-tab-panel{min-height:0}.modal-card--profile{max-height:92vh;overflow:auto}}
 
 #solicitud-modal .modal-card,
 #pago-modal .modal-card,
 #devolver-modal .modal-card,
-#po-detail-modal .modal-card,
-#solicitud-detail-modal .modal-card {
+#po-detail-modal .modal-card {
   max-width: min(92vw, 560px);
+}
+
+#solicitud-detail-modal .modal-card {
+  width: min(94vw, 900px);
+  max-width: min(94vw, 900px);
+  max-height: 90vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#solicitud-detail-modal .detail-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+#solicitud-detail-modal .detail-table th:first-child,
+#solicitud-detail-modal .detail-table td:first-child { width: 48%; overflow-wrap: anywhere; }
+#solicitud-detail-modal .detail-table th:not(:first-child),
+#solicitud-detail-modal .detail-table td:not(:first-child) { text-align: right; white-space: nowrap; }
+
+.ops-confirm-content { display:grid; gap:.75rem; }
+.kardex-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
+.kardex-summary > div { padding:.65rem; border:1px solid var(--border); border-radius:9px; background:var(--surface2); }
+.kardex-summary small { display:block; color:var(--muted); }
+.kardex-summary strong { display:block; margin-top:.2rem; font-size:1.05rem; }
+.kardex-table { width:100%; min-width:0; font-size:.75rem; }
+.kardex-table th,.kardex-table td { padding:.48rem .42rem; border-bottom:1px solid var(--border); vertical-align:top; }
+.kardex-qty--in { color:#15735f; font-weight:700; }
+.kardex-qty--out { color:#b23a3a; font-weight:700; }
+
+@media(max-width:640px){
+  #solicitud-detail-modal .detail-table th:nth-child(4),
+  #solicitud-detail-modal .detail-table td:nth-child(4){display:none}
+  .kardex-summary{grid-template-columns:1fr}
 }
 
 #reportes-ai-modal .modal-card {
@@ -532,16 +640,20 @@
 }
 
 .sale-percent-input {
-  width: 2.6rem;
-  height: 1.35rem;
-  padding: 0 0.2rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 4px;
-  font-size: 0.7rem;
+  width: 4.25rem;
+  min-width: 4.25rem;
+  height: 2.15rem;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 700;
   text-align: center;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--surface);
+  color: var(--text);
 }
+
+.sale-percent-input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); border-color: var(--accent); }
 
 .sale-toggle-cell {
   vertical-align: middle;
@@ -605,3 +717,14 @@
   background: #fff;
   border-color: #fff;
 }
+/* Empresa: formulario editorial y carrusel */
+#page-company .company-admin-panel { margin-bottom:1.5rem; padding:clamp(1rem,2vw,1.5rem); border-radius:16px; }
+#page-company .company-admin-fields { display:grid; gap:.75rem; }
+#page-company .company-admin-fields .fg { min-width:0; }
+#page-company .company-admin-fields input,#page-company .company-admin-fields textarea { width:100%; }
+.company-carousel-toolbar { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-top:.65rem; padding-top:1rem; border-top:1px solid var(--border); }
+.company-hero-slides { display:grid; gap:.85rem; }
+.company-hero-slide { padding:1rem; border:1px solid var(--border); border-radius:12px; background:var(--surface2); }
+.company-hero-slide-head { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.75rem; }
+.company-hero-slide .fg-row { display:grid; grid-template-columns:1.4fr 1fr; gap:.75rem; }
+@media (max-width:620px) { .company-hero-slide .fg-row { grid-template-columns:1fr; } }

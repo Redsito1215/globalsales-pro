@@ -7,6 +7,10 @@ function commercialEsc(value) {
 function commercialMoney(value) {
   return '$' + Number(value || 0).toLocaleString('es-EC', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
+function commercialDate(value, fallback = 'Actual') {
+  if (!value) return fallback;
+  return window.formatBusinessDateTime ? window.formatBusinessDateTime(value) : String(value).replace('T', ' ').slice(0, 19);
+}
 async function commercialFetch(url, options = {}) {
   const response = await fetch(url, {headers: {'Content-Type':'application/json', ...(options.headers || {})}, ...options});
   const data = await response.json().catch(() => ({}));
@@ -159,7 +163,7 @@ async function loadCommercialHistory(id, title) {
   try {
     const data = await commercialFetch(`/api/shop/products/${id}/price-history`); const rows = data.history || [];
     document.getElementById('commercial-history-title').textContent = `Historial · ${title}`; box.hidden = false;
-    body.innerHTML = rows.length ? rows.map(r => `<tr><td>${commercialEsc((r.effective_from || '').slice(0,19))}</td><td>${commercialEsc((r.effective_to || 'Actual').slice(0,19))}</td><td>${commercialMoney(r.unit_price)}</td><td>${commercialMoney(r.unit_cost)}</td><td>${r.sale_enabled ? `${r.sale_percent || 0}%` : 'No'}</td><td>${Number(r.margin_pct || 0).toFixed(2)}%</td></tr>`).join('') : '<tr><td colspan="6">Aún no hay cambios registrados.</td></tr>';
+    body.innerHTML = rows.length ? rows.map(r => `<tr><td>${commercialEsc(commercialDate(r.effective_from, '—'))}</td><td>${commercialEsc(commercialDate(r.effective_to))}</td><td>${commercialMoney(r.unit_price)}</td><td>${commercialMoney(r.unit_cost)}</td><td>${r.sale_enabled ? `${r.sale_percent || 0}%` : 'No'}</td><td>${Number(r.margin_pct || 0).toFixed(2)}%</td></tr>`).join('') : '<tr><td colspan="6">Aún no hay cambios registrados.</td></tr>';
     box.scrollIntoView({behavior:'smooth', block:'nearest'});
   } catch (error) { notifyErr(error.message); }
 }

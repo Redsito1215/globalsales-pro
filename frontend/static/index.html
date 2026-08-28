@@ -3,41 +3,43 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GLOBTRADE S.A. — Plataforma Comercial</title>
-<link rel="icon" type="image/png" href="/static/img/globtrade-logo.png" />
+<title>Altavia Trade — Plataforma Comercial</title>
+<link rel="icon" type="image/png" href="/static/img/altavia-trade-logo.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260820e" />
-<link rel="stylesheet" href="/static/css/storefront.css?v=20260824a" />
-<link rel="stylesheet" href="/static/css/page-unified.css?v=20260820a" />
-<link rel="stylesheet" href="/static/css/admin-ui.css?v=20260824b" />
+<link rel="stylesheet" href="/static/css/globtrade-theme.css?v=20260828e" />
+<link rel="stylesheet" href="/static/css/storefront.css?v=20260828a" />
+<link rel="stylesheet" href="/static/css/page-unified.css?v=20260826b" />
+<link rel="stylesheet" href="/static/css/admin-ui.css?v=20260828c" />
 <link rel="stylesheet" href="/static/css/commercial-admin.css?v=20260824a" />
 <link rel="stylesheet" href="/static/css/ux-live.css?v=20260813i" />
-<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260820b" />
+<link rel="stylesheet" href="/static/css/theme-normalize.css?v=20260828a" />
 <link rel="stylesheet" href="/static/css/innovate-ui.css?v=20260820c" />
 <link rel="stylesheet" href="/static/css/globtrade-identity.css?v=20260820b" />
 <link rel="stylesheet" href="/static/css/accessibility.css?v=20260824a" />
-<script src="/static/js/ops-ui.js?v=20260822a" defer></script>
+<link rel="stylesheet" href="/static/css/smart-select.css?v=20260827e" />
+<script src="/static/js/ops-ui.js?v=20260828a" defer></script>
 <script src="/static/js/ops-live.js?v=20260820a" defer></script>
 <script src="/static/js/auth-nav.js?v=20260819c" defer></script>
-<script src="/static/js/company-admin.js?v=20260822a" defer></script>
-<script src="/static/js/commercial-admin.js?v=20260824a" defer></script>
-<script src="/static/js/q4-datos.js?v=20260824c" defer></script>
-<script src="/static/js/q3-ventas.js?v=20260820a" defer></script>
-<script src="/static/js/q3-pedidos.js?v=20260819c" defer></script>
-<script src="/static/js/q2-analisis.js?v=20260810v" defer></script>
-<script src="/static/js/tienda.js?v=20260824a" defer></script>
-<script src="/static/js/shop-header-nav.js?v=20260820i" defer></script>
+<script src="/static/js/company-admin.js?v=20260828b" defer></script>
+<script src="/static/js/commercial-admin.js?v=20260828a" defer></script>
+<script src="/static/js/q4-datos.js?v=20260828c" defer></script>
+<script src="/static/js/q3-ventas.js?v=20260827e" defer></script>
+<script src="/static/js/q3-pedidos.js?v=20260827e" defer></script>
+<script src="/static/js/q2-analisis.js?v=20260828d" defer></script>
+<script src="/static/js/tienda.js?v=20260828a" defer></script>
+<script src="/static/js/shop-header-nav.js?v=20260827k" defer></script>
 <script src="/static/js/mis-pedidos.js?v=20260824b" defer></script>
-<script src="/static/js/solicitud-detail.js?v=20260824c" defer></script>
+<script src="/static/js/solicitud-detail.js?v=20260827e" defer></script>
 <script src="/static/js/notificaciones.js?v=20260824c" defer></script>
 <script src="/static/js/soporte.js?v=20260816a" defer></script>
 <script src="/static/js/roles-admin.js?v=20260820a" defer></script>
-<script src="/static/js/decisiones.js?v=20260810v" defer></script>
-<script src="/static/js/compras.js?v=20260824d" defer></script>
-<script src="/static/js/reportes.js?v=20260824b" defer></script>
+<script src="/static/js/decisiones.js?v=20260827g" defer></script>
+<script src="/static/js/compras.js?v=20260827b" defer></script>
+<script src="/static/js/reportes.js?v=20260828c" defer></script>
 <script src="/static/js/accessibility.js?v=20260824a" defer></script>
+<script src="/static/js/smart-select.js?v=20260827e" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 (function(){
@@ -54,8 +56,8 @@
 <div id="a11y-page-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="boot-screen" aria-live="polite">
   <div class="boot-brand">
-    <span class="boot-mark" aria-hidden="true"><img src="/static/img/globtrade-logo.png" alt="" width="72" height="72" /></span>
-    <div class="boot-title">GLOBTRADE</div>
+    <span class="boot-mark" aria-hidden="true"><img data-company-logo src="/static/img/altavia-trade-logo.png" alt="" width="72" height="72" /></span>
+    <div class="boot-title" data-company-name>ALTAVIA TRADE</div>
   </div>
   <div class="boot-spinner" aria-hidden="true"></div>
   <p class="boot-msg">Iniciando plataforma…</p>
@@ -69,8 +71,8 @@
     </button>
     <div class="logo-text">
       <div class="logo-mark">
-        <span class="logo-icon" aria-hidden="true"><img src="/static/img/globtrade-logo.png" alt="" width="32" height="32" class="logo-icon-img" /></span>
-        <span class="logo-wordmark">GLOBTRADE</span>
+        <span class="logo-icon" aria-hidden="true"><img data-company-logo src="/static/img/altavia-trade-logo.png" alt="" width="32" height="32" class="logo-icon-img" /></span>
+        <span class="logo-wordmark" data-company-name>ALTAVIA TRADE</span>
       </div>
     </div>
   </div>
@@ -78,14 +80,10 @@
 
     <div class="nav-block nav-folder is-open" data-nav-section="ops">
       <button type="button" class="nav-folder-toggle" aria-expanded="true" onclick="toggleNavGroup(this)">
-        <span class="nav-section-label nav-section-label--toggle">Operacionales</span>
+        <span class="nav-section-label nav-section-label--toggle">Operativo</span>
         <span class="nav-folder-chevron" aria-hidden="true"></span>
       </button>
       <div class="nav-folder-body">
-        <button type="button" class="nav-item" data-page="dashboard" data-nav-section="ops" onclick="showPage('dashboard', this)">
-          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg></span>
-          <span class="nav-label">Tablero</span>
-        </button>
         <button type="button" class="nav-item active" data-page="tienda" data-nav-section="ops" onclick="showPage('tienda', this, { tiendaMode: 'catalog' })">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h8l1 4H5l1-4z"/><path d="M5 6h10l-1 11H6L5 6z"/></svg></span>
           <span class="nav-label">Tienda</span>
@@ -117,55 +115,55 @@
 
     <div class="nav-block nav-folder" data-nav-section="q2">
       <button type="button" class="nav-folder-toggle" aria-expanded="false" onclick="toggleNavGroup(this)">
-        <span class="nav-section-label nav-section-label--toggle">Estratégicas</span>
+        <span class="nav-section-label nav-section-label--toggle">Estratégico</span>
         <span class="nav-folder-chevron" aria-hidden="true"></span>
       </button>
       <div class="nav-folder-body">
+        <button type="button" class="nav-item" data-page="dashboard" data-nav-section="q2" onclick="showPage('dashboard', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg></span>
+          <span class="nav-label">Resumen ejecutivo</span>
+        </button>
         <button type="button" class="nav-item" data-page="decisiones" data-nav-section="q2" onclick="showPage('decisiones', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 16V9M10 16V4M16 16v-6"/><path d="M3 16h14"/></svg></span>
-          <span class="nav-label">Decisiones</span>
+          <span class="nav-label">Centro de decisiones</span>
         </button>
         <button type="button" class="nav-item" data-page="reportes-compuestos" data-nav-section="q2" onclick="showPage('reportes-compuestos', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 15h14M5 11h10M7 7h6M9 3h2"/></svg></span>
-          <span class="nav-label">Informes compuestos</span>
-        </button>
-        <button type="button" class="nav-item" data-page="orders" data-nav-section="q2" onclick="showPage('orders', this)">
-          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h14v10a1 1 0 01-1 1H4a1 1 0 01-1-1V6z"/><path d="M3 6l2-2h10l2 2"/><path d="M8 10h4"/></svg></span>
-          <span class="nav-label">Explorar ventas</span>
+          <span class="nav-label">Informes gerenciales</span>
         </button>
         <button type="button" class="nav-item" data-page="trends" data-nav-section="q2" onclick="showPage('trends', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 14l4-5 4 3 6-8"/><path d="M2 17h16"/></svg></span>
-          <span class="nav-label">Tendencia de ventas</span>
+          <span class="nav-label">Tendencia ejecutiva</span>
         </button>
         <button type="button" class="nav-item" data-page="regions" data-nav-section="q2" onclick="showPage('regions', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.5 2.5 3.5 5 3.5 7.5S12.5 15 10 17.5 6.5 12 6.5 10 7.5 5 10 2.5z"/></svg></span>
-          <span class="nav-label">Ventas por región</span>
-        </button>
-        <button type="button" class="nav-item" data-page="products" data-nav-section="q2" onclick="showPage('products', this)">
-          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7l7-4 7 4-7 4-7-4z"/><path d="M3 7v6l7 4 7-4V7"/></svg></span>
-          <span class="nav-label">Ventas por categoría</span>
-        </button>
-        <button type="button" class="nav-item" data-page="catalogo" data-nav-section="q2" onclick="showPage('catalogo', this)">
-          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h14v11a1 1 0 01-1 1H4a1 1 0 01-1-1V5z"/><path d="M3 5l2-3h10l2 3"/></svg></span>
-          <span class="nav-label">Catálogo analítico</span>
-        </button>
-        <button type="button" class="nav-item" data-page="reportes" data-nav-section="q2" onclick="showPage('reportes', this)">
-          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h8l2 2v12H5V3z"/><path d="M7 8h6M7 11h6M7 14h4"/></svg></span>
-          <span class="nav-label">Informes simples</span>
-        </button>
-        <button type="button" class="nav-item" data-page="export" data-nav-section="q2" onclick="showPage('export', this)">
-          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3v10"/><path d="M6 9l4 4 4-4"/><path d="M4 17h12"/></svg></span>
-          <span class="nav-label">Exportar datos</span>
+          <span class="nav-label">Mercado por región</span>
         </button>
       </div>
     </div>
 
     <div class="nav-block nav-folder" data-nav-section="gestion">
       <button type="button" class="nav-folder-toggle" aria-expanded="false" onclick="toggleNavGroup(this)">
-        <span class="nav-section-label nav-section-label--toggle">Gestión</span>
+        <span class="nav-section-label nav-section-label--toggle">Táctico</span>
         <span class="nav-folder-chevron" aria-hidden="true"></span>
       </button>
       <div class="nav-folder-body">
+        <button type="button" class="nav-item" data-page="reportes" data-nav-section="gestion" onclick="showPage('reportes', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h8l2 2v12H5V3z"/><path d="M7 8h6M7 11h6M7 14h4"/></svg></span>
+          <span class="nav-label">Informes operativos</span>
+        </button>
+        <button type="button" class="nav-item" data-page="orders" data-nav-section="gestion" onclick="showPage('orders', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h14v10a1 1 0 01-1 1H4a1 1 0 01-1-1V6z"/><path d="M3 6l2-2h10l2 2"/><path d="M8 10h4"/></svg></span>
+          <span class="nav-label">Explorar ventas</span>
+        </button>
+        <button type="button" class="nav-item" data-page="catalogo" data-nav-section="gestion" onclick="showPage('catalogo', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h14v11a1 1 0 01-1 1H4a1 1 0 01-1-1V5z"/><path d="M3 5l2-3h10l2 3"/></svg></span>
+          <span class="nav-label">Catálogo analítico</span>
+        </button>
+        <button type="button" class="nav-item" data-page="export" data-nav-section="gestion" onclick="showPage('export', this)">
+          <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3v10"/><path d="M6 9l4 4 4-4"/><path d="M4 17h12"/></svg></span>
+          <span class="nav-label">Descargar datos</span>
+        </button>
         <button type="button" class="nav-item" data-page="gestion" data-gestion-table="dim_region" data-nav-section="gestion" onclick="showGestion('dim_region', this)">
           <span class="nav-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3a12 12 0 010 14M10 3a12 12 0 000 14"/></svg></span>
           <span class="nav-label">Regiones</span>
@@ -276,7 +274,7 @@
     </div>
   </div>
 
-  <header class="shop-madson-header" id="shop-madson-header" aria-label="Navegación GLOBTRADE">
+  <header class="shop-madson-header" id="shop-madson-header" aria-label="Navegación Altavia Trade">
     <div class="shop-madson-header-top">
       <button type="button" class="shop-madson-menu-btn" id="shop-panel-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="shop-madson-nav" onclick="toggleShopNavDropdown()">
         <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
@@ -289,9 +287,9 @@
           <button type="submit" class="shop-madson-search-btn">Buscar</button>
         </div>
       </form>
-      <a href="#" class="shop-madson-logo" onclick="event.preventDefault(); showPage('tienda', document.querySelector('[data-page=tienda]'), { tiendaMode: 'home' })" aria-label="GLOBTRADE inicio">
+      <a href="#" class="shop-madson-logo" onclick="event.preventDefault(); showPage('tienda', document.querySelector('[data-page=tienda]'), { tiendaMode: 'home' })" aria-label="Altavia Trade inicio">
         <span class="shop-madson-logo-mark" aria-hidden="true">///</span>
-        <span class="shop-madson-logo-text">GLOBTRADE</span>
+        <span class="shop-madson-logo-text" data-company-name>ALTAVIA TRADE</span>
       </a>
       <div class="shop-madson-actions">
         <button type="button" class="shop-header-login-btn" id="shop-header-login" onclick="openLoginModal()">Iniciar sesión</button>
@@ -321,14 +319,14 @@
     <div class="page" id="page-dashboard">
       <div class="page-shell">
       <header class="page-hero">
-        <span class="page-badge">Tablero Q1</span>
-        <h1 class="page-title">Explora el comercio global con datos en tiempo real</h1>
-        <p class="page-lead">KPIs, tendencias y desglose por región, canal y producto — una vista ejecutiva diseñada para decidir rápido, no para perderse en tablas.</p>
+        <span class="page-badge">Nivel estratégico · Dirección</span>
+        <h1 class="page-title">Resumen ejecutivo</h1>
+        <p class="page-lead">Indicadores clave para gerencia: ingresos, utilidad, cobertura, regiones, canales y señales para decidir rápido.</p>
         <div id="dash-lag-banner" class="dash-lag-banner" hidden></div>
       </header>
 
       <div class="dash-shell">
-        <aside class="dash-panel dash-panel--filters" aria-label="Filtros del tablero">
+        <aside class="dash-panel dash-panel--filters dash-panel--filters-plain" aria-label="Filtros del tablero">
           <div class="dash-panel-head">
             <h2>Filtros</h2>
             <p>Región, producto, canal y período</p>
@@ -339,8 +337,7 @@
               <select id="dash-region" onchange="applyDashFilters()">
                 <option value="">Todas las regiones</option>
                 <option value="Sub-Saharan Africa">África subsahariana</option>
-                <option value="Europe">Europa</option>
-                <option value="Asia">Asia</option>
+                <option value="Europe">Europa</option><option value="Asia">Asia</option>
                 <option value="Middle East and North Africa">Oriente Medio y Norte de África</option>
                 <option value="North America">América del Norte</option>
                 <option value="Central America and the Caribbean">Centroamérica y el Caribe</option>
@@ -357,33 +354,9 @@
                 <option value="Meat">Carnes</option><option value="Cereal">Cereales</option><option value="Baby Food">Alimentos para bebés</option>
               </select>
             </div>
-            <div class="fg">
-              <label for="dash-channel">Canal de venta</label>
-              <select id="dash-channel" onchange="applyDashFilters()">
-                <option value="">Todos</option>
-                <option value="Online">En línea</option>
-                <option value="Offline">Presencial</option>
-              </select>
-            </div>
-            <div class="fg">
-              <label for="dash-priority">Prioridad</label>
-              <select id="dash-priority" onchange="applyDashFilters()">
-                <option value="">Todas</option>
-                <option value="C">C — Crítica</option>
-                <option value="H">H — Alta</option>
-                <option value="M">M — Media</option>
-                <option value="L">L — Baja</option>
-              </select>
-            </div>
-            <div class="fg">
-              <label for="dash-months">Período</label>
-              <select id="dash-months" onchange="applyDashFilters()">
-                <option value="12">Últimos 12 meses</option>
-                <option value="24">Últimos 24 meses</option>
-                <option value="48">Últimos 48 meses</option>
-                <option value="999" selected>Todo el histórico</option>
-              </select>
-            </div>
+            <div class="fg"><label for="dash-channel">Canal de venta</label><select id="dash-channel" onchange="applyDashFilters()"><option value="">Todos</option><option value="Online">En línea</option><option value="Offline">Presencial</option></select></div>
+            <div class="fg"><label for="dash-priority">Prioridad</label><select id="dash-priority" onchange="applyDashFilters()"><option value="">Todas</option><option value="C">C — Crítica</option><option value="H">H — Alta</option><option value="M">M — Media</option><option value="L">L — Baja</option></select></div>
+            <div class="fg"><label for="dash-months">Período</label><select id="dash-months" onchange="applyDashFilters()"><option value="12">Últimos 12 meses</option><option value="24">Últimos 24 meses</option><option value="48">Últimos 48 meses</option><option value="999" selected>Todo el histórico</option></select></div>
             <button type="button" class="btn btn-ghost btn-block" onclick="resetDashFilters()">Limpiar filtros</button>
           </div>
         </aside>
@@ -391,8 +364,8 @@
         <div class="dash-main">
           <section class="dash-section" aria-labelledby="dash-resumen-title">
             <div class="dash-section-head">
-              <h2 id="dash-resumen-title">Resumen</h2>
-              <p>Ingresos, utilidad, pedidos y cobertura del histórico</p>
+              <h2 id="dash-resumen-title">Pulso del negocio</h2>
+              <p>Ingresos, utilidad, pedidos y cobertura estratégica</p>
             </div>
             <div class="dash-stats" id="kpi-cards">
               <div class="stat-card stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
@@ -405,12 +378,14 @@
               <div class="stat-card stat-card--compact stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
               <div class="stat-card stat-card--compact stat-skeleton" aria-hidden="true"><div class="skel skel-lg"></div><div class="skel skel-sm"></div></div>
             </div>
+            <div class="exec-insights-grid" id="dash-exec-insights" aria-live="polite"></div>
+            <div class="exec-actions" id="dash-exec-actions"></div>
           </section>
 
           <section class="dash-section" aria-labelledby="dash-charts-title">
             <div class="dash-section-head">
-              <h2 id="dash-charts-title">Tendencia y desglose</h2>
-              <p>Ingresos y utilidad en el tiempo, más región, canal, prioridad y países</p>
+              <h2 id="dash-charts-title">Lectura ejecutiva</h2>
+              <p>Tendencia, mercado, canales, prioridades y países con más movimiento</p>
             </div>
             <div class="charts-row charts-row--hero">
               <div class="chart-box chart-box--hero">
@@ -469,7 +444,7 @@
                       <th>N.º pedido</th>
                       <th>Región</th>
                       <th>País</th>
-                      <th>Producto</th>
+                      <th>Categoría</th>
                       <th>Canal</th>
                       <th>Prior.</th>
                       <th>Fecha Pedido</th>
@@ -500,8 +475,8 @@
       <div class="page-shell">
       <header class="page-hero">
         <span class="page-badge">Catálogo Q1</span>
-        <h1 class="page-title">Catálogo mayorista</h1>
-        <p class="page-lead">Explora categorías y productos del dataset analítico.</p>
+        <h1 class="page-title">Catálogo analítico</h1>
+        <p class="page-lead">Explora categorías, productos y su valor comercial acumulado.</p>
       </header>
       <div class="page-body">
       <section id="catalog-view-categories" class="catalog-view">
@@ -533,9 +508,9 @@
     <div class="page" id="page-trends">
       <div class="page-shell">
       <header class="page-hero">
-        <span class="page-badge">Análisis Q1</span>
-        <h1 class="page-title">Tendencias</h1>
-        <p class="page-lead">Evolución mensual de ingresos, utilidad y mix de productos.</p>
+        <span class="page-badge">Nivel estratégico · Evolución</span>
+        <h1 class="page-title">Tendencia ejecutiva</h1>
+        <p class="page-lead">Evolución mensual de ingresos, utilidad y mezcla de categorías para anticipar dirección del negocio.</p>
       </header>
       <div class="page-body">
       <div class="charts-row single">
@@ -573,9 +548,9 @@
     <div class="page" id="page-regions">
       <div class="page-shell">
       <header class="page-hero">
-        <span class="page-badge">Análisis Q1</span>
-        <h1 class="page-title">Regiones y países</h1>
-        <p class="page-lead">Desempeño geográfico por ingresos, utilidad y volumen de pedidos.</p>
+        <span class="page-badge">Nivel estratégico · Mercado</span>
+        <h1 class="page-title">Mercado por región</h1>
+        <p class="page-lead">Desempeño geográfico por ingresos, utilidad y volumen de pedidos para priorizar expansión comercial.</p>
       </header>
       <div class="page-body">
       <div class="table-box">
@@ -584,7 +559,7 @@
         </div>
         <div class="table-scroll">
           <table id="tbl-regions"><thead><tr>
-            <th>Región</th><th>Ingresos (USD)</th><th>Utilidad (USD)</th><th>Pedidos</th><th>Margen</th>
+            <th>Región</th><th>Ingresos (USD)</th><th>Participación</th><th>Utilidad (USD)</th><th>Pedidos</th><th>Ticket promedio</th><th>Margen</th>
           </tr></thead><tbody id="body-regions"></tbody></table>
         </div>
       </div>
@@ -645,6 +620,10 @@
           <input id="f-country" type="text" placeholder="ej. Mexico" style="width:150px" />
         </div>
         <div class="filter-group">
+          <label>Región</label>
+          <input id="f-region" type="text" placeholder="ej. South America" style="width:180px" />
+        </div>
+        <div class="filter-group">
           <label>Categoría</label>
           <select id="f-itemtype">
             <option value="">Todos</option>
@@ -692,7 +671,7 @@
         </div>
         <div class="table-scroll">
           <table><thead><tr>
-            <th>N.º pedido</th><th>País</th><th>Región</th><th>Producto</th><th>Canal</th>
+            <th>N.º pedido</th><th>País</th><th>Región</th><th>Categoría</th><th>Canal</th>
             <th>Prioridad</th><th>Fecha Pedido</th><th>Fecha Envío</th>
             <th>Unidades</th><th>Ingreso</th><th>Utilidad</th>
           </tr></thead><tbody id="body-orders"></tbody></table>
@@ -721,7 +700,7 @@
         </div>
         <div class="company-admin-grid">
           <div class="company-admin-logo">
-            <img id="company-logo-preview" class="company-logo-preview" src="/static/img/globtrade-logo.png" alt="Logo de la empresa" />
+            <img id="company-logo-preview" class="company-logo-preview" src="/static/img/altavia-trade-logo.png" alt="Logo de Altavia Trade" />
             <label class="btn btn-ghost btn-sm company-logo-upload">
               Cambiar logo
               <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="uploadCompanyLogo(this)" />
@@ -747,7 +726,7 @@
               <div class="fg"><label for="company-field-phone">Teléfono</label><input id="company-field-phone" type="tel" /></div>
             </div>
             <div class="fg"><label for="company-field-website">Sitio web</label><input id="company-field-website" type="text" placeholder="www.ejemplo.com" /></div>
-            <div class="fg"><label for="company-field-invoice_signer">Firma en factura</label><input id="company-field-invoice_signer" type="text" placeholder="Equipo Comercial GLOBTRADE" /></div>
+            <div class="fg"><label for="company-field-invoice_signer">Firma en factura</label><input id="company-field-invoice_signer" type="text" placeholder="Equipo Comercial Altavia Trade" /></div>
             <div class="fg"><label for="company-field-tax_rate">IVA % (incluido en el total de la factura)</label><input id="company-field-tax_rate" type="number" min="0" max="30" step="1" /></div>
             <div class="fg"><label for="company-field-invoice_footer">Nota al pie de factura</label><textarea id="company-field-invoice_footer" rows="2"></textarea></div>
             <div class="company-admin-actions">
@@ -776,6 +755,8 @@
             <div class="fg"><label for="company-field-storefront_hero_title">Título principal</label><input id="company-field-storefront_hero_title" type="text" /></div>
             <div class="fg"><label for="company-field-storefront_hero_lead">Descripción</label><textarea id="company-field-storefront_hero_lead" rows="3"></textarea></div>
             <div class="fg"><label for="company-field-storefront_hero_cta">Texto del botón</label><input id="company-field-storefront_hero_cta" type="text" placeholder="Ver catálogo" /></div>
+            <div class="company-carousel-toolbar"><strong>Diapositivas adicionales</strong><button type="button" class="btn btn-ghost btn-sm" onclick="addCompanyHeroSlide()">+ Agregar espacio</button></div>
+            <div id="company-hero-slides" class="company-hero-slides"></div>
             <p class="admin-page-meta">Guarda junto con los datos de empresa usando el botón «Guardar datos» del bloque anterior.</p>
           </div>
         </div>
@@ -834,7 +815,7 @@
         <p>Diagnóstico original del proyecto · varios puntos ya resueltos en la plataforma</p>
       </div>
       <div class="platform-status-banner">
-        <p><strong>Estado en GLOBTRADE:</strong> roles y permisos, ETL manual + Airflow, sync incremental al tablero, libro de caja, requisiciones → OC, notificaciones in-app y respaldos con <code>scripts/backup_mongo</code>.</p>
+        <p><strong>Estado en <span data-company-name>Altavia Trade</span>:</strong> roles y permisos, ETL manual + Airflow, sync incremental al tablero, libro de caja, requisiciones → OC, notificaciones in-app y respaldos con <code>scripts/backup_mongo</code>.</p>
         <div class="ops-chips platform-status-chips">
           <span class="ops-chip ops-chip--ok"><span>Roles</span><strong>OK</strong></span>
           <span class="ops-chip ops-chip--ok"><span>ETL / sync</span><strong>OK</strong></span>
@@ -961,9 +942,9 @@
     <div class="page" id="page-decisiones">
       <div class="page-shell">
         <header class="page-hero">
-        <span class="page-badge">Decisiones Q2</span>
-        <h1 class="page-title">Decisiones</h1>
-        <p class="page-lead">Margen, stock y embudo comercial para apoyar decisiones.</p>
+        <span class="page-badge">Nivel estratégico · ClickHouse</span>
+        <h1 class="page-title">Centro de decisiones</h1>
+        <p class="page-lead">Rentabilidad, portafolio, inventario y acciones recomendadas para competir mejor.</p>
       </header>
         <div class="page-body">
           <div class="filters">
@@ -992,9 +973,9 @@
     <div class="page" id="page-reportes-compuestos">
       <div class="page-shell">
         <header class="page-hero">
-        <span class="page-badge">Informes Q2</span>
-        <h1 class="page-title">Informes compuestos</h1>
-        <p class="page-lead">Análisis de ventas, rankings y cruces para ver cómo evoluciona el negocio.</p>
+        <span class="page-badge">Nivel estratégico · ClickHouse</span>
+        <h1 class="page-title">Informes gerenciales</h1>
+        <p class="page-lead">Informes compuestos con cruces de ventas, inventario, compras, proveedores, logística y rentabilidad.</p>
       </header>
         <div class="page-body">
           <div class="filters">
@@ -1002,16 +983,25 @@
               <label for="rc-select">Informe</label>
               <select id="rc-select" onchange="onRcSelect(); loadRcActual()"></select>
             </div>
+            <div class="filter-group"><label for="rc-start">Desde</label><input id="rc-start" type="date" onchange="loadRcActual()"></div>
+            <div class="filter-group"><label for="rc-end">Hasta</label><input id="rc-end" type="date" onchange="loadRcActual()"></div>
+            <div class="filter-group"><label for="rc-category">Categoría</label><select id="rc-category" data-smart-title="Categoría" data-search-placeholder="Buscar categoría…" onchange="loadRcActual()"><option value="">Todas</option></select></div>
+            <div class="filter-group"><label for="rc-region">Región</label><select id="rc-region" data-smart-title="Región" data-search-placeholder="Buscar región…" onchange="loadRcActual()"><option value="">Todas</option></select></div>
+            <div class="filter-group"><label for="rc-channel">Canal</label><select id="rc-channel" data-smart-title="Canal" data-search-placeholder="Buscar canal…" onchange="loadRcActual()"><option value="">Todos</option></select></div>
             <div class="filter-group filter-group--action">
+              <button type="button" class="btn btn-ghost" onclick="clearRcFilters()">Limpiar filtros</button>
               <button type="button" class="btn btn-ghost" id="rc-btn-ai" onclick="openReportesAiModal('compuesto')">Asistente IA</button>
               <button type="button" class="btn btn-primary" id="rc-btn-refresh" onclick="loadRcActual()">Actualizar</button>
               <button type="button" class="btn btn-ghost" id="rc-btn-pdf" onclick="exportRcPdf()">Exportar PDF</button>
-              <button type="button" class="btn btn-ghost" id="rc-btn-csv" onclick="exportRcCsv()">Exportar CSV</button>
             </div>
           </div>
           <p id="rc-fallback-banner" class="reportes-fallback-banner page-meta-strip" hidden></p>
           <p id="rc-export-status" class="reportes-export-status page-meta-strip" hidden></p>
           <p id="rc-meta" class="catalog-meta page-meta-strip"></p>
+          <section class="rc-chart-card" aria-labelledby="rc-chart-title">
+            <div class="table-header"><div class="table-title" id="rc-chart-title">Visualización</div><span class="rc-source-badge">ClickHouse</span></div>
+            <div id="rc-chart" class="rc-chart" role="img" aria-label="Gráfico del informe seleccionado"></div>
+          </section>
           <div class="table-box">
             <div class="table-header">
               <div class="table-title" id="rc-title">Selecciona un informe</div>
@@ -1032,9 +1022,9 @@
     <div class="page" id="page-reportes">
       <div class="page-shell">
         <header class="page-hero">
-        <span class="page-badge">Reportes Q2</span>
-        <h1 class="page-title">Informes simples</h1>
-        <p class="page-lead">Consultas del día a día sobre pedidos, stock, soporte y más.</p>
+        <span class="page-badge">Nivel táctico</span>
+        <h1 class="page-title">Informes operativos</h1>
+        <p class="page-lead">Seguimiento táctico de pedidos, stock, soporte y otras actividades diarias.</p>
       </header>
         <div class="page-body">
           <div class="filters">
@@ -1051,10 +1041,10 @@
               <input id="reportes-thr" type="number" value="20" style="width:80px" />
             </div>
             <div class="filter-group filter-group--action">
+              <button type="button" class="btn btn-ghost" onclick="clearReportesFilters()">Limpiar filtros</button>
               <button type="button" class="btn btn-ghost" id="reportes-btn-ai" onclick="openReportesAiModal('simple')">Asistente IA</button>
               <button type="button" class="btn btn-primary" id="reportes-btn-refresh" onclick="loadReporteActual()">Actualizar</button>
               <button type="button" class="btn btn-ghost" id="reportes-btn-pdf" onclick="exportReportePdf()">Exportar PDF</button>
-              <button type="button" class="btn btn-ghost" id="reportes-btn-csv" onclick="exportReporteCsv()">Exportar CSV</button>
             </div>
           </div>
           <p id="reportes-export-status" class="reportes-export-status page-meta-strip" hidden></p>
@@ -1162,7 +1152,7 @@
                 <div class="filter-group"><label>Proveedor</label><select id="preq-vendor"><option value="">—</option></select></div>
                 <div class="filter-group"><label>Variante</label><select id="preq-variant"><option value="">—</option></select></div>
                 <div class="filter-group filter-input--narrow"><label>Cantidad</label><input id="preq-qty" type="number" value="20" min="1" /></div>
-                <div class="filter-group filter-input--narrow"><label>Costo unit.</label><input id="preq-cost" type="number" step="0.01" value="0" /></div>
+                <div class="filter-group filter-input--narrow"><label>Costo unit.</label><input id="preq-cost" type="number" min="0.01" step="0.01" placeholder="0.00" required /></div>
                 <div class="filter-group filter-group--action"><button type="button" class="btn btn-primary" onclick="createRequisition()">Crear requisición</button></div>
               </div>
             </div>
@@ -1182,7 +1172,7 @@
                 <div class="filter-group"><label>Proveedor</label><select id="po-vendor"><option value="">—</option></select></div>
                 <div class="filter-group"><label>Variante</label><select id="po-variant"><option value="">—</option></select></div>
                 <div class="filter-group filter-input--narrow"><label>Cantidad</label><input id="po-qty" type="number" value="50" min="1" /></div>
-                <div class="filter-group filter-input--narrow"><label>Costo unit.</label><input id="po-cost" type="number" step="0.01" value="0" /></div>
+                <div class="filter-group filter-input--narrow"><label>Costo unit.</label><input id="po-cost" type="number" min="0.01" step="0.01" placeholder="0.00" required /></div>
                 <div class="filter-group filter-group--action"><button type="button" class="btn btn-primary" onclick="createPO()">Crear OC</button></div>
               </div>
             </div>
@@ -1292,6 +1282,7 @@
               <h2 class="shop-madson-hero-title" id="shop-hero-title">Abastece tu negocio con catálogo global</h2>
               <p class="shop-madson-hero-lead" id="shop-hero-lead">Pedidos consolidados, envío coordinado y seguimiento en Mis pedidos — todo desde un solo lugar.</p>
               <button type="button" class="shop-madson-cta" id="shop-hero-cta" onclick="applyTiendaMode('catalog')">Ver catálogo</button>
+              <div class="shop-hero-carousel-controls" id="shop-hero-carousel-controls" hidden><button type="button" onclick="changeStorefrontHero(-1)" aria-label="Banner anterior">‹</button><span id="shop-hero-carousel-dots"></span><button type="button" onclick="changeStorefrontHero(1)" aria-label="Banner siguiente">›</button></div>
             </div>
           </div>
         </section>
@@ -1333,7 +1324,7 @@
               <div class="shop-toolbar-classic-actions">
                 <div class="shop-bulk-add" id="shop-bulk-add" hidden>
                   <label for="shop-bulk-qty" class="shop-bulk-label">Cant. c/u</label>
-                  <input type="number" id="shop-bulk-qty" class="shop-bulk-qty" min="1" value="1" oninput="syncShopBulkQty(this.value); updateShopBulkActions()" />
+                  <input type="number" id="shop-bulk-qty" class="shop-bulk-qty" min="1" step="1" value="1" oninput="syncShopBulkQty(this.value); updateShopBulkActions()" />
                   <button type="button" class="shop-widget-btn shop-widget-btn--primary shop-bulk-btn" id="shop-bulk-btn" onclick="tiendaAddCollectionToCart()">Colección completa</button>
                 </div>
                 <select id="shop-sort" class="shop-sort-select" onchange="applyShopFilters()" aria-label="Ordenar productos">
@@ -1425,7 +1416,7 @@
           <div class="filters" style="border:none;padding:0;margin:0;box-shadow:none;background:transparent">
             <div class="filter-group"><label>Región</label><input id="np-region" placeholder="Europe" /></div>
             <div class="filter-group"><label>País</label><input id="np-country" placeholder="France" /></div>
-            <div class="filter-group"><label>Producto (categoría)</label><input id="np-item" placeholder="Snacks" /></div>
+            <div class="filter-group"><label>Categoría</label><input id="np-item" placeholder="Snacks" /></div>
             <div class="filter-group"><label>Canal</label><input id="np-channel" placeholder="En línea" /></div>
             <div class="filter-group"><label>Prioridad</label><input id="np-priority" value="M" style="width:60px" /></div>
             <div class="filter-group"><label>Unidades</label><input id="np-units" type="number" value="10" style="width:80px" /></div>
@@ -1439,7 +1430,7 @@
         <div class="table-box">
           <div class="table-header"><div class="table-title">Últimos pedidos</div></div>
           <div class="table-scroll">
-            <table><thead><tr><th>ID</th><th>País</th><th>Producto</th><th>Unidades</th><th>Ingreso</th><th>Acciones</th></tr></thead>
+            <table><thead><tr><th>ID</th><th>País</th><th>Categoría</th><th>Unidades</th><th>Ingreso</th><th>Acciones</th></tr></thead>
             <tbody id="pedidos-admin-body"></tbody></table>
           </div>
         </div>
@@ -1450,7 +1441,7 @@
             <div class="filters filters--flat">
               <div class="filter-group"><label>Región</label><input id="ep-region" /></div>
               <div class="filter-group"><label>País</label><input id="ep-country" /></div>
-              <div class="filter-group"><label>Producto (categoría)</label><input id="ep-item" /></div>
+              <div class="filter-group"><label>Categoría</label><input id="ep-item" /></div>
               <div class="filter-group"><label>Canal</label><input id="ep-channel" /></div>
               <div class="filter-group filter-input--narrow"><label>Prioridad</label><input id="ep-priority" maxlength="1" /></div>
               <div class="filter-group filter-input--narrow"><label>Unidades</label><input id="ep-units" type="number" min="0" /></div>
@@ -1677,13 +1668,14 @@
       <div class="page-shell">
       <header class="page-hero">
         <span class="page-badge">Exportación Q2</span>
-        <h1 class="page-title">Exportar datos</h1>
-        <p class="page-lead">Descarga CSV de ventas filtradas. Requiere sesión de analista o administrador.</p>
+        <h1 class="page-title">Descargar datos</h1>
+        <p class="page-lead">Genera un PDF de ventas filtradas. Requiere sesión de analista o administrador.</p>
       </header>
       <div class="page-body">
       <div class="filters">
         <div class="filter-group"><label>Región</label><input id="an-region" placeholder="Opcional" /></div>
-        <div class="filter-group"><label>Producto</label><input id="an-itemtype" placeholder="Opcional" /></div>
+        <div class="filter-group"><label>País</label><input id="an-country" placeholder="Opcional" /></div>
+        <div class="filter-group"><label>Categoría</label><input id="an-itemtype" placeholder="Opcional" /></div>
         <div class="filter-group"><label>Canal</label><select id="an-channel"><option value="">Todos</option><option value="Online">En línea</option><option value="Offline">Presencial</option></select></div>
         <div class="filter-group"><label>Prioridad</label><select id="an-priority"><option value="">Todas</option><option value="C">C</option><option value="H">H</option><option value="M">M</option><option value="L">L</option></select></div>
         <div class="filter-group"><label>Periodo</label>
@@ -1701,10 +1693,23 @@
           </select>
         </div>
         <div class="filter-group filter-group--action">
-          <button type="button" class="btn btn-primary" data-require-perm="analysis.export" onclick="exportAnalysis()">Descargar CSV</button>
+          <button type="button" class="btn btn-primary" data-require-perm="analysis.export" onclick="previewAnalysisExport()">Previsualizar</button>
         </div>
       </div>
       <p id="export-status" class="catalog-meta"></p>
+      <div id="export-preview" class="modal export-preview-modal" hidden role="dialog" aria-modal="true" aria-labelledby="export-preview-title" onclick="if(event.target===this) closeAnalysisPreview()">
+        <div class="modal-box export-preview-box">
+          <div class="table-header table-header--split export-preview-header">
+            <div><div class="table-title" id="export-preview-title">Vista previa de la descarga</div><span id="export-preview-meta" class="dash-records-meta"></span></div>
+            <button type="button" class="modal-x" onclick="closeAnalysisPreview()" aria-label="Cerrar">×</button>
+          </div>
+          <div class="table-scroll"><table><thead id="export-preview-head"></thead><tbody id="export-preview-body"></tbody></table></div>
+          <div class="export-preview-actions">
+            <button type="button" class="btn btn-ghost" onclick="closeAnalysisPreview()">Volver a filtros</button>
+            <button type="button" class="btn btn-primary" onclick="exportAnalysis()">Descargar PDF</button>
+          </div>
+        </div>
+      </div>
       </div>
       </div><!-- /page-shell -->
     </div>
@@ -1747,7 +1752,7 @@
         </div>
         <div class="filter-group filter-group--action">
           <button type="button" class="btn btn-ghost" onclick="loadAuditPage()">Actualizar</button>
-          <button type="button" class="btn btn-primary" onclick="exportAuditLog()">Exportar Excel</button>
+          <button type="button" class="btn btn-primary" onclick="exportAuditLog()">Exportar PDF</button>
         </div>
       </div>
       <div class="table-box table-box--admin">
@@ -1789,12 +1794,20 @@
                 <option value="false">Inactivos</option>
               </select>
             </div>
+            <div class="filter-group" id="gestion-category-filter" hidden>
+              <label for="gestion-category">Categoría</label>
+              <select id="gestion-category" onchange="onGestionProductFilterChange()">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="filter-group" id="gestion-vendor-filter" hidden>
+              <label for="gestion-vendor">Proveedor</label>
+              <select id="gestion-vendor" onchange="onGestionProductFilterChange()">
+                <option value="">Todos</option>
+              </select>
+            </div>
             <div class="filter-group filter-group--action filter-group--actions-row">
               <button type="button" class="btn btn-primary btn-sm" id="gestion-create-btn" data-require-perm="masters.write" onclick="openMasterCreate()">+ Nuevo</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="syncStaleAnalytics()">Sincronizar fact</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="elt.run" onclick="runBuildModel()">Reconstruir modelo</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync()">Sincronizar catálogo</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-require-perm="masters.write" onclick="runShopSync(true)" title="Regenera inventario desde maestros">Reiniciar stock</button>
             </div>
           </div>
           <p id="datos-build-status" class="catalog-meta admin-page-meta"></p>
@@ -1940,6 +1953,27 @@ function applyTheme(mode, reloadPage) {
     }
   }
 }
+function applyLanguage(language) {
+  const lang = 'es';
+  window.ALTAVIA_LOCALE = 'es-EC';
+  document.documentElement.lang = 'es';
+  localStorage.setItem('gt-language', 'es');
+  const copy = {
+    title:'Mi perfil', sub:'Administra tus datos, preferencias y acceso desde un solo lugar.',
+    personal:'Datos personales', preferences:'Preferencias', access:'Acceso', name:'Nombre completo', phone:'Teléfono',
+    language:'Idioma y formatos', timezone:'Zona horaria', theme:'Tema', role:'Rol asignado', email:'Correo electrónico',
+    current:'Contraseña actual', next:'Nueva contraseña', confirm:'Confirmar contraseña', save:'Guardar cambios', cancel:'Cancelar',
+  };
+  const set = (selector, value) => { const el=document.querySelector(selector); if(el) el.textContent=value; };
+  set('#profile-modal-title', copy.title); set('#profile-modal > .modal-card > .modal-sub', copy.sub);
+  set('#profile-modal [data-profile-tab="personal"]', copy.personal); set('#profile-modal [data-profile-tab="preferences"]', copy.preferences);
+  set('#profile-modal [data-profile-tab="access"]', copy.access); set('label[for="profile-name"]', copy.name);
+  set('label[for="profile-phone"]', copy.phone); set('label[for="profile-language"]', copy.language);
+  set('label[for="profile-timezone"]', copy.timezone); set('label[for="profile-theme"]', copy.theme);
+  set('.profile-access-summary small', copy.role); set('label[for="profile-email"]', copy.email);
+  set('label[for="profile-current-pass"]', copy.current); set('label[for="profile-new-pass"]', copy.next);
+  set('label[for="profile-new-pass2"]', copy.confirm); set('#profile-save-btn', copy.save); set('#profile-cancel-btn', copy.cancel);
+}
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme');
   applyTheme(current === 'dark' ? 'light' : 'dark', true);
@@ -2005,9 +2039,25 @@ function toggleShopNavDropdown() {
 }
 
 // ── Reloj ───────────────────────────────────────────────────────────
+function formatBusinessDateTime(value, options = {}) {
+  if (value === null || value === undefined || value === '') return '—';
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value).replace('T', ' ').slice(0, 19);
+  return new Intl.DateTimeFormat(window.ALTAVIA_LOCALE || 'es-EC', {
+    timeZone: window.ALTAVIA_TIMEZONE || 'America/Guayaquil',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+    ...options,
+  }).format(parsed);
+}
+window.formatBusinessDateTime = formatBusinessDateTime;
 function updateClock(){
-  document.getElementById('clock').textContent =
-    new Date().toLocaleString('es-EC',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const clock = document.getElementById('clock');
+  if (clock) clock.textContent = new Intl.DateTimeFormat(window.ALTAVIA_LOCALE || 'es-EC', {
+    timeZone: window.ALTAVIA_TIMEZONE || 'America/Guayaquil',
+    hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'
+  }).format(new Date());
 }
 setInterval(updateClock,1000); updateClock();
 
@@ -2081,14 +2131,14 @@ function markPageLoaded(id) {
 
 // ── Navigation ──────────────────────────────────────────────────────
 const titles = {
-  dashboard:'Tablero',
+  dashboard:'Resumen ejecutivo',
   catalogo:'Catálogo analítico',
   company:'Empresa',
-  trends:'Tendencia de ventas',
-  regions:'Ventas por región',
+  trends:'Tendencia ejecutiva',
+  regions:'Mercado por región',
   products:'Ventas por categoría',
-  export:'Exportar datos',
-  decisiones:'Decisiones',
+  export:'Descargar datos',
+  decisiones:'Centro de decisiones',
   tienda:'Tienda',
   'mis-pedidos':'Mis pedidos',
   notificaciones:'Notificaciones',
@@ -2097,13 +2147,13 @@ const titles = {
   orders:'Explorar ventas',
   'roles-admin':'Roles y usuarios',
   'commercial-admin':'Gestión comercial',
-  gestion:'Gestión',
+  gestion:'Maestros tácticos',
   schema:'Modelo de datos',
   load:'Carga de datos',
   audit:'Auditoría',
   compras:'Compras e inventario',
-  reportes:'Informes simples',
-  'reportes-compuestos':'Informes compuestos',
+  reportes:'Informes operativos',
+  'reportes-compuestos':'Informes gerenciales',
 };
 function showPage(id, btn, opts) {
   opts = opts || {};
@@ -2122,7 +2172,7 @@ function showPage(id, btn, opts) {
   }
   if (typeof openNavGroupForPage === 'function') openNavGroupForPage(id);
   document.getElementById('topbar-title').textContent = titles[id]||id;
-  document.title = `${titles[id] || id} — GLOBTRADE S.A.`;
+  document.title = `${titles[id] || id} — ${window.COMPANY_NAME || 'Altavia Trade'}`;
   document.body.classList.add('shop-page-active');
   document.body.classList.toggle('shop-on-tienda', id === 'tienda');
   if (id !== 'tienda') closeShopNavDropdown();
@@ -2171,9 +2221,76 @@ function loadPage(id, opts = {}) {
 }
 
 // ── Formatters ──────────────────────────────────────────────────────
-const fmtUSD = v => v==null?'—':'$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
-const fmtNum = v => v==null?'—':Number(v).toLocaleString('en-US');
+const fmtUSD = v => v==null?'—':new Intl.NumberFormat(window.ALTAVIA_LOCALE || 'es-EC',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(v));
+const fmtNum = v => v==null?'—':Number(v).toLocaleString(window.ALTAVIA_LOCALE || 'es-EC');
 const fmtPct = v => v==null?'—':Number(v).toFixed(1)+'%';
+
+function executiveGrowth(trend) {
+  if (!Array.isArray(trend) || trend.length < 2) return null;
+  const current = Number(trend[trend.length - 1]?.revenue || 0);
+  const previous = Number(trend[trend.length - 2]?.revenue || 0);
+  if (!previous) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function openExecutiveReport(reportId) {
+  const btn = document.querySelector('.nav-item[data-page="reportes-compuestos"]');
+  if (typeof window.openStrategicReport === 'function') window.openStrategicReport(reportId, btn);
+  else showPage('reportes-compuestos', btn);
+}
+
+function renderExecutiveInsights(bundle) {
+  const root = document.getElementById('dash-exec-insights');
+  const actions = document.getElementById('dash-exec-actions');
+  if (!root || !actions) return;
+  const s = bundle?.summary || {};
+  if (!(Number(s.total_orders) > 0)) {
+    root.innerHTML = '';
+    actions.innerHTML = '';
+    return;
+  }
+  const regions = [...(bundle.regions || [])].sort((a,b) => Number(b.revenue || 0) - Number(a.revenue || 0));
+  const countries = [...(bundle.countries || [])].sort((a,b) => Number(b.revenue || 0) - Number(a.revenue || 0));
+  const channels = [...(bundle.channels || [])].sort((a,b) => Number(b.orders || 0) - Number(a.orders || 0));
+  const topRegion = regions[0] || {};
+  const topCountry = countries[0] || {};
+  const topChannel = channels[0] || {};
+  const concentration = Number(s.total_revenue) > 0
+    ? (Number(topRegion.revenue || 0) / Number(s.total_revenue)) * 100 : 0;
+  const concentrationLabel = concentration >= 45 ? 'Concentración alta' : concentration >= 30 ? 'Concentración media' : 'Mercado diversificado';
+  const growth = executiveGrowth(bundle.trend || []);
+  const growthLabel = growth == null ? 'Sin comparación disponible' : `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}% frente al mes anterior`;
+  const growthClass = growth != null && growth < 0 ? ' exec-insight-card--warn' : '';
+  root.innerHTML = `
+    <article class="exec-insight-card">
+      <small>Mercado líder</small><strong>${escHtml(topRegion.region || 'Sin región')}</strong>
+      <span>${fmtUSD(topRegion.revenue || 0)} · ${concentration.toFixed(1)}% del ingreso</span>
+    </article>
+    <article class="exec-insight-card${concentration >= 45 ? ' exec-insight-card--warn' : ''}">
+      <small>Riesgo geográfico</small><strong>${concentrationLabel}</strong>
+      <span>Evalúa dependencia y oportunidades de expansión</span>
+    </article>
+    <article class="exec-insight-card">
+      <small>País prioritario</small><strong>${escHtml(topCountry.country || 'Sin país')}</strong>
+      <span>${fmtUSD(topCountry.revenue || 0)} en ventas</span>
+    </article>
+    <article class="exec-insight-card">
+      <small>Canal dominante</small><strong>${escHtml(topChannel.sales_channel || 'Sin canal')}</strong>
+      <span>${fmtNum(topChannel.orders || 0)} pedidos</span>
+    </article>
+    <article class="exec-insight-card${growthClass}">
+      <small>Señal de crecimiento</small><strong>${growth == null ? 'Por calcular' : (growth >= 0 ? 'Crecimiento' : 'Contracción')}</strong>
+      <span>${growthLabel}</span>
+    </article>`;
+  actions.innerHTML = `
+    <div class="exec-actions-head"><strong>Preguntas para dirección</strong><span>Abre análisis cruzados con datos del negocio</span></div>
+    <button type="button" class="exec-action-card" onclick="showPage('regions', document.querySelector('.nav-item[data-page=regions]'))"><strong>¿Dónde conviene crecer?</strong><span>Compara ingresos, utilidad, margen y peso de cada región.</span></button>
+    <button type="button" class="exec-action-card" onclick="openExecutiveReport('RC-11')"><strong>¿Qué proveedores generan más ganancia?</strong><span>Relaciona compras, productos vendidos, ingresos y utilidad.</span></button>
+    <button type="button" class="exec-action-card" onclick="openExecutiveReport('RC-13')"><strong>¿Qué productos sostienen el margen?</strong><span>Prioriza productos por rentabilidad y rotación.</span></button>
+    <button type="button" class="exec-action-card" onclick="openExecutiveReport('RC-12')"><strong>¿Cuánto compramos frente a lo vendido?</strong><span>Contrasta abastecimiento, ventas y capital comprometido.</span></button>`;
+}
+
+window.openExecutiveReport = openExecutiveReport;
 
 // ── Chart helpers ────────────────────────────────────────────────────
 function destroyChart(id){
@@ -2302,6 +2419,7 @@ async function loadDashboard(force = false) {
   const countries = bundle?.countries || [];
   markPageLoaded('dashboard');
   if(!s) {
+    renderExecutiveInsights(null);
     setChartsLoading(false);
     if (kpiEl) {
       kpiEl.innerHTML =
@@ -2335,6 +2453,7 @@ async function loadDashboard(force = false) {
     }
   }
   if (s.strategic_ready === false || !(s.total_orders > 0)) {
+    renderExecutiveInsights(null);
     if (kpiEl) {
       kpiEl.innerHTML =
         `<div class="stat-card stat-card--wide"><div class="stat-value" style="font-size:0.95rem">Sin datos de ventas para mostrar</div>
@@ -2342,6 +2461,7 @@ async function loadDashboard(force = false) {
     }
     if (sec) { sec.hidden = true; sec.innerHTML = ''; }
   } else {
+    renderExecutiveInsights(bundle);
     if (kpiEl) {
       kpiEl.innerHTML = `
       <div class="stat-card stat-card--accent">
@@ -2514,17 +2634,22 @@ async function loadRegions(force = false) {
   if (!tbody) return;
   if (!regs || !regs.length) {
     tbody.innerHTML = typeof opsEmptyRow === 'function'
-      ? opsEmptyRow(5, { title: regs ? 'Sin datos' : 'Sin conexión', hint: 'Revisa la base de datos o los filtros del tablero.' })
-      : `<tr><td colspan="5">${regs ? 'Sin datos' : 'Sin conexión'}</td></tr>`;
+      ? opsEmptyRow(7, { title: regs ? 'Sin datos' : 'Sin conexión', hint: 'Revisa la base de datos o los filtros del tablero.' })
+      : `<tr><td colspan="7">${regs ? 'Sin datos' : 'Sin conexión'}</td></tr>`;
   } else {
+    const totalRevenue = regs.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
     tbody.innerHTML = regs.map(r=>{
       const m = r.revenue>0 ? ((r.profit/r.revenue)*100).toFixed(1) : '—';
+      const share = totalRevenue > 0 ? (Number(r.revenue || 0) / totalRevenue) * 100 : 0;
+      const ticket = Number(r.orders || 0) > 0 ? Number(r.revenue || 0) / Number(r.orders) : 0;
       return `<tr>
         <td>${r.region}</td>
         <td>${fmtUSD(r.revenue)}</td>
+        <td><strong>${share.toFixed(1)}%</strong></td>
         <td>${fmtUSD(r.profit)}</td>
         <td>${fmtNum(r.orders)}</td>
-        <td>${m}%</td>
+        <td>${fmtUSD(ticket)}</td>
+        <td>${m === '—' ? '—' : m + '%'}</td>
       </tr>`;
     }).join('');
   }
@@ -2600,6 +2725,7 @@ class OrdersTable {
   async search() {
     this._filters = {
       country:   document.getElementById('f-country')?.value  || '',
+      region:    document.getElementById('f-region')?.value   || '',
       item_type: document.getElementById('f-itemtype')?.value || '',
       channel:   document.getElementById('f-channel')?.value  || '',
       priority:  document.getElementById('f-priority')?.value || '',
@@ -2945,9 +3071,15 @@ function normalizeCatalogRow(c, index) {
   const categoryId = Number(
     c?.category_id ?? CATALOG_CATEGORY_IDS[name] ?? (index + 1)
   );
-  let n = Number(c?.product_count ?? c?.sku_variants ?? 10);
-  if (!Number.isFinite(n) || n < 10) n = 10;
-  return { category_id: categoryId, name, product_count: n };
+  let n = Number(c?.product_count ?? c?.sku_variants ?? 0);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  return {
+    category_id: categoryId,
+    name,
+    product_count: n,
+    revenue: Number(c?.revenue || 0),
+    units: Number(c?.units || 0),
+  };
 }
 
 function catalogShowCategories() {
@@ -2990,7 +3122,11 @@ function renderCategoryGrid(rows) {
     btn.innerHTML = `
       <span class="category-card-id">ID ${c.category_id}</span>
       <h3 class="category-card-name">${escHtml(c.name)}</h3>
-      <p class="category-card-meta">${c.product_count || 10} productos</p>`;
+      <p class="category-card-meta">${c.product_count || 0} productos</p>
+      <div class="category-card-totals">
+        <span><small>Valor vendido</small><strong>${fmtUSD(c.revenue || 0)}</strong></span>
+        <span><small>Unidades</small><strong>${fmtNum(c.units || 0)}</strong></span>
+      </div>`;
     btn.onclick = () => openCatalogCategory(c.name, c.category_id);
     grid.appendChild(btn);
   });
@@ -3113,6 +3249,7 @@ function openLoginModal() {
   m.hidden = false;
   m.setAttribute('aria-hidden', 'false');
   document.getElementById('login-error').textContent = '';
+  resetPasswordVisibility(m);
   document.getElementById('login-user')?.focus();
 }
 function closeLoginModal() {
@@ -3123,6 +3260,7 @@ function closeLoginModal() {
 }
 function refreshAuthUi(user, access) {
   window._authUser = user || null;
+  window.ALTAVIA_TIMEZONE = user?.timezone || 'America/Guayaquil';
   if (access) setAccess(access);
   else if (user?.role) setAccess({ ...window._access, role: user.role, pages: window._access.pages, permissions: window._access.permissions });
   const logged = !!(user && (user.email || user.username));
@@ -3144,7 +3282,16 @@ function refreshAuthUi(user, access) {
   const initial = (who.trim()[0] || 'G').toUpperCase();
   const label = logged ? who + (user.role ? ' · ' + user.role : '') : '';
   if (sbCard) sbCard.hidden = !logged;
-  if (sbAvatar) sbAvatar.textContent = initial;
+  if (sbAvatar) {
+    if (user?.avatar_url) {
+      const img = document.createElement('img');
+      img.src = user.avatar_url;
+      img.alt = 'Foto de perfil';
+      sbAvatar.replaceChildren(img);
+    } else {
+      sbAvatar.textContent = initial;
+    }
+  }
   if (sbName) sbName.textContent = who || 'Usuario';
   if (sbRole) sbRole.textContent = user?.role || '';
   if (topUser) {
@@ -3163,6 +3310,8 @@ function refreshAuthUi(user, access) {
   if (typeof applyPermissionUi === 'function') applyPermissionUi();
   if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
   if (typeof refreshVentasBadge === 'function') refreshVentasBadge();
+  if (logged && user?.theme && typeof applyTheme === 'function') applyTheme(user.theme, false);
+  if (logged && typeof applyLanguage === 'function') applyLanguage(user?.language || 'es');
 }
 async function fetchMe() {
   try {
@@ -3177,6 +3326,7 @@ function openRegisterModal() {
   m.hidden = false;
   m.setAttribute('aria-hidden', 'false');
   document.getElementById('register-error').textContent = '';
+  resetPasswordVisibility(m);
   document.getElementById('reg-name')?.focus();
 }
 function closeRegisterModal() {
@@ -3250,29 +3400,59 @@ async function logout() {
   const tiendaNav = document.querySelector('.nav-item[data-page="tienda"]');
   showPage('tienda', tiendaNav, { tiendaMode: 'home' });
 }
-function openProfileModal() {
+async function openProfileModal() {
   const user = window._authUser;
   if (!user) return;
   const m = document.getElementById('profile-modal');
   if (!m) return;
   document.getElementById('profile-name').value = user.name || '';
   document.getElementById('profile-email').value = user.email || '';
+  document.getElementById('profile-phone').value = user.phone || '';
+  const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Guayaquil';
+  const detectedTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.getElementById('profile-language').value = 'es';
+  applyLanguage('es');
+  const timezoneSelect = document.getElementById('profile-timezone');
+  const preferredTimezone = user.preferences_configured ? (user.timezone || detectedTimezone) : detectedTimezone;
+  if (![...timezoneSelect.options].some(o => o.value === preferredTimezone)) timezoneSelect.add(new Option(preferredTimezone, preferredTimezone));
+  timezoneSelect.value = preferredTimezone;
+  document.getElementById('profile-theme').value = user.preferences_configured ? (user.theme || detectedTheme) : detectedTheme;
+  const avatar = document.getElementById('profile-avatar-preview');
+  if (avatar) avatar.innerHTML = user.avatar_url ? `<img src="${user.avatar_url}" alt="Foto de perfil">` : (user.name || user.email || 'U').trim()[0].toUpperCase();
+  document.getElementById('profile-role-summary').textContent = user.role_label || user.role || 'Usuario';
   document.getElementById('profile-current-pass').value = '';
   document.getElementById('profile-new-pass').value = '';
   document.getElementById('profile-new-pass2').value = '';
   document.getElementById('profile-error').textContent = '';
-  const sem1w = document.getElementById('profile-sem1-wrap');
-  if (sem1w) sem1w.hidden = user.role !== 'administrador';
-  const soundEl = document.getElementById('profile-notif-sound');
-  if (soundEl) {
-    const stored = localStorage.getItem('gt-notif-sound');
-    soundEl.checked = stored === null
-      ? (typeof opsUxDefaultSoundForRole === 'function' ? opsUxDefaultSoundForRole() : false)
-      : stored === '1';
-  }
   m.hidden = false;
   m.setAttribute('aria-hidden', 'false');
+  showProfileTab('personal');
+  resetPasswordVisibility(m);
   document.getElementById('profile-name')?.focus();
+  if (user.role === 'cliente' && !user.phone) {
+    try {
+      const response = await fetch(API + '/auth/profile/suggestions', { credentials:'same-origin' });
+      const data = await response.json();
+      const suggestion = data.suggestions || {};
+      if (!document.getElementById('profile-phone').value) document.getElementById('profile-phone').value = suggestion.phone || '';
+    } catch { /* Los campos quedan disponibles para ingreso manual. */ }
+  }
+}
+function showProfileTab(name) {
+  document.querySelectorAll('#profile-modal .profile-tab-panel').forEach(p => p.hidden = p.dataset.profileTab !== name);
+  document.querySelectorAll('#profile-modal .profile-tab-btn').forEach(b => b.classList.toggle('is-active', b.dataset.profileTab === name));
+}
+async function uploadProfileAvatar(input) {
+  const file = input?.files?.[0]; if (!file) return;
+  const fd = new FormData(); fd.append('avatar', file);
+  const errEl = document.getElementById('profile-error'); errEl.textContent = '';
+  try {
+    const r = await fetch(API + '/auth/profile/avatar', { method:'POST', credentials:'same-origin', body:fd });
+    const data = await r.json().catch(() => ({})); if (!r.ok) throw new Error(data.message || 'No se pudo subir la imagen.');
+    window._authUser = data.user; refreshAuthUi(data.user, window._access);
+    const preview=document.getElementById('profile-avatar-preview'); if(preview) preview.innerHTML=`<img src="${data.avatar_url}" alt="Foto de perfil">`;
+    notifyOk('Foto de perfil actualizada.');
+  } catch(e) { errEl.textContent=String(e.message||e); }
 }
 function closeProfileModal() {
   const m = document.getElementById('profile-modal');
@@ -3290,7 +3470,16 @@ async function submitProfile(e) {
     current_password: document.getElementById('profile-current-pass').value,
     new_password: document.getElementById('profile-new-pass').value,
     password_confirm: document.getElementById('profile-new-pass2').value,
+    phone: document.getElementById('profile-phone').value.trim(),
+    language: 'es',
+    timezone: document.getElementById('profile-timezone').value,
+    theme: document.getElementById('profile-theme').value,
   };
+  const phoneInput = document.getElementById('profile-phone');
+  if (phoneInput && !phoneInput.checkValidity()) {
+    errEl.textContent = 'Ingresa un teléfono válido.';
+    showProfileTab('personal'); phoneInput.focus(); return;
+  }
   try {
     const r = await fetch(API + '/auth/profile', {
       method: 'PATCH',
@@ -3305,15 +3494,49 @@ async function submitProfile(e) {
     }
     closeProfileModal();
     refreshAuthUi(data.user, data.access);
+    applyTheme(data.user?.theme || payload.theme, false);
+    applyLanguage(data.user?.language || payload.language);
     notifyOk(data.message || 'Perfil actualizado.');
   } catch (e) {
     errEl.textContent = String(e.message || e);
   }
 }
 
+function initPasswordToggles(root) {
+  (root || document).querySelectorAll('input[type="password"][data-password-toggle]').forEach(input => {
+    if (input.dataset.passwordReady === '1') return;
+    input.dataset.passwordReady = '1';
+    const wrap = document.createElement('div');
+    wrap.className = 'password-field';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'password-toggle';
+    button.setAttribute('aria-label', 'Mostrar contraseña');
+    button.setAttribute('aria-pressed', 'false');
+    button.innerHTML = '<span aria-hidden="true">👁</span>';
+    button.addEventListener('click', () => {
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      button.setAttribute('aria-pressed', showing ? 'false' : 'true');
+      button.setAttribute('aria-label', showing ? 'Mostrar contraseña' : 'Ocultar contraseña');
+      input.focus();
+    });
+    wrap.appendChild(button);
+  });
+}
+function resetPasswordVisibility(scope) {
+  (scope || document).querySelectorAll('input[data-password-toggle]').forEach(input => { input.type = 'password'; });
+  (scope || document).querySelectorAll('.password-toggle').forEach(button => {
+    button.setAttribute('aria-pressed', 'false'); button.setAttribute('aria-label', 'Mostrar contraseña');
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initThemeUi();
+  applyLanguage(localStorage.getItem('gt-language') || 'es');
+  initPasswordToggles(document);
   if (typeof renderShopHeaderNav === 'function') renderShopHeaderNav();
   fetchMe().then(data => {
     refreshAuthUi(data?.user || null, data?.access);
@@ -3344,7 +3567,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="fg">
         <label for="login-pass">Contraseña</label>
-        <input type="password" id="login-pass" name="password" autocomplete="current-password" required />
+        <input type="password" id="login-pass" name="password" autocomplete="current-password" data-password-toggle required />
       </div>
       <p id="login-error" class="login-error" role="alert"></p>
       <button type="submit" class="btn btn-primary btn-block">Entrar</button>
@@ -3371,11 +3594,11 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="fg">
         <label for="reg-password">Contraseña</label>
-        <input type="password" id="reg-password" autocomplete="new-password" placeholder="Mín. 8 caracteres, letra y número" required />
+        <input type="password" id="reg-password" autocomplete="new-password" data-password-toggle placeholder="Mín. 8 caracteres, letra y número" required />
       </div>
       <div class="fg">
         <label for="reg-password2">Confirmar contraseña</label>
-        <input type="password" id="reg-password2" autocomplete="new-password" required />
+        <input type="password" id="reg-password2" autocomplete="new-password" data-password-toggle required />
       </div>
       <p id="register-error" class="login-error" role="alert"></p>
       <button type="submit" class="btn btn-primary btn-block">Registrarme</button>
@@ -3388,43 +3611,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <div id="profile-modal" class="modal" hidden aria-hidden="true" role="dialog" aria-labelledby="profile-modal-title">
   <div class="modal-backdrop" onclick="closeProfileModal()"></div>
-  <div class="modal-card">
+  <div class="modal-card modal-card--profile">
     <h2 id="profile-modal-title">Mi perfil</h2>
-    <p class="modal-sub">Actualiza tu nombre o correo. Para cambiar correo o contraseña debes indicar tu contraseña actual.</p>
+    <p class="modal-sub">Administra tus datos, preferencias y acceso desde un solo lugar.</p>
     <form onsubmit="submitProfile(event)">
-      <div class="fg">
-        <label for="profile-name">Nombre completo</label>
-        <input type="text" id="profile-name" autocomplete="name" required />
-      </div>
-      <div class="fg">
-        <label for="profile-email">Correo electrónico</label>
-        <input type="email" id="profile-email" autocomplete="email" required />
-      </div>
-      <label class="ux-pref-row" for="profile-notif-sound">
-        <input type="checkbox" id="profile-notif-sound" onchange="opsUxSetNotifSound(this.checked)" />
-        Sonido al recibir notificaciones nuevas
-      </label>
-      <div id="profile-sem1-wrap" class="fg fg--spaced" hidden>
-        <p class="modal-sub" style="margin-bottom:8px">Vista histórica del tablero (solo administrador). La plataforma principal es la SPA actual.</p>
-        <button type="button" class="btn btn-ghost btn-block" onclick="window.location.href='/sem1'">Vista histórica</button>
-        <p class="modal-sub" style="margin-top:6px;margin-bottom:0">Tablero histórico disponible solo para administradores.</p>
-      </div>
-      <p class="modal-sub" style="margin-top:8px;margin-bottom:4px">Cambiar contraseña (opcional)</p>
-      <div class="fg">
-        <label for="profile-current-pass">Contraseña actual</label>
-        <input type="password" id="profile-current-pass" autocomplete="current-password" placeholder="Solo si cambias correo o contraseña" />
-      </div>
-      <div class="fg">
-        <label for="profile-new-pass">Nueva contraseña</label>
-        <input type="password" id="profile-new-pass" autocomplete="new-password" placeholder="Mín. 8 caracteres, letra y número" />
-      </div>
-      <div class="fg">
-        <label for="profile-new-pass2">Confirmar nueva contraseña</label>
-        <input type="password" id="profile-new-pass2" autocomplete="new-password" />
-      </div>
+      <nav class="profile-tabs" aria-label="Secciones del perfil">
+        <button type="button" class="profile-tab-btn is-active" data-profile-tab="personal" onclick="showProfileTab('personal')">Datos personales</button>
+        <button type="button" class="profile-tab-btn" data-profile-tab="preferences" onclick="showProfileTab('preferences')">Preferencias</button>
+        <button type="button" class="profile-tab-btn" data-profile-tab="access" onclick="showProfileTab('access')">Acceso</button>
+      </nav>
+      <section class="profile-tab-panel" data-profile-tab="personal">
+        <div class="profile-avatar-row"><div class="profile-avatar-preview" id="profile-avatar-preview">U</div><label class="btn btn-ghost btn-sm">Cambiar foto<input type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="uploadProfileAvatar(this)"></label></div>
+        <div class="profile-form-grid"><div class="fg"><label for="profile-name">Nombre completo</label><input type="text" id="profile-name" autocomplete="name" minlength="2" maxlength="100" required /></div><div class="fg"><label for="profile-phone">Teléfono</label><input type="tel" id="profile-phone" autocomplete="tel" inputmode="tel" maxlength="20" pattern="\+?[0-9][0-9 ()-]{6,19}" placeholder="+593 99 123 4567" /></div></div>
+      </section>
+      <section class="profile-tab-panel" data-profile-tab="preferences" hidden>
+        <div class="profile-form-grid"><div class="fg"><label>Idioma</label><input type="text" value="Español" disabled></div><input id="profile-language" type="hidden" value="es"><div class="fg"><label for="profile-timezone">Zona horaria</label><select id="profile-timezone"><option value="America/Guayaquil">Ecuador (GMT-5)</option><option value="America/Bogota">Colombia (GMT-5)</option><option value="America/Lima">Perú (GMT-5)</option><option value="America/Mexico_City">México</option><option value="Europe/Madrid">España</option></select></div><div class="fg"><label for="profile-theme">Tema</label><select id="profile-theme"><option value="light">Claro</option><option value="dark">Oscuro</option></select></div></div>
+      </section>
+      <section class="profile-tab-panel" data-profile-tab="access" hidden>
+        <div class="profile-access-summary"><small>Rol asignado</small><strong id="profile-role-summary">Usuario</strong><p class="modal-sub">El administrador gestiona el acceso correspondiente a este rol.</p></div>
+        <div class="fg"><label for="profile-email">Correo electrónico</label><input type="email" id="profile-email" autocomplete="email" required /></div>
+        <p class="modal-sub">Cambiar contraseña (opcional)</p><div class="profile-form-grid"><div class="fg"><label for="profile-current-pass">Contraseña actual</label><input type="password" id="profile-current-pass" autocomplete="current-password" data-password-toggle placeholder="Necesaria para correo o contraseña" /></div><div class="fg"><label for="profile-new-pass">Nueva contraseña</label><input type="password" id="profile-new-pass" autocomplete="new-password" data-password-toggle placeholder="Mín. 8 caracteres, letra y número" /></div><div class="fg"><label for="profile-new-pass2">Confirmar contraseña</label><input type="password" id="profile-new-pass2" autocomplete="new-password" data-password-toggle /></div></div>
+      </section>
       <p id="profile-error" class="login-error" role="alert"></p>
-      <button type="submit" class="btn btn-primary btn-block">Guardar cambios</button>
-      <button type="button" class="btn btn-ghost btn-block" onclick="closeProfileModal()">Cancelar</button>
+      <button type="submit" class="btn btn-primary btn-block" id="profile-save-btn">Guardar cambios</button>
+      <button type="button" class="btn btn-ghost btn-block" id="profile-cancel-btn" onclick="closeProfileModal()">Cancelar</button>
     </form>
   </div>
 </div>
@@ -3455,7 +3665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="prod-detail-body"></div>
         <div class="shop-detail-actions">
           <label for="prod-detail-qty" class="shop-bulk-label">Cantidad</label>
-          <input type="number" id="prod-detail-qty" min="1" value="1" style="width:72px" />
+          <input type="number" id="prod-detail-qty" min="1" step="1" value="1" style="width:72px" oninput="clampQtyInput(this)" />
           <button type="button" class="btn btn-primary" onclick="tiendaAddFromDetail()">Agregar al carrito</button>
           <button type="button" class="btn btn-ghost" onclick="closeProductDetail()">Cerrar</button>
         </div>
@@ -3565,7 +3775,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 <div id="devolver-modal" class="modal" hidden aria-hidden="true">
   <div class="modal-backdrop" onclick="closeDevolverModal()"></div>
-  <div class="modal-card" style="max-width:560px;max-height:90vh;overflow:auto">
+  <div class="modal-card modal-card--request-detail">
     <h2>Inspección de devolución</h2>
     <p class="modal-sub">Solo reingresa a stock lo que esté en buen estado. Lo dañado se registra como merma y no vuelve a inventario vendible.</p>
     <input type="hidden" id="devolver-request-id" value="" />
@@ -3573,14 +3783,14 @@ document.addEventListener('DOMContentLoaded', () => {
       <select id="devolver-condition" onchange="onDevolverConditionChange()">
         <option value="apto">Apto — reingresa todo al stock</option>
         <option value="danado">Dañado — nada reingresa</option>
-        <option value="mixto">Mixto — inspeccionar por línea</option>
+        <option value="mixto">Elegir productos y cantidades</option>
       </select>
     </div>
     <div class="fg"><label for="devolver-reason">Motivo (opcional)</label>
       <input type="text" id="devolver-reason" placeholder="Ej. cliente no conforme, embalaje abierto…" />
     </div>
     <div id="devolver-mixto-block" hidden>
-      <p class="modal-sub" style="margin-top:0">Indica cuántas unidades aptas y dañadas por línea (deben sumar la cantidad del pedido).</p>
+      <p class="modal-sub" style="margin-top:0">Indica solo lo que el cliente devuelve ahora. Puedes devolver uno o varios productos y completar el resto después.</p>
       <div class="table-scroll"><table>
         <thead><tr><th>Producto / SKU</th><th>Pedido</th><th>Apto</th><th>Dañado</th></tr></thead>
         <tbody id="devolver-lines-body"></tbody>

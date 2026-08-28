@@ -51,13 +51,57 @@ def find_by_id(user_id: str) -> dict[str, Any] | None:
 def public_user(doc: dict[str, Any]) -> dict[str, Any]:
     email = doc["email"]
     role = doc.get("role", "cliente")
+    preferences = doc.get("preferences") or {}
+    default_notifications = (
+        {"orders": True, "inventory": False, "reports": False, "support": True}
+        if role == "cliente"
+        else {"orders": True, "inventory": True, "reports": True, "support": True}
+    )
     return {
         "id": str(doc["_id"]),
         "email": email,
         "username": email,
         "name": doc.get("name", ""),
         "role": role,
+        "avatar_url": doc.get("avatar_url"),
+        "phone": doc.get("phone", ""),
+        "job_title": doc.get("job_title", ""),
+        "department": doc.get("department", ""),
+        "country": doc.get("country", ""),
+        "city": doc.get("city", ""),
+        "language": preferences.get("language", "es"),
+        "timezone": preferences.get("timezone", "America/Guayaquil"),
+        "theme": preferences.get("theme", "light"),
+        "notification_preferences": preferences.get("notifications") or default_notifications,
+        "preferences_configured": bool(preferences),
+        "permissions": roles_service.permissions_for_role(role),
+        "role_label": (roles_service.get_role(role) or {}).get("label", role),
     }
+
+
+def profile_suggestions(doc: dict[str, Any]) -> dict[str, str]:
+    """Recupera datos de contacto fiables del pedido más reciente del cliente."""
+    if doc.get("role") != "cliente":
+        return {}
+    db = _db()
+    last = db["purchase_requests"].find_one(
+        {"client_email": doc.get("email")},
+        {"_id": 0, "client_phone": 1, "country_id": 1, "shipping_destination": 1},
+        sort=[("request_id", -1)],
+    ) or {}
+    result: dict[str, str] = {}
+    if last.get("client_phone"):
+        result["phone"] = str(last["client_phone"])
+    if last.get("country_id") is not None:
+        country = db["dim_pais"].find_one(
+            {"country_id": int(last["country_id"])}, {"_id": 0, "name": 1}
+        ) or {}
+        if country.get("name"):
+            result["country"] = str(country["name"])
+    destination = str(last.get("shipping_destination") or "").strip()
+    if destination and "," not in destination and len(destination) <= 80:
+        result["city"] = destination
+    return result
 
 
 def create_user(*, email: str, password: str, name: str, role: str = "cliente") -> dict[str, Any]:
@@ -158,6 +202,7 @@ def update_profile(
     email: str,
     current_password: str | None = None,
     new_password: str | None = None,
+    profile_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     doc = find_by_id(user_id)
     if not doc:
@@ -173,7 +218,22 @@ def update_profile(
         if not current_password or not verify_password(doc, current_password):
             raise ValueError("invalid_current_password")
 
-    updates: dict[str, Any] = {"name": name}
+    extra = profile_data or {}
+    notifications = extra.get("notification_preferences") or {}
+    updates: dict[str, Any] = {
+        "name": name,
+        "phone": str(extra.get("phone") or "").strip()[:30],
+        "job_title": str(extra.get("job_title") or "").strip()[:80],
+        "department": str(extra.get("department") or "").strip()[:80],
+        "country": str(extra.get("country") or "").strip()[:80],
+        "city": str(extra.get("city") or "").strip()[:80],
+        "preferences": {
+            "language": "en" if extra.get("language") == "en" else "es",
+            "timezone": str(extra.get("timezone") or "America/Guayaquil")[:80],
+            "theme": "dark" if extra.get("theme") == "dark" else "light",
+            "notifications": {key: bool(notifications.get(key, True)) for key in ("orders", "inventory", "reports", "support")},
+        },
+    }
     if email_changed:
         if find_by_email(email):
             raise ValueError("duplicate_email")
@@ -181,9 +241,16 @@ def update_profile(
     if password_change:
         updates["password_hash"] = generate_password_hash(new_password or "")
 
-    if updates.get("email") == current and updates.get("name") == doc.get("name") and not password_change:
-        return public_user(doc)
-
     _col().update_one({"_id": doc["_id"]}, {"$set": updates})
+    updated = find_by_id(user_id)
+    return public_user(updated) if updated else {}
+
+
+def update_avatar(user_id: str, avatar_url: str) -> dict[str, Any]:
+    """Actualiza solamente la foto del propietario del perfil."""
+    doc = find_by_id(user_id)
+    if not doc:
+        raise ValueError("not_found")
+    _col().update_one({"_id": doc["_id"]}, {"$set": {"avatar_url": avatar_url}})
     updated = find_by_id(user_id)
     return public_user(updated) if updated else {}

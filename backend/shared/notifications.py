@@ -158,17 +158,17 @@ def status_message(status: str, request_id: int) -> tuple[str, str]:
     elif status == "entregada":
         body = (
             f"Tu solicitud #{request_id} fue marcada como entregada.\n"
-            f"Gracias por comprar en GLOBTRADE."
+            f"Gracias por comprar en Altavia Trade."
         )
     elif status == "devuelta":
         body = (
             f"Tu solicitud #{request_id} fue marcada como devolución.\n"
-            f"El inventario fue repuesto. Revisa Mis pedidos en GLOBTRADE."
+            f"El inventario fue repuesto. Revisa Mis pedidos en Altavia Trade."
         )
     else:
         body = (
             f"Tu solicitud de compra #{request_id} cambió a estado: {label}.\n"
-            f"Revisa Mis pedidos o Notificaciones en GLOBTRADE."
+            f"Revisa Mis pedidos o Notificaciones en Altavia Trade."
         )
     return subject, body
 

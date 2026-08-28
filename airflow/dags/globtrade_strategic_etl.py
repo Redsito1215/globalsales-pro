@@ -3,7 +3,7 @@
 DAG: validación y sincronización segura GLOBTRADE → fact_ventas.
 
 Estrategia idempotente: Mongo landing → sincronización pendiente → validación.
-No usa el CSV antiguo y no elimina colecciones. Ejecución exclusivamente manual.
+No usa el CSV antiguo y no elimina colecciones. Ejecución diaria automática y manual.
 """
 from __future__ import annotations
 
@@ -54,12 +54,18 @@ def _task_validate() -> None:
     run()
 
 
+def _task_publish_clickhouse() -> None:
+    from etl_proceso.steps.sync_clickhouse import sync_clickhouse
+
+    sync_clickhouse()
+
+
 with DAG(
     dag_id="globtrade_strategic_etl",
-    description="ETL manual seguro: Mongo landing→sincronización→validación (RC/Tablero)",
+    description="ETL diario: Mongo landing→sincronización→validación→ClickHouse (RC/Tablero)",
     default_args=default_args,
     start_date=datetime(2026, 1, 1),
-    schedule=None,
+    schedule="0 2 * * *",
     catchup=False,
     tags=["globtrade", "etl", "estrategico", "reportes-rc"],
     max_active_runs=1,
@@ -80,10 +86,15 @@ with DAG(
         task_id="validate_strategic_layer",
         python_callable=_task_validate,
     )
+    publish_clickhouse_reports = PythonOperator(
+        task_id="publish_clickhouse_reports",
+        python_callable=_task_publish_clickhouse,
+    )
 
     (
         inspect_mongo_landing
         >> preserve_landing_dataset
         >> synchronize_strategic_layer
         >> validate_strategic_layer
+        >> publish_clickhouse_reports
     )

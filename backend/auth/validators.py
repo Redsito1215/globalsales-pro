@@ -6,6 +6,7 @@ import re
 
 _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 _NAME_RE = re.compile(r"^[\w\sáéíóúÁÉÍÓÚñÑüÜ.'\-]{2,100}$", re.UNICODE)
+_PHONE_RE = re.compile(r"^\+?[0-9][0-9\s()\-]{6,19}$")
 
 
 def normalize_email(raw: str) -> str:
@@ -83,6 +84,8 @@ def validate_profile_update(
     password_confirm: str,
     email_changed: bool,
     password_change: bool,
+    phone: str = "",
+    language: str = "es",
 ) -> dict[str, str]:
     errors: dict[str, str] = {}
     name = (name or "").strip()
@@ -110,5 +113,11 @@ def validate_profile_update(
             errors["new_password"] = pwd_err
         if new_password != password_confirm:
             errors["password_confirm"] = "Las contraseñas no coinciden."
+
+    clean_phone = (phone or "").strip()
+    if clean_phone and not _PHONE_RE.match(clean_phone):
+        errors["phone"] = "Ingresa un teléfono válido; usa solo números, espacios, +, paréntesis o guiones."
+    if language not in {"es", "en"}:
+        errors["language"] = "Selecciona Español o English."
 
     return errors

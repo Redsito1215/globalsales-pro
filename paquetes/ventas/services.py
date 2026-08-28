@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from auth import roles_service
 from paquetes.tablero import catalogo_nombres as nom
@@ -20,18 +21,44 @@ REQUEST_STATUSES = frozenset(
         "convertida",
         "enviada",
         "entregada",
+        "devolucion_parcial",
         "devuelta",
         "rechazada",
         "cancelada",
     }
 )
-ACTIVE_STATUSES = frozenset({"pendiente", "en_revision", "aprobada", "convertida", "enviada"})
+ACTIVE_STATUSES = frozenset({"pendiente", "en_revision", "aprobada", "convertida", "enviada", "devolucion_parcial"})
 RESTOCK_STATUSES = frozenset({"rechazada", "cancelada"})
 POST_SALE_STATUSES = frozenset({"enviada", "entregada"})
 PAYMENT_ALLOWED_STATUSES = frozenset({"aprobada"})
 PAYMENT_STATUSES = frozenset({"pendiente_pago", "parcial", "pagado", "credito"})
 PAYMENT_METHODS = frozenset({"tarjeta"})
 RETURN_CONDITIONS = frozenset({"apto", "danado", "mixto"})
+EC_TZ = ZoneInfo("America/Guayaquil")
+
+
+def _now_ec_iso() -> str:
+    return datetime.now(EC_TZ).replace(microsecond=0).isoformat()
+
+
+def _parse_non_negative_number(value: Any, field: str, *, allow_zero: bool = True) -> float:
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        raise ValueError(f"invalid_{field}") from None
+    if number < 0 or (not allow_zero and number <= 0):
+        raise ValueError(f"invalid_{field}")
+    return number
+
+
+def _clean_phone(value: Any) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    digits = re.sub(r"\D", "", raw)
+    if not digits or raw.lstrip().startswith("-"):
+        raise ValueError("invalid_phone")
+    return raw
 
 
 def _record_request_event(
@@ -437,25 +464,25 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         "request_id": rid,
         "client_name": client_name,
         "client_email": client_email,
-        "client_phone": (data.get("client_phone") or "").strip() or None,
+        "client_phone": _clean_phone(data.get("client_phone")),
         "country_id": country_id,
         "channel_id": channel_id,
         "status": "pendiente",
         "payment_status": "pendiente_pago",
         "paid_at": None,
         "paid_amount": None,
-        "payment_due": round(float(data.get("total") or 0), 2) if data.get("total") else None,
+        "payment_due": round(_parse_non_negative_number(data.get("total"), "total"), 2) if data.get("total") else None,
         "notes": (data.get("notes") or "").strip() or None,
-        "created_at": date.today().isoformat(),
+        "created_at": _now_ec_iso(),
         "reviewed_by": None,
         "order_id": None,
         "discount_code": (data.get("discount_code") or "").strip().upper() or None,
-        "discount_amount": round(float(data.get("discount_amount") or 0), 2),
-        "subtotal": round(float(data.get("subtotal") or 0), 2),
-        "shipping_cost": round(float(data.get("shipping_cost") or 0), 2),
+        "discount_amount": round(_parse_non_negative_number(data.get("discount_amount"), "discount_amount"), 2),
+        "subtotal": round(_parse_non_negative_number(data.get("subtotal"), "subtotal"), 2),
+        "shipping_cost": round(_parse_non_negative_number(data.get("shipping_cost"), "shipping_cost"), 2),
         "shipping_destination": (data.get("shipping_destination") or data.get("destination") or "").strip() or None,
         "shipping_region": (data.get("shipping_region") or "").strip() or None,
-        "total": round(float(data.get("total") or 0), 2),
+        "total": round(_parse_non_negative_number(data.get("total"), "total"), 2),
         "commercial_policy": data.get("commercial_policy") or None,
         "stock_lines": stock_lines,
         "stock_restored": False,
@@ -479,13 +506,13 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("invalid_product")
         # Prioridad: precio de variante/checkout > maestro
         if item.get("unit_price") is not None and item.get("unit_price") != "":
-            unit_price = float(item["unit_price"])
+            unit_price = _parse_non_negative_number(item["unit_price"], "unit_price", allow_zero=False)
         else:
-            unit_price = float(prod.get("unit_price") or 0)
+            unit_price = _parse_non_negative_number(prod.get("unit_price"), "unit_price", allow_zero=False)
         if item.get("unit_cost") is not None and item.get("unit_cost") != "":
-            unit_cost = float(item["unit_cost"])
+            unit_cost = _parse_non_negative_number(item["unit_cost"], "unit_cost")
         else:
-            unit_cost = float(prod.get("unit_cost") or 0)
+            unit_cost = _parse_non_negative_number(prod.get("unit_cost"), "unit_cost")
         line_gross = round(unit_price * qty, 2)
         built_gross.append(line_gross)
         line_docs.append(
@@ -508,7 +535,7 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         )
         lid += 1
 
-    discount_amount = round(float(data.get("discount_amount") or 0), 2)
+    discount_amount = round(_parse_non_negative_number(data.get("discount_amount"), "discount_amount"), 2)
     shares = _allocate_discount(built_gross, discount_amount)
     for i, doc in enumerate(line_docs):
         share = shares[i] if i < len(shares) else 0.0
@@ -516,7 +543,7 @@ def create_request(data: dict[str, Any]) -> dict[str, Any]:
         doc["line_net"] = round(max(doc["line_gross"] - share, 0.0), 2)
 
     calc_subtotal = round(sum(built_gross), 2)
-    shipping_cost = round(float(data.get("shipping_cost") or 0), 2)
+    shipping_cost = round(_parse_non_negative_number(data.get("shipping_cost"), "shipping_cost"), 2)
     calc_total = round(max(calc_subtotal - discount_amount + shipping_cost, 0.0), 2)
     if not data.get("subtotal"):
         request_doc["subtotal"] = calc_subtotal
@@ -623,6 +650,8 @@ def update_status(request_id: int, status: str, *, reviewer_email: str | None = 
     patch: dict[str, Any] = {"status": status, "reviewed_by": reviewer_email}
     if status == "enviada":
         patch["shipped_at"] = date.today().isoformat()
+        patch["carrier"] = req.get("carrier") or "Transporte interno"
+        patch["estimated_delivery"] = req.get("estimated_delivery") or (date.today() + timedelta(days=7)).isoformat()
         if not req.get("tracking_number"):
             patch["tracking_number"] = f"GT-{int(request_id):06d}"
     if status == "entregada":
@@ -745,7 +774,7 @@ def update_payment(
         subject=f"Solicitud #{request_id} — pago {payment_status.replace('_', ' ')}",
         body=(
             f"El estado de pago de tu solicitud #{request_id} es: {payment_status.replace('_', ' ')}.\n"
-            f"Revisa Mis pedidos en GLOBTRADE."
+            f"Revisa Mis pedidos en Altavia Trade."
         ),
         category="pago",
         request_id=int(request_id),
@@ -1074,6 +1103,7 @@ def plan_return_stock(
     *,
     condition: str,
     inspections: list[dict[str, Any]] | None = None,
+    partial: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """
     Decide qué unidades reingresan a stock (apto) y cuáles no (dañado).
@@ -1114,14 +1144,14 @@ def plan_return_stock(
         if ok < 0 or bad < 0:
             raise ValueError("invalid_return_qty")
         ordered = by_vid[vid]
-        if ok + bad != ordered:
+        if (not partial and ok + bad != ordered) or (partial and (ok + bad < 1 or ok + bad > ordered)):
             raise ValueError("return_qty_mismatch")
         if ok:
             restock_map[vid] = ok
         if bad:
             damaged_map[vid] = bad
     missing = set(by_vid) - seen
-    if missing:
+    if missing and not partial:
         raise ValueError("return_inspection_incomplete")
     restock = [{"variant_id": vid, "quantity": qty} for vid, qty in restock_map.items()]
     damaged = [{"variant_id": vid, "quantity": qty} for vid, qty in damaged_map.items()]
@@ -1241,9 +1271,9 @@ def return_delivered_request(
     req = db["purchase_requests"].find_one({"request_id": int(request_id)})
     if not req:
         raise ValueError("not_found")
-    if req.get("status") != "entregada":
+    if req.get("status") not in {"entregada", "devolucion_parcial"}:
         raise ValueError("must_be_delivered")
-    if req.get("status") == "devuelta" or req.get("returned_at"):
+    if req.get("status") == "devuelta":
         raise ValueError("already_returned")
     if req.get("payment_status") == "pagado":
         from shared.accounting import assert_period_open
@@ -1251,14 +1281,30 @@ def return_delivered_request(
         assert_period_open()
 
     stock_lines = _request_stock_lines(req)
+    previous_events = list(req.get("return_events") or [])
+    returned_before: dict[int, int] = {}
+    for event in previous_events:
+        for line in (event.get("restock_lines") or []) + (event.get("damaged_lines") or []):
+            vid = int(line.get("variant_id") or 0)
+            returned_before[vid] = returned_before.get(vid, 0) + int(line.get("quantity") or 0)
+    stock_lines = [
+        {**line, "quantity": int(line["quantity"]) - returned_before.get(int(line["variant_id"]), 0)}
+        for line in stock_lines
+        if int(line["quantity"]) - returned_before.get(int(line["variant_id"]), 0) > 0
+    ]
     restock_lines, damaged_lines = plan_return_stock(
         stock_lines,
         condition=condition or "",
         inspections=inspections,
+        partial=bool(inspections),
     )
 
     for line in restock_lines:
         _apply_restock_qty(db, int(line["variant_id"]), int(line["quantity"]))
+    if restock_lines and req.get("lot_allocations"):
+        from shared.inventory_lots import restore_allocated_lots
+        restore_allocated_lots(allocations=req.get("lot_allocations") or [], returned_lines=restock_lines,
+                               request_id=int(request_id), actor_email=reviewer_email)
 
     # Registro de merma / no reingreso (no vuelve a available)
     if damaged_lines:
@@ -1309,27 +1355,43 @@ def return_delivered_request(
 
     restock_units = sum(int(l["quantity"]) for l in restock_lines)
     damaged_units = sum(int(l["quantity"]) for l in damaged_lines)
+    event_units = restock_units + damaged_units
+    if event_units < 1:
+        raise ValueError("invalid_return_qty")
+    total_ordered = sum(int(l.get("quantity") or 0) for l in _request_stock_lines(req))
+    total_returned = sum(returned_before.values()) + event_units
+    is_complete = total_returned >= total_ordered
+    cumulative_refund = round(float(req.get("return_refund_amount") or 0) + refund_total, 2)
+    return_event = {
+        "event_id": len(previous_events) + 1, "returned_at": datetime.now(timezone.utc).isoformat(),
+        "reason": (reason or "").strip() or None, "condition": (condition or "").strip().lower(),
+        "restock_lines": restock_lines, "damaged_lines": damaged_lines,
+        "units": event_units, "refund_amount": round(refund_total, 2), "reviewed_by": reviewer_email,
+    }
     paid_amount = float(req.get("paid_amount") or 0)
     refund_status = "sin_reembolso"
-    if refund_total > 0:
-        refund_status = "reembolsado" if refund_total >= paid_amount else "reembolso_parcial"
+    if cumulative_refund > 0:
+        refund_status = "reembolsado" if cumulative_refund >= paid_amount else "reembolso_parcial"
     db["purchase_requests"].update_one(
         {"request_id": int(request_id)},
         {
             "$set": {
-                "status": "devuelta",
-                "returned_at": date.today().isoformat(),
+                "status": "devuelta" if is_complete else "devolucion_parcial",
+                "returned_at": date.today().isoformat() if is_complete else None,
+                "last_return_at": return_event["returned_at"],
                 "return_reason": (reason or "").strip() or None,
                 "return_condition": (condition or "").strip().lower(),
                 "return_restock_lines": restock_lines,
                 "return_damaged_lines": damaged_lines,
-                "return_restock_units": restock_units,
-                "return_damaged_units": damaged_units,
-                "return_refund_amount": round(refund_total, 2),
+                "return_restock_units": int(req.get("return_restock_units") or 0) + restock_units,
+                "return_damaged_units": int(req.get("return_damaged_units") or 0) + damaged_units,
+                "return_refund_amount": cumulative_refund,
                 "refund_status": refund_status,
                 "reviewed_by": reviewer_email,
-                "stock_restored": restock_units > 0,
+                "return_request_status": "processed",
+                "stock_restored": bool(req.get("stock_restored")) or restock_units > 0,
             }
+            , "$push": {"return_events": return_event}
         },
     )
     log_audit(
@@ -1354,13 +1416,54 @@ def return_delivered_request(
         },
     )
     full = get_request(request_id) or {}
-    _notify_request_status(full, "devuelta")
+    _notify_request_status(full, "devuelta" if is_complete else "devolucion_parcial")
     return full
+
+
+def request_customer_return(request_id: int, *, customer_email: str, reason: str) -> dict[str, Any]:
+    """Registra la intención del cliente; inventario y reembolso esperan inspección interna."""
+    db = get_db()
+    clean_email = (customer_email or "").strip().lower()
+    clean_reason = (reason or "").strip()
+    req = db["purchase_requests"].find_one({"request_id": int(request_id)})
+    if not req:
+        raise ValueError("not_found")
+    if (req.get("client_email") or "").strip().lower() != clean_email:
+        raise ValueError("forbidden")
+    if req.get("status") not in {"entregada", "devolucion_parcial"}:
+        raise ValueError("must_be_delivered")
+    if req.get("return_request_status") == "pending":
+        raise ValueError("return_already_requested")
+    if len(clean_reason) < 5:
+        raise ValueError("return_reason_required")
+    now = datetime.now(timezone.utc).isoformat()
+    db["purchase_requests"].update_one(
+        {"request_id": int(request_id)},
+        {"$set": {
+            "return_request_status": "pending", "return_request_reason": clean_reason,
+            "return_requested_at": now, "return_requested_by": clean_email,
+        }},
+    )
+    _record_request_event(
+        db, request_id, "return_requested", actor_email=clean_email,
+        details={"reason": clean_reason},
+    )
+    notify_roles(
+        roles=(ADMIN_ROLE, "vendedor"),
+        subject=f"Devolución solicitada · pedido #{request_id}",
+        body=f"{clean_email} solicita una devolución: {clean_reason}",
+        category="ventas", meta={"request_id": int(request_id)},
+    )
+    return get_request(request_id) or {}
 
 
 def list_store_products(*, category_id: int | None = None, limit: int = 100, offset: int = 0) -> dict[str, Any]:
     db = get_db()
-    query: dict[str, Any] = {}
+    active_categories = db["dim_categoria"].distinct("category_id", {"active": {"$ne": False}})
+    query: dict[str, Any] = {
+        "active": {"$ne": False},
+        "category_id": {"$in": active_categories or [-1]},
+    }
     if category_id:
         query["category_id"] = int(category_id)
     col = db["dim_producto"]
@@ -1396,7 +1499,7 @@ def create_order(data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("invalid_region")
     if not db["dim_pais"].find_one({"name": country_name}):
         raise ValueError("invalid_country")
-    if not db["dim_categoria"].find_one({"name": item_type}):
+    if not db["dim_categoria"].find_one({"name": item_type, "active": {"$ne": False}}):
         raise ValueError("invalid_product")
     if not db["dim_canal"].find_one({"name": channel_name}):
         raise ValueError("invalid_channel")

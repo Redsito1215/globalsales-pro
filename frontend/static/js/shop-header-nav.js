@@ -2,9 +2,8 @@
 const SHOP_NAV_SECTIONS = [
   {
     id: 'ops',
-    label: 'Operacionales',
+    label: 'Operativo',
     items: [
-      { page: 'dashboard', label: 'Tablero' },
       { page: 'tienda', label: 'Tienda' },
       { page: 'mis-pedidos', label: 'Mis pedidos' },
       { page: 'ventas', label: 'Pedidos y ventas' },
@@ -15,23 +14,23 @@ const SHOP_NAV_SECTIONS = [
   },
   {
     id: 'q2',
-    label: 'Estratégicas',
+    label: 'Estratégico',
     items: [
-      { page: 'decisiones', label: 'Decisiones' },
-      { page: 'reportes-compuestos', label: 'Informes compuestos' },
-      { page: 'orders', label: 'Explorar ventas' },
-      { page: 'trends', label: 'Tendencia de ventas' },
-      { page: 'regions', label: 'Ventas por región' },
-      { page: 'products', label: 'Ventas por categoría' },
-      { page: 'catalogo', label: 'Catálogo analítico' },
-      { page: 'reportes', label: 'Informes simples' },
-      { page: 'export', label: 'Exportar datos' },
+      { page: 'dashboard', label: 'Resumen ejecutivo' },
+      { page: 'decisiones', label: 'Centro de decisiones' },
+      { page: 'reportes-compuestos', label: 'Informes gerenciales' },
+      { page: 'trends', label: 'Tendencia ejecutiva' },
+      { page: 'regions', label: 'Mercado por región' },
     ],
   },
   {
     id: 'gestion',
-    label: 'Gestión',
+    label: 'Táctico',
     items: [
+      { page: 'reportes', label: 'Informes operativos' },
+      { page: 'orders', label: 'Explorar ventas' },
+      { page: 'catalogo', label: 'Catálogo analítico' },
+      { page: 'export', label: 'Descargar datos' },
       { gestion: 'dim_region', label: 'Regiones' },
       { gestion: 'dim_pais', label: 'Países' },
       { gestion: 'dim_categoria', label: 'Categorías' },
@@ -75,16 +74,17 @@ function collectVisibleShopNavItems() {
 function shopNavItemAttrs(item) {
   const page = item.page ? ` data-shop-page="${item.page}"` : '';
   const gestion = item.gestion ? ` data-shop-gestion="${item.gestion}"` : '';
-  return { page, gestion };
+  const report = item.report ? ` data-shop-report="${item.report}"` : '';
+  return { page, gestion, report };
 }
 
 function renderShopNavFlatItems(items) {
   return items
     .map((item) => {
-      const { page, gestion } = shopNavItemAttrs(item);
+      const { page, gestion, report } = shopNavItemAttrs(item);
       return `
         <div class="shop-nav-group shop-nav-group--direct">
-          <button type="button" class="shop-nav-group-toggle shop-nav-direct-link"${page}${gestion}>
+          <button type="button" class="shop-nav-group-toggle shop-nav-direct-link"${page}${gestion}${report}>
             <span>${item.label}</span>
           </button>
         </div>`;
@@ -135,6 +135,7 @@ function bindShopNavHover() {
   const nav = document.getElementById('shop-madson-nav');
   if (!nav || nav.dataset.hoverBound === '1') return;
   nav.dataset.hoverBound = '1';
+  const hoverCloseDelayMs = 3000;
 
   nav.querySelectorAll('.shop-nav-group').forEach((group) => {
     let closeTimer = null;
@@ -157,7 +158,7 @@ function bindShopNavHover() {
         group.classList.remove('is-open');
         const toggle = group.querySelector('.shop-nav-group-toggle');
         if (toggle) toggle.setAttribute('aria-expanded', 'false');
-      }, 120);
+      }, hoverCloseDelayMs);
     });
   });
 }
@@ -172,6 +173,10 @@ function navigateShopNavItem(item) {
   }
   if (!item.page) return;
   const sideBtn = document.querySelector(`.nav-item[data-page="${item.page}"]`);
+  if (item.report && typeof openStrategicReport === 'function') {
+    openStrategicReport(item.report, sideBtn);
+    return;
+  }
   const pageOpts = item.page === 'tienda' ? { tiendaMode: 'catalog' } : {};
   if (typeof showPage === 'function') showPage(item.page, sideBtn, pageOpts);
 }
@@ -211,9 +216,8 @@ function renderShopHeaderNav() {
       if (!visibleItems.length) return;
       const itemsHtml = visibleItems
         .map((item) => {
-          const page = item.page ? ` data-shop-page="${item.page}"` : '';
-          const gestion = item.gestion ? ` data-shop-gestion="${item.gestion}"` : '';
-          return `<button type="button" class="shop-nav-dropdown-item"${page}${gestion}>${item.label}</button>`;
+          const { page, gestion, report } = shopNavItemAttrs(item);
+          return `<button type="button" class="shop-nav-dropdown-item"${page}${gestion}${report}>${item.label}</button>`;
         })
         .join('');
       parts.push(`
@@ -240,9 +244,11 @@ function renderShopHeaderNav() {
     event.stopPropagation();
     const page = btn.getAttribute('data-shop-page') || '';
     const gestion = btn.getAttribute('data-shop-gestion') || '';
+    const report = btn.getAttribute('data-shop-report') || '';
     navigateShopNavItem({
       page: page || undefined,
       gestion: gestion || undefined,
+      report: report || undefined,
     });
   };
 

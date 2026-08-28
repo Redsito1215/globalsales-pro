@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import math
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -161,7 +162,9 @@ def delete_vendor(vendor_id: int) -> None:
 def list_inventory(*, q: str | None = None, low_only: bool = False, threshold: int = 20, limit: int = 100, offset: int = 0) -> dict[str, Any]:
     db = get_db()
     wh = warehouse_summary()
-    query: dict[str, Any] = {}
+    from paquetes.shop.services import active_catalog_product_ids
+    active_ids = active_catalog_product_ids(db)
+    query: dict[str, Any] = {"product_id": {"$in": active_ids or [-1]}}
     if low_only:
         query["inventory_quantity"] = {"$lte": int(threshold)}
     total = db["product_variants"].count_documents(query)
@@ -175,7 +178,10 @@ def list_inventory(*, q: str | None = None, low_only: bool = False, threshold: i
     term = (q or "").strip().lower()
     out = []
     for v in rows:
-        prod = db["products"].find_one({"product_id": v.get("product_id")}, {"_id": 0, "title": 1, "vendor_id": 1})
+        prod = db["products"].find_one(
+            {"product_id": v.get("product_id")},
+            {"_id": 0, "title": 1, "vendor_id": 1, "product_type": 1, "tags": 1, "status": 1},
+        )
         vendor = None
         if prod and prod.get("vendor_id"):
             vendor = db["vendors"].find_one({"vendor_id": prod["vendor_id"]}, {"_id": 0, "name": 1})
@@ -202,6 +208,8 @@ def list_inventory(*, q: str | None = None, low_only: bool = False, threshold: i
                 "product_id": v.get("product_id"),
                 "sku": sku,
                 "title": title,
+                "category": (prod or {}).get("product_type") or (prod or {}).get("tags") or "Sin categoría",
+                "product_status": (prod or {}).get("status") or "active",
                 "inventory_quantity": available,
                 **balances,
                 "minimum_stock": minimum,
@@ -320,7 +328,7 @@ def register_physical_count(variant_id: int, *, counted: int, reason: str, actor
 
 # ── Órdenes de compra ───────────────────────────────────────────────────
 
-PO_STATUSES = frozenset({"borrador", "enviada", "parcial", "recibida", "cancelada"})
+PO_STATUSES = frozenset({"borrador", "enviada", "parcial", "recibida", "devuelta_parcial", "devuelta", "cancelada"})
 
 
 def list_purchase_orders(*, status: str | None = None, limit: int = 50, offset: int = 0) -> dict[str, Any]:
@@ -353,7 +361,7 @@ def create_purchase_order(data: dict[str, Any]) -> dict[str, Any]:
     db = get_db()
     vendor_id = int(data.get("vendor_id") or 0)
     vendor = db["vendors"].find_one({"vendor_id": vendor_id})
-    if not vendor:
+    if not vendor or vendor.get("active") is False:
         raise ValueError("invalid_vendor")
     lines_in = data.get("lines") or []
     if not lines_in:
@@ -374,8 +382,6 @@ def create_purchase_order(data: dict[str, Any]) -> dict[str, Any]:
         "sent_at": date.today().isoformat() if initial_status == "enviada" else None,
         "received_at": None,
     }
-    db["purchase_orders"].insert_one(po)
-
     line_docs = []
     lid = _next_id(db["purchase_order_lines"], "line_id")
     for item in lines_in:
@@ -387,6 +393,8 @@ def create_purchase_order(data: dict[str, Any]) -> dict[str, Any]:
         if not variant:
             raise ValueError("invalid_variant")
         cost = float(item.get("unit_cost") if item.get("unit_cost") is not None else (variant.get("cost") or 0))
+        if not math.isfinite(cost) or cost <= 0:
+            raise ValueError("invalid_unit_cost")
         line_docs.append(
             {
                 "line_id": lid,
@@ -400,6 +408,7 @@ def create_purchase_order(data: dict[str, Any]) -> dict[str, Any]:
             }
         )
         lid += 1
+    db["purchase_orders"].insert_one(po)
     if line_docs:
         db["purchase_order_lines"].insert_many(line_docs)
 
@@ -442,7 +451,8 @@ def send_purchase_order(po_id: int) -> dict[str, Any]:
     return get_purchase_order(po_id) or {}
 
 
-def receive_purchase_order(po_id: int, *, receipts: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def receive_purchase_order(po_id: int, *, receipts: list[dict[str, Any]] | None = None,
+                           actor_email: str | None = None) -> dict[str, Any]:
     """Recibe OC (completa o parcial) y sube stock."""
     db = get_db()
     po = db["purchase_orders"].find_one({"po_id": int(po_id)})
@@ -458,9 +468,12 @@ def receive_purchase_order(po_id: int, *, receipts: list[dict[str, Any]] | None 
         raise ValueError("no_lines")
 
     receipt_map: dict[int, int] = {}
+    receipt_details: dict[int, dict[str, Any]] = {}
     if receipts:
         for r in receipts:
-            receipt_map[int(r.get("line_id") or 0)] = int(r.get("quantity") or 0)
+            line_id = int(r.get("line_id") or 0)
+            receipt_map[line_id] = int(r.get("quantity") or 0)
+            receipt_details[line_id] = r
     else:
         for line in lines:
             pending = int(line.get("quantity_ordered") or 0) - int(line.get("quantity_received") or 0)
@@ -481,6 +494,14 @@ def receive_purchase_order(po_id: int, *, receipts: list[dict[str, Any]] | None 
             int(line["variant_id"]), qty, reason=f"Recepción de orden de compra #{po_id}",
             movement_type="purchase_receipt", reference=f"PO-{po_id}",
         )
+        detail = receipt_details.get(lid) or {}
+        if detail.get("lot_code"):
+            from shared.inventory_lots import register_lot
+            register_lot(
+                variant_id=int(line["variant_id"]), lot_code=detail.get("lot_code"), quantity=qty,
+                expiry_date=detail.get("expiry_date"), received_date=date.today().isoformat(),
+                po_id=int(po_id), actor_email=actor_email,
+            )
         db["purchase_order_lines"].update_one(
             {"line_id": lid},
             {"$inc": {"quantity_received": qty}},
@@ -508,6 +529,61 @@ def receive_purchase_order(po_id: int, *, receipts: list[dict[str, Any]] | None 
         po_id=po_id,
         meta={"status": status},
     )
+    return get_purchase_order(po_id) or {}
+
+
+def return_purchase_order(
+    po_id: int, *, returns: list[dict[str, Any]], reason: str,
+    actor_email: str | None = None,
+) -> dict[str, Any]:
+    """Devuelve al proveedor unidades ya recibidas y deja trazabilidad en kardex."""
+    db = get_db()
+    po = db["purchase_orders"].find_one({"po_id": int(po_id)})
+    if not po:
+        raise ValueError("not_found")
+    if po.get("status") not in {"recibida", "devuelta_parcial"}:
+        raise ValueError("po_not_received")
+    clean_reason = normalize_adjustment_reason(reason)
+    requested = {int(row.get("line_id") or 0): int(row.get("quantity") or 0) for row in (returns or [])}
+    lines = list(db["purchase_order_lines"].find({"po_id": int(po_id)}))
+    applied: list[dict[str, Any]] = []
+    for line in lines:
+        lid = int(line["line_id"])
+        qty = requested.get(lid, 0)
+        if qty <= 0:
+            continue
+        received = int(line.get("quantity_received") or 0)
+        returned = int(line.get("quantity_returned") or 0)
+        if qty > received - returned:
+            raise ValueError("return_exceeds_received")
+        variant = db["product_variants"].find_one({"variant_id": int(line["variant_id"])}, {"inventory_quantity": 1})
+        if not variant or int(variant.get("inventory_quantity") or 0) < qty:
+            raise ValueError("insufficient_stock_for_return")
+        applied.append({"line_id": lid, "variant_id": int(line["variant_id"]), "quantity": qty})
+    if not applied:
+        raise ValueError("nothing_to_return")
+    for row in applied:
+        add_stock(
+            row["variant_id"], -row["quantity"], reason=clean_reason,
+            movement_type="purchase_return", reference=f"PO-{po_id}", actor_email=actor_email,
+        )
+        db["purchase_order_lines"].update_one(
+            {"line_id": row["line_id"]}, {"$inc": {"quantity_returned": row["quantity"]}},
+        )
+    refreshed = list(db["purchase_order_lines"].find({"po_id": int(po_id)}))
+    complete = all(
+        int(line.get("quantity_returned") or 0) >= int(line.get("quantity_received") or 0)
+        for line in refreshed if int(line.get("quantity_received") or 0) > 0
+    )
+    status = "devuelta" if complete else "devuelta_parcial"
+    event = {
+        "return_id": _next_id(db["purchase_order_returns"], "return_id"), "po_id": int(po_id),
+        "lines": applied, "reason": clean_reason, "actor_email": actor_email,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    db["purchase_order_returns"].insert_one(event)
+    db["purchase_orders"].update_one({"po_id": int(po_id)}, {"$set": {"status": status, "last_return_at": event["created_at"]}})
+    log_audit("return_po", entity="purchase_orders", entity_id=po_id, details={"status": status, "lines": applied})
     return get_purchase_order(po_id) or {}
 
 
@@ -569,7 +645,7 @@ def create_purchase_requisition(data: dict[str, Any]) -> dict[str, Any]:
     db = get_db()
     vendor_id = int(data.get("vendor_id") or 0)
     vendor = db["vendors"].find_one({"vendor_id": vendor_id})
-    if not vendor:
+    if not vendor or vendor.get("active") is False:
         raise ValueError("invalid_vendor")
     lines_in = data.get("lines") or []
     if not lines_in:
@@ -585,8 +661,6 @@ def create_purchase_requisition(data: dict[str, Any]) -> dict[str, Any]:
         "approved_at": None,
         "po_id": None,
     }
-    db["purchase_requisitions"].insert_one(doc)
-
     line_docs = []
     lid = _next_id(db["purchase_requisition_lines"], "line_id")
     for item in lines_in:
@@ -598,6 +672,8 @@ def create_purchase_requisition(data: dict[str, Any]) -> dict[str, Any]:
         if not variant:
             raise ValueError("invalid_variant")
         cost = float(item.get("unit_cost") if item.get("unit_cost") is not None else (variant.get("cost") or 0))
+        if not math.isfinite(cost) or cost <= 0:
+            raise ValueError("invalid_unit_cost")
         line_docs.append(
             {
                 "line_id": lid,
@@ -610,6 +686,7 @@ def create_purchase_requisition(data: dict[str, Any]) -> dict[str, Any]:
             }
         )
         lid += 1
+    db["purchase_requisitions"].insert_one(doc)
     if line_docs:
         db["purchase_requisition_lines"].insert_many(line_docs)
 

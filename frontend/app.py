@@ -1,4 +1,4 @@
-"""GLOBTRADE S.A. — Plataforma web (Q1–Q4)."""
+"""Altavia Trade — Plataforma web (Q1–Q4)."""
 import os
 import sys
 import time
@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT))
 
-from flask import Flask, g, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, g, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
@@ -27,6 +27,7 @@ from paquetes.decisiones import decisiones_bp
 from paquetes.compras import compras_bp
 from paquetes.reportes import reportes_bp
 from paquetes.empresa import empresa_bp
+from paquetes.profesional import profesional_bp
 
 static_dir = Path(__file__).parent / "static"
 settings.assert_safe_production()
@@ -53,6 +54,7 @@ app.register_blueprint(decisiones_bp)
 app.register_blueprint(compras_bp)
 app.register_blueprint(reportes_bp)
 app.register_blueprint(empresa_bp)
+app.register_blueprint(profesional_bp)
 
 import paquetes.tablero.catalogo as _catalogo_mod
 
@@ -171,41 +173,13 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
-def _sem1_admin_only():
-    if session.get("role") != "administrador":
-        return redirect("/")
-
-
-@app.route("/sem1")
-@app.route("/sem1/")
-def sem1_dashboard():
-    denied = _sem1_admin_only()
-    if denied:
-        return denied
-    resp = send_from_directory(Path(app.static_folder) / "sem1", "index.html")
-    resp.headers["X-Globtrade-Legacy"] = "sem1"
-    resp.headers["Deprecation"] = "true"
-    return resp
-
-
-@app.route("/sem1/master")
-def sem1_master_tables():
-    denied = _sem1_admin_only()
-    if denied:
-        return denied
-    resp = send_from_directory(Path(app.static_folder) / "sem1", "master_tables.html")
-    resp.headers["X-Globtrade-Legacy"] = "sem1"
-    resp.headers["Deprecation"] = "true"
-    return resp
-
-
 if __name__ == "__main__":
     port = settings.web_port
     debug = settings.app_env.lower() != "production" and os.getenv("FLASK_DEBUG", "1").lower() in ("1", "true", "yes", "on")
     from shared.mongo import mongo_topology
 
     topo = mongo_topology()
-    print(f"GLOBTRADE S.A. → http://127.0.0.1:{port}")
+    print(f"Altavia Trade → http://127.0.0.1:{port}")
     if topo["split_enabled"]:
         print(
             f"MongoDB ops: {topo['mongo_uri']} / {topo['ops_database']} · "

@@ -559,3 +559,23 @@ tr:hover td {
     width: 100%;
   }
 }
+/* Cobertura oscura transversal: formularios, tablas, tarjetas y ventanas */
+html[data-theme="dark"] body,
+html[data-theme="dark"] .page,
+html[data-theme="dark"] .content { background:var(--bg) !important; color:var(--text) !important; }
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .filters,
+html[data-theme="dark"] .table-box,
+html[data-theme="dark"] .page-panel,
+html[data-theme="dark"] .modal-card,
+html[data-theme="dark"] .modal-box,
+html[data-theme="dark"] .company-hero-slide,
+html[data-theme="dark"] .smart-select-dialog { background:var(--surface) !important; color:var(--text) !important; border-color:var(--border) !important; }
+html[data-theme="dark"] table th { background:var(--surface2) !important; color:var(--text) !important; }
+html[data-theme="dark"] table td { background:var(--surface) !important; color:var(--text) !important; border-color:var(--border) !important; }
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color:var(--muted) !important; opacity:1; }
+html[data-theme="dark"] option { background:var(--surface); color:var(--text); }
+html[data-theme="dark"] .btn-ghost { background:var(--surface) !important; color:var(--text) !important; border-color:var(--border) !important; }

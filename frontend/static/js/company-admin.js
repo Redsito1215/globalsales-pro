@@ -23,7 +23,36 @@
       const node = el('company-field-' + key);
       if (node) body[key] = node.value.trim();
     });
+    body.storefront_heroes = [...document.querySelectorAll('.company-hero-slide')].map(card => ({
+      image_url: card.querySelector('[data-hero-field="image_url"]')?.value.trim() || '',
+      kicker: card.querySelector('[data-hero-field="kicker"]')?.value.trim() || '',
+      title: card.querySelector('[data-hero-field="title"]')?.value.trim() || '',
+      lead: card.querySelector('[data-hero-field="lead"]')?.value.trim() || '',
+      cta: card.querySelector('[data-hero-field="cta"]')?.value.trim() || '',
+    })).filter(slide => Object.values(slide).some(Boolean));
     return body;
+  }
+
+  function heroSlideHtml(slide = {}) {
+    const safe = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    return `<article class="company-hero-slide">
+      <div class="company-hero-slide-head"><strong>Banner adicional</strong><button type="button" class="btn btn-ghost btn-sm" onclick="this.closest('.company-hero-slide').remove()">Eliminar</button></div>
+      <div class="fg-row"><div class="fg"><label>Imagen</label><div class="company-slide-image-control"><input data-hero-field="image_url" value="${safe(slide.image_url)}" placeholder="URL o selecciona un archivo" /><label class="btn btn-ghost btn-sm">Subir<input type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="uploadCompanyHeroSlideImage(this)" /></label></div></div><div class="fg"><label>Etiqueta</label><input data-hero-field="kicker" value="${safe(slide.kicker)}" /></div></div>
+      <div class="fg"><label>Título</label><input data-hero-field="title" value="${safe(slide.title)}" /></div>
+      <div class="fg"><label>Descripción</label><textarea data-hero-field="lead" rows="2">${safe(slide.lead)}</textarea></div>
+      <div class="fg"><label>Texto del botón</label><input data-hero-field="cta" value="${safe(slide.cta)}" placeholder="Ver catálogo" /></div>
+    </article>`;
+  }
+
+  function renderHeroSlides(slides) {
+    const root = el('company-hero-slides');
+    if (root) root.innerHTML = (slides || []).map(heroSlideHtml).join('');
+  }
+
+  function addCompanyHeroSlide() {
+    const root = el('company-hero-slides');
+    if (!root || root.children.length >= 7) return;
+    root.insertAdjacentHTML('beforeend', heroSlideHtml());
   }
 
   function setPreview(url, imgId) {
@@ -44,6 +73,7 @@
     field('company-field-storefront_hero_lead', 'storefront_hero_lead', profile);
     field('company-field-storefront_hero_cta', 'storefront_hero_cta', profile);
     setPreview(profile.storefront_hero_image_url, 'storefront-hero-preview');
+    renderHeroSlides(profile.storefront_heroes || []);
   }
 
   async function loadCompanyAdmin() {
@@ -98,8 +128,10 @@
           title: p.storefront_hero_title,
           lead: p.storefront_hero_lead,
           cta: p.storefront_hero_cta,
+          heroes: [{image_url:p.storefront_hero_image_url,kicker:p.storefront_hero_kicker,title:p.storefront_hero_title,lead:p.storefront_hero_lead,cta:p.storefront_hero_cta}, ...(p.storefront_heroes || [])],
         });
       }
+      if (typeof window.applyCompanyProfile === 'function') window.applyCompanyProfile(data.profile || {});
     } catch (e) {
       if (status) status.textContent = e.message || 'Error al guardar';
       if (typeof opsToast === 'function') opsToast(e.message || 'Error al procesar', 'error');
@@ -122,6 +154,7 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.message || 'No se pudo subir el logo');
       setPreview(data.logo_url || data.profile?.logo_url);
+      if (typeof window.applyCompanyProfile === 'function') window.applyCompanyProfile(data.profile || {});
       if (status) status.textContent = 'Logo actualizado.';
       if (typeof opsToast === 'function') opsToast('Logo actualizado', 'ok');
     } catch (e) {
@@ -160,8 +193,28 @@
     }
   }
 
+  async function uploadCompanyHeroSlideImage(input) {
+    const file = input?.files?.[0];
+    const card = input?.closest('.company-hero-slide');
+    const urlInput = card?.querySelector('[data-hero-field="image_url"]');
+    if (!file || !urlInput) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const response = await fetch(API + '/empresa/perfil/storefront-slide', { method: 'POST', credentials: 'include', body: fd });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'No se pudo subir la imagen');
+      urlInput.value = data.image_url || '';
+      if (typeof opsToast === 'function') opsToast('Imagen añadida al carrusel. Guarda los datos para publicarla.', 'ok');
+    } catch (error) {
+      if (typeof opsToast === 'function') opsToast(error.message || 'Error al subir la imagen', 'error');
+    } finally { input.value = ''; }
+  }
+
   window.loadCompanyAdmin = loadCompanyAdmin;
   window.saveCompanyProfile = saveCompanyProfile;
   window.uploadCompanyLogo = uploadCompanyLogo;
   window.uploadStorefrontHeroImage = uploadStorefrontHeroImage;
+  window.addCompanyHeroSlide = addCompanyHeroSlide;
+  window.uploadCompanyHeroSlideImage = uploadCompanyHeroSlideImage;
 })();

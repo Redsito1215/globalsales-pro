@@ -23,6 +23,12 @@ function vendorGeoDisplay(v) {
   return parts.length ? parts.join(' · ') : '—';
 }
 
+function comprasEsc(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
 async function ensureVendorGeoMasters() {
   if (vendorGeoState.regions.length) return;
   try {
@@ -120,6 +126,8 @@ function poStatusBadge(st) {
     enviada: 'badge badge--info',
     parcial: 'badge badge--warn',
     recibida: 'badge badge--ok',
+    devuelta_parcial: 'badge badge--warn',
+    devuelta: 'badge badge--danger',
     cancelada: 'badge badge--danger',
   };
   return `<span class="${map[st] || 'badge'}">${st || '—'}</span>`;
@@ -390,10 +398,32 @@ async function showInventoryKardex(variantId, sku) {
   const data = await r.json();
   if (!r.ok) { toast(data.message || 'No se pudo cargar el kardex.', 'danger'); return; }
   const rows = data.movements || [];
-  const text = rows.length
-    ? rows.slice(0, 12).map(x => `${(x.created_at || '').slice(0, 10)} · ${x.movement_type} · ${x.quantity > 0 ? '+' : ''}${x.quantity} · saldo ${x.after} · ${x.reason}`).join('\n')
-    : 'Todavía no existen movimientos registrados para esta variante.';
-  if (typeof opsConfirm === 'function') await opsConfirm({ title: `Kardex ${sku || '#' + variantId}`, message: text, confirmLabel: 'Cerrar' });
+  const labels = {
+    purchase_receipt: 'Recepción de compra', sale_commitment: 'Reserva de venta',
+    sale_release: 'Liberación de reserva', sale_fulfillment: 'Salida por venta',
+    return_good: 'Devolución apta', return_damaged: 'Devolución dañada',
+    physical_count: 'Conteo físico', adjustment: 'Ajuste', stock_set: 'Ajuste de stock',
+  };
+  const current = rows.length ? Number(rows[0].after || 0) : 0;
+  const entries = rows.reduce((sum, row) => sum + Math.max(Number(row.quantity || 0), 0), 0);
+  const exits = rows.reduce((sum, row) => sum + Math.abs(Math.min(Number(row.quantity || 0), 0)), 0);
+  const table = rows.length ? `<div class="table-scroll"><table class="kardex-table"><thead><tr>
+      <th>Fecha</th><th>Movimiento</th><th>Cantidad</th><th>Saldo</th><th>Referencia / motivo</th>
+    </tr></thead><tbody>${rows.map(row => {
+      const qty = Number(row.quantity || 0);
+      const date = String(row.created_at || '').replace('T', ' ').slice(0, 16) || '—';
+      const detail = [row.reference, row.reason].filter(Boolean).join(' · ');
+      return `<tr><td>${comprasEsc(date)}</td><td>${comprasEsc(labels[row.movement_type] || row.movement_type || '—')}</td>
+        <td class="${qty >= 0 ? 'kardex-qty--in' : 'kardex-qty--out'}">${qty > 0 ? '+' : ''}${qty}</td>
+        <td>${Number(row.after || 0).toLocaleString('es-EC')}</td><td>${comprasEsc(detail || '—')}</td></tr>`;
+    }).join('')}</tbody></table></div>` : '<p class="modal-sub">Todavía no existen movimientos registrados para esta variante.</p>';
+  const html = `<div class="ops-confirm-content"><div class="kardex-summary">
+      <div><small>Saldo actual</small><strong>${current.toLocaleString('es-EC')}</strong></div>
+      <div><small>Entradas registradas</small><strong>+${entries.toLocaleString('es-EC')}</strong></div>
+      <div><small>Salidas registradas</small><strong>-${exits.toLocaleString('es-EC')}</strong></div>
+    </div>${table}</div>`;
+  if (typeof opsNotice === 'function') await opsNotice({ title: `Kardex ${sku || '#' + variantId}`, html, wide: true });
+  else if (typeof opsConfirm === 'function') await opsConfirm({ title: `Kardex ${sku || '#' + variantId}`, html, confirmLabel: 'Cerrar', wide: true });
 }
 
 async function loadComprasProveedores() {
@@ -571,7 +601,10 @@ async function createRequisition() {
   const variantId = parseInt(document.getElementById('preq-variant')?.value || '0', 10);
   const qty = parseInt(document.getElementById('preq-qty')?.value || '0', 10);
   const cost = parseFloat(document.getElementById('preq-cost')?.value || '0');
-  if (!vendorId || !variantId || qty < 1) { toast('Proveedor, variante y cantidad son obligatorios.', 'warn'); return; }
+  if (!vendorId || !variantId || qty < 1 || !Number.isFinite(cost) || cost <= 0) {
+    toast('Proveedor, variante, cantidad y costo mayor a 0 son obligatorios.', 'warn');
+    return;
+  }
   const r = await fetch(`${API}/compras/requisitions`, {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
@@ -639,12 +672,14 @@ async function loadComprasOCs() {
     const st = po.status || '';
     const canSend = st === 'borrador';
     const canRecv = st === 'enviada' || st === 'parcial';
-    const canCancel = !['recibida', 'cancelada'].includes(st);
+    const canCancel = !['recibida', 'devuelta_parcial', 'devuelta', 'cancelada'].includes(st);
+    const canReturn = ['recibida', 'devuelta_parcial'].includes(st);
     const linesAttr = encodeURIComponent(JSON.stringify(po.lines || []));
     const actions = [
       `<button type="button" class="btn btn-ghost btn-ops" onclick="openPoDetail(${po.po_id})">Ver</button>`,
       canSend ? `<button type="button" class="btn btn-primary btn-ops" onclick="sendPO(${po.po_id})">Enviar</button>` : '',
       canRecv ? `<button type="button" class="btn btn-primary btn-ops" onclick="receivePO(${po.po_id}, '${linesAttr}')">Recibir</button>` : '',
+      canReturn ? `<button type="button" class="btn btn-ghost btn-ops" onclick="returnPO(${po.po_id}, '${linesAttr}')">Devolver</button>` : '',
       canCancel ? `<button type="button" class="btn btn-ghost btn-ops" onclick="cancelPO(${po.po_id})">Cancelar</button>` : '',
     ].filter(Boolean).join(' ') || '—';
     return `<tr>
@@ -665,7 +700,7 @@ async function fillPoVendorSelect() {
   const data = await r.json();
   const prev = sel.value;
   sel.innerHTML = '<option value="">— Proveedor —</option>' +
-    (data.vendors || []).map(v => `<option value="${v.vendor_id}">${v.name}</option>`).join('');
+    (data.vendors || []).map(v => `<option value="${v.vendor_id}" data-filter-region="${comprasEsc(regionLabel(v.region_name) || 'Sin región')}" data-filter-country="${comprasEsc(v.country || 'Sin país')}">${comprasEsc(v.name)}</option>`).join('');
   if (prev) sel.value = prev;
 }
 
@@ -676,7 +711,12 @@ async function fillPoVariantSelect() {
   const data = await r.json();
   const prev = sel.value;
   sel.innerHTML = '<option value="">— Variante / código —</option>' +
-    (data.items || []).map(v => `<option value="${v.variant_id}">${v.sku || v.variant_id} · ${v.title}</option>`).join('');
+    (data.items || []).map(v => {
+      const available = Number(v.available ?? v.inventory_quantity ?? 0);
+      const minimum = Number(v.minimum_stock || 0);
+      const stockGroup = available <= 0 ? 'Sin existencias' : available <= minimum ? 'Existencias bajas' : 'Disponible';
+      return `<option value="${v.variant_id}" data-filter-category="${comprasEsc(v.category || 'Sin categoría')}" data-filter-vendor="${comprasEsc(v.vendor || 'Sin proveedor')}" data-filter-stock="${stockGroup}">${comprasEsc(v.sku || v.variant_id)} · ${comprasEsc(v.title)}</option>`;
+    }).join('');
   if (prev) sel.value = prev;
 }
 
@@ -685,8 +725,8 @@ async function createPO() {
   const variant_id = parseInt(document.getElementById('po-variant').value, 10);
   const quantity = parseInt(document.getElementById('po-qty').value, 10) || 0;
   const unit_cost = parseFloat(document.getElementById('po-cost').value) || 0;
-  if (!vendor_id || !variant_id || quantity < 1) {
-    toast('Completa proveedor, variante y cantidad', 'warn');
+  if (!vendor_id || !variant_id || quantity < 1 || !Number.isFinite(unit_cost) || unit_cost <= 0) {
+    toast('Completa proveedor, variante, cantidad y un costo mayor a 0.', 'warn');
     return;
   }
   const r = await fetch(API + '/compras/purchase-orders', {
@@ -842,6 +882,42 @@ async function cancelPO(id) {
   toast('OC cancelada', 'ok');
   loadComprasOCs();
 }
+
+async function returnPO(id, linesRaw) {
+  let lines = [];
+  try { lines = JSON.parse(decodeURIComponent(linesRaw || '%5B%5D')); } catch { lines = []; }
+  const available = lines.map(line => ({
+    line_id: Number(line.line_id), label: line.sku || `Línea ${line.line_id}`,
+    max: Math.max(Number(line.quantity_received || 0) - Number(line.quantity_returned || 0), 0),
+  })).filter(line => line.max > 0);
+  if (!available.length) { toast('Esta OC ya no tiene unidades disponibles para devolver.', 'warn'); return; }
+  const reason = await opsPrompt({
+    title: 'Devolver al proveedor', message: 'Explica el motivo. Se descontará del inventario y quedará en el kardex.',
+    label: 'Motivo', confirmLabel: 'Continuar',
+    validate: value => value.trim().length < 8 ? 'Escribe al menos 8 caracteres.' : null,
+  });
+  if (reason == null) return;
+  const returns = [];
+  for (const line of available) {
+    const raw = await opsPrompt({
+      title: `Devolver ${line.label}`, message: `Disponibles para devolver: ${line.max}. Usa 0 para omitir.`,
+      label: 'Cantidad', inputType: 'number', min: 0, step: 1, defaultValue: '0', confirmLabel: 'Aplicar',
+      validate: value => Number.isInteger(Number(value)) && Number(value) >= 0 && Number(value) <= line.max ? null : `Indica un entero entre 0 y ${line.max}.`,
+    });
+    if (raw == null) return;
+    if (Number(raw) > 0) returns.push({ line_id: line.line_id, quantity: Number(raw) });
+  }
+  if (!returns.length) { toast('No se seleccionaron unidades para devolver.', 'warn'); return; }
+  const r = await fetch(`${API}/compras/purchase-orders/${id}/return`, {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason, returns }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(data.message || 'No se pudo registrar la devolución.', 'danger'); return; }
+  toast(data.message, 'ok'); loadComprasOCs();
+}
+
+window.returnPO = returnPO;
 
 function cashMovementLabel(type) {
   const map = { payment_in: 'Entrada (pago)', refund_out: 'Salida (devolución)', adjustment: 'Ajuste' };
@@ -1094,7 +1170,7 @@ async function openPoDetail(poId) {
     }
     const po = poData.order || poData;
     const lineRows = (po.lines || []).map(l => `<tr>
-      <td>${l.sku || l.variant_id}</td><td>${l.quantity_ordered}</td><td>${l.quantity_received}</td><td>${fmtUSD(l.unit_cost)}</td>
+      <td>${l.sku || l.variant_id}</td><td>${l.quantity_ordered}</td><td>${l.quantity_received}</td><td>${l.quantity_returned || 0}</td><td>${fmtUSD(l.unit_cost)}</td>
     </tr>`).join('');
     body.innerHTML = `
       <div class="detail-grid">
@@ -1103,8 +1179,8 @@ async function openPoDetail(poId) {
         <div><span class="detail-label">Creada</span>${po.created_at || '—'}</div>
         ${po.received_at ? `<div><span class="detail-label">Recibida</span>${po.received_at}</div>` : ''}
       </div>
-      <table class="detail-table" style="margin-top:10px"><thead><tr><th>SKU / Var.</th><th>Pedido</th><th>Recibido</th><th>Costo</th></tr></thead>
-      <tbody>${lineRows || '<tr><td colspan="4">Sin líneas</td></tr>'}</tbody></table>
+      <table class="detail-table" style="margin-top:10px"><thead><tr><th>SKU / Var.</th><th>Pedido</th><th>Recibido</th><th>Devuelto</th><th>Costo</th></tr></thead>
+      <tbody>${lineRows || '<tr><td colspan="5">Sin líneas</td></tr>'}</tbody></table>
       ${typeof renderAuditTrail === 'function' ? renderAuditTrail(histData.entries || [], { title: 'Historial de la OC' }) : ''}`;
   } catch {
     body.innerHTML = '<p class="modal-sub">Error de red al cargar la OC.</p>';

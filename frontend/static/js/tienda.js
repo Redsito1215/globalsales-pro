@@ -10,6 +10,7 @@ let tiendaState = {
   shippingCost: 0,
   shippingRegion: '',
   priceMax: null,
+  catalogPriceMax: null,
 };
 window.tiendaState = tiendaState;
 
@@ -103,12 +104,17 @@ function clampQtyInput(el) {
 }
 
 async function loadTiendaPage() {
-  await Promise.all([loadStorefrontHero(), loadShopCollections(), loadTiendaProducts()]);
+  await Promise.all([loadStorefrontHero(), loadShopCollections(), loadShopPriceCeiling()]);
+  await loadTiendaProducts();
   updateShopHighlights();
   renderTiendaCart();
 }
 
-function applyStorefrontHeroToPage(hero) {
+let storefrontHeroes = [];
+let storefrontHeroIndex = 0;
+let storefrontHeroTimer = null;
+
+function renderStorefrontHero(hero) {
   if (!hero) return;
   const img = document.getElementById('shop-hero-img');
   const kicker = document.getElementById('shop-hero-kicker');
@@ -117,12 +123,50 @@ function applyStorefrontHeroToPage(hero) {
   const cta = document.getElementById('shop-hero-cta');
   if (img && hero.image_url) {
     img.src = hero.image_url + (hero.image_url.includes('?') ? '&' : '?') + 't=' + Date.now();
-    img.alt = hero.title || 'Banner GLOBTRADE';
+    img.alt = hero.title || 'Banner Altavia Trade';
   }
   if (kicker) kicker.textContent = hero.kicker || '';
   if (title) title.textContent = hero.title || '';
   if (lead) lead.textContent = hero.lead || '';
   if (cta) cta.textContent = hero.cta || 'Ver catálogo';
+}
+
+function changeStorefrontHero(step) {
+  if (storefrontHeroes.length < 2) return;
+  storefrontHeroIndex = (storefrontHeroIndex + Number(step) + storefrontHeroes.length) % storefrontHeroes.length;
+  renderStorefrontHero(storefrontHeroes[storefrontHeroIndex]);
+  document.querySelectorAll('#shop-hero-carousel-dots i').forEach((dot, i) => dot.classList.toggle('is-active', i === storefrontHeroIndex));
+}
+
+function applyStorefrontHeroToPage(hero) {
+  if (!hero) return;
+  const candidates = Array.isArray(hero.heroes) ? hero.heroes : [hero];
+  storefrontHeroes = candidates.filter(slide => slide && (slide.title || slide.lead || slide.image_url));
+  if (!storefrontHeroes.length) {
+    document.getElementById('shop-storefront-hero').hidden = true;
+    return;
+  }
+  document.getElementById('shop-storefront-hero').hidden = false;
+  storefrontHeroIndex = 0;
+  renderStorefrontHero(storefrontHeroes[0]);
+  const controls = document.getElementById('shop-hero-carousel-controls');
+  const dots = document.getElementById('shop-hero-carousel-dots');
+  if (controls) controls.hidden = storefrontHeroes.length < 2;
+  if (dots) dots.innerHTML = storefrontHeroes.map((_, i) => `<i class="${i === 0 ? 'is-active' : ''}"></i>`).join('');
+  clearInterval(storefrontHeroTimer);
+  if (storefrontHeroes.length > 1) storefrontHeroTimer = setInterval(() => changeStorefrontHero(1), 6500);
+}
+
+function applyCompanyProfile(profile) {
+  if (!profile) return;
+  const name = profile.name || profile.legal_name || 'Altavia Trade';
+  window.COMPANY_NAME = name;
+  document.querySelectorAll('.shop-madson-logo-text').forEach(el => { el.textContent = String(name).toUpperCase(); });
+  document.querySelectorAll('[data-company-name]').forEach(el => { el.textContent = name; });
+  document.querySelectorAll('[data-company-logo]').forEach(img => { if (profile.logo_url) img.src = profile.logo_url; });
+  const favicon = document.querySelector('link[rel="icon"]');
+  if (favicon && profile.logo_url) favicon.href = profile.logo_url;
+  document.title = document.title.replace(/— .*$/, `— ${name}`);
 }
 
 async function loadStorefrontHero() {
@@ -131,21 +175,42 @@ async function loadStorefrontHero() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.message || 'Error');
     applyStorefrontHeroToPage(data.hero || {});
+    applyCompanyProfile(data.company || {});
   } catch (_) {
     /* defaults en HTML */
   }
 }
 
 window.applyStorefrontHeroToPage = applyStorefrontHeroToPage;
+window.changeStorefrontHero = changeStorefrontHero;
+window.applyCompanyProfile = applyCompanyProfile;
+
+function productListPriceMax(products) {
+  const prices = (products || []).map(p => Number((p.variant || {}).price || p.unit_price || 0)).filter(n => n > 0);
+  return prices.length ? Math.ceil(Math.max(...prices)) : null;
+}
+
+async function loadShopPriceCeiling() {
+  try {
+    const r = await fetch(API + '/shop/products?limit=500', { cache: 'no-store' });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) return;
+    tiendaState.catalogPriceMax = productListPriceMax(data.products || []);
+  } catch (_) {
+    /* si falla, se usa el máximo de la lista actual */
+  }
+}
 
 function updateShopHighlights() {
   const products = tiendaState.products || [];
   const meta = document.getElementById('shop-results-range');
-  if (meta && products.length) {
+  const selected = tiendaState.collections.find(c => Number(c.collection_id) === Number(tiendaState.collectionId));
+  const activeName = document.getElementById('shop-active-category-name');
+  if (activeName) activeName.textContent = selected?.title || 'Todos los productos';
+  if (meta) {
     const n = tiendaState.filtered.length;
-    meta.textContent = n
-      ? `Mostrando 1–${n} de ${products.length} resultados`
-      : `0 resultados de ${products.length}`;
+    const range = n ? `Mostrando 1–${n} de ${products.length} resultados` : `0 resultados de ${products.length}`;
+    meta.textContent = selected ? `${selected.title} · ${range}` : range;
   }
   initShopPriceSlider(products);
 }
@@ -153,9 +218,8 @@ function updateShopHighlights() {
 function initShopPriceSlider(products) {
   const slider = document.getElementById('shop-price-max');
   if (!slider || !products.length) return;
-  const prices = products.map(p => Number((p.variant || {}).price || 0)).filter(n => n > 0);
-  if (!prices.length) return;
-  const max = Math.ceil(Math.max(...prices));
+  const max = tiendaState.catalogPriceMax || productListPriceMax(products);
+  if (!max) return;
   slider.min = '0';
   slider.max = String(max);
   if (tiendaState.priceMax == null || tiendaState.priceMax > max) {
@@ -179,10 +243,13 @@ async function loadShopCollections() {
   if (!nav) return;
   nav.innerHTML = '<button type="button" class="shop-collection-link" disabled>Cargando…</button>';
   try {
-    const r = await fetch(API + '/shop/collections');
+    const r = await fetch(API + '/shop/collections', { cache: 'no-store' });
     const data = await r.json();
     if (!r.ok) throw new Error(data.message || 'Error al cargar colecciones');
     tiendaState.collections = data.collections || [];
+    if (tiendaState.collectionId != null && !tiendaState.collections.some(c => Number(c.collection_id) === Number(tiendaState.collectionId))) {
+      tiendaState.collectionId = null;
+    }
     renderShopCollectionsNav();
   } catch (e) {
     nav.innerHTML = `<button type="button" class="shop-collection-link" disabled>Error: ${e.message}</button>`;
@@ -190,8 +257,16 @@ async function loadShopCollections() {
 }
 
 function selectShopCollection(id) {
-  tiendaState.collectionId = id;
+  tiendaState.collectionId = id != null && tiendaState.collections.some(c => Number(c.collection_id) === Number(id)) ? id : null;
+  tiendaState.priceMax = tiendaState.catalogPriceMax || null;
+  const slider = document.getElementById('shop-price-max');
+  if (slider && tiendaState.priceMax != null) {
+    slider.max = String(tiendaState.priceMax);
+    slider.value = String(tiendaState.priceMax);
+    onShopPriceSlider();
+  }
   renderShopCollectionsNav();
+  updateShopHighlights();
   loadTiendaProducts();
 }
 
@@ -199,15 +274,32 @@ function renderShopCollectionsNav() {
   const nav = document.getElementById('shop-collections-nav');
   if (!nav) return;
   const allCount = tiendaState.collections.reduce((s, c) => s + (c.product_count || 0), 0);
-  let html = `<button type="button" class="shop-collection-link ${tiendaState.collectionId == null ? 'active' : ''}" onclick="selectShopCollection(null)">
+  let html = `<button type="button" class="shop-collection-link ${tiendaState.collectionId == null ? 'active' : ''}" aria-current="${tiendaState.collectionId == null ? 'true' : 'false'}" onclick="selectShopCollection(null)">
     Todos <span>(${allCount})</span></button>`;
   html += tiendaState.collections.map(c =>
-    `<button type="button" class="shop-collection-link ${tiendaState.collectionId === c.collection_id ? 'active' : ''}" onclick="selectShopCollection(${c.collection_id})">
+    `<button type="button" class="shop-collection-link ${Number(tiendaState.collectionId) === Number(c.collection_id) ? 'active' : ''}" aria-current="${Number(tiendaState.collectionId) === Number(c.collection_id) ? 'true' : 'false'}" onclick="selectShopCollection(${c.collection_id})">
       ${c.title} <span>(${c.product_count || 0})</span></button>`
   ).join('');
   nav.innerHTML = html;
+  updateShopHighlights();
   updateShopBulkActions();
 }
+
+async function refreshStorefrontCatalog() {
+  tiendaState.catalogPriceMax = null;
+  await loadShopPriceCeiling();
+  await loadShopCollections();
+  await loadTiendaProducts();
+  updateShopHighlights();
+  updateShopBulkActions();
+}
+
+window.refreshStorefrontCatalog = refreshStorefrontCatalog;
+window.addEventListener('masterdata:changed', event => {
+  if (['dim_categoria', 'dim_producto'].includes(event.detail?.table)) {
+    refreshStorefrontCatalog().catch(() => {});
+  }
+});
 
 function applyShopFilters() {
   filterShopProducts();
@@ -227,7 +319,8 @@ function sortShopProducts(list) {
 }
 
 function syncShopBulkQty(value) {
-  const v = String(value ?? '');
+  const parsed = parsePositiveQty(value, { notify: false });
+  const v = String(parsed || 1);
   ['shop-bulk-qty', 'shop-bulk-qty-side'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = v;
@@ -272,7 +365,7 @@ async function loadTiendaProducts() {
   let r;
   let data = {};
   try {
-    r = await fetch(API + '/shop/products?' + q);
+    r = await fetch(API + '/shop/products?' + q, { cache: 'no-store' });
     data = await r.json().catch(() => ({}));
   } catch (_) {
     grid.innerHTML = '<div class="shop-cart-empty" style="grid-column:1/-1">No se pudo conectar con el servidor.</div>';
@@ -444,7 +537,10 @@ function renderTiendaCart() {
         <div class="shop-cart-quantity" role="group" aria-label="Cantidad de ${c.title}">
           <button type="button" class="shop-cart-quantity-btn" onclick="tiendaChangeCartQty(${c.variant_id}, -1)"
             aria-label="Disminuir cantidad de ${c.title}" ${c.quantity <= 1 ? 'disabled' : ''}>−</button>
-          <output class="shop-cart-quantity-value" aria-live="polite">${c.quantity}</output>
+          <input type="number" class="shop-cart-quantity-input" min="1" step="1" value="${c.quantity}"
+            aria-label="Cantidad de ${c.title}" onclick="event.stopPropagation()"
+            oninput="tiendaSetCartQty(${c.variant_id}, this.value, { silent: true })"
+            onblur="tiendaSetCartQty(${c.variant_id}, this.value)" />
           <button type="button" class="shop-cart-quantity-btn" onclick="tiendaChangeCartQty(${c.variant_id}, 1)"
             aria-label="Aumentar cantidad de ${c.title}" ${c.max_quantity != null && c.quantity >= c.max_quantity ? 'disabled' : ''}>+</button>
         </div>
@@ -466,6 +562,23 @@ function tiendaChangeCartQty(variantId, delta) {
     return;
   }
   item.quantity = next;
+  renderTiendaCart();
+}
+
+function tiendaSetCartQty(variantId, raw, opts) {
+  const item = tiendaState.cart.find(c => c.variant_id === variantId);
+  if (!item) return;
+  const qty = parsePositiveQty(raw, { notify: opts?.silent === true ? false : undefined });
+  if (qty == null) {
+    if (opts?.silent !== true) renderTiendaCart();
+    return;
+  }
+  if (item.max_quantity != null && qty > item.max_quantity) {
+    item.quantity = item.max_quantity;
+    if (opts?.silent !== true) notifyWarn('No hay más unidades disponibles de este producto.');
+  } else {
+    item.quantity = qty;
+  }
   renderTiendaCart();
 }
 
@@ -515,7 +628,7 @@ function renderProductDetailModal(p) {
   if (title) title.textContent = p.name || p.title || 'Producto';
   if (category) {
     const bits = [p.category_name, p.collection_title].filter(Boolean);
-    category.textContent = bits.length ? bits.join(' · ') : (p.product_type || 'Catálogo GLOBTRADE');
+    category.textContent = bits.length ? bits.join(' · ') : (p.product_type || 'Catálogo Altavia Trade');
   }
   if (media) {
     const img = p.image?.src;
@@ -631,6 +744,7 @@ function tiendaAddFromDetail() {
 window.openProductDetail = openProductDetail;
 window.closeProductDetail = closeProductDetail;
 window.tiendaAddFromDetail = tiendaAddFromDetail;
+window.tiendaSetCartQty = tiendaSetCartQty;
 
 function isAssistedPurchase() {
   return !!(window._authUser && window._authUser.role !== 'cliente');
@@ -769,6 +883,10 @@ async function submitSolicitud() {
     }
   }
   const phone = document.getElementById('sol-client-phone').value.trim();
+  if (phone && (phone.startsWith('-') || !/\d/.test(phone))) {
+    notifyWarn('El teléfono no puede ser negativo ni contener solo signos.');
+    return;
+  }
   const country_id = parseInt(document.getElementById('sol-country-id').value, 10);
   const destination = (document.getElementById('sol-shipping-destination')?.value || '').trim();
   const channelSel = document.getElementById('sol-channel-id');
@@ -821,7 +939,7 @@ async function loadTiendaMasterSelects() {
     if (countrySel && countries.length) {
       const prev = countrySel.value;
       countrySel.innerHTML = countries.map(p =>
-        `<option value="${p.country_id}">${p.name}</option>`).join('');
+        `<option value="${p.country_id}" data-filter-region="${escHtml(p.region_name || 'Sin región')}">${escHtml(p.name)}</option>`).join('');
       if (prev) countrySel.value = prev;
       countrySel.onchange = () => refreshShippingQuote();
     }

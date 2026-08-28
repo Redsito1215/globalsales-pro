@@ -56,7 +56,7 @@ MASTER_TABLES: dict[str, dict[str, Any]] = {
         "label": "Categorías",
         "description": "Familias de producto; la clave en inglés se conserva en el almacén para el ETL.",
         "editable": True,
-        "fields": ["category_id", "name", "description", "active"],
+        "fields": ["category_id", "name", "description", "sale_enabled", "sale_percent", "active"],
     },
     "dim_producto": {
         "pk": "product_id",

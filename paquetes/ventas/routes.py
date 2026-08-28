@@ -71,22 +71,25 @@ def sales_orders_create():
 @ventas_bp.put("/sales/orders/<order_id>")
 @admin_required
 def sales_orders_update(order_id: str):
-    body = request.get_json(silent=True) or {}
-    try:
-        row = services.update_order(order_id, body)
-        return jsonify({"status": "ok", "order": row})
-    except ValueError as e:
-        return _ventas_error(e)
+    return jsonify(
+        {
+            "status": "error",
+            "message": "Los pedidos históricos son de solo lectura para proteger la trazabilidad.",
+            "code": "immutable_order",
+        }
+    ), 409
 
 
 @ventas_bp.delete("/sales/orders/<order_id>")
 @admin_required
 def sales_orders_delete(order_id: str):
-    try:
-        n = services.delete_order(order_id)
-        return jsonify({"status": "ok", "message": f"Eliminados {n} registro(s).", "deleted": n})
-    except ValueError as e:
-        return _ventas_error(e)
+    return jsonify(
+        {
+            "status": "error",
+            "message": "No se eliminan pedidos: quedan como evidencia para informes y auditoría.",
+            "code": "immutable_order",
+        }
+    ), 409
 
 
 @ventas_bp.get("/tienda/productos")
@@ -366,6 +369,21 @@ def devolver_solicitud(request_id: int):
         return _ventas_error(e)
 
 
+@ventas_bp.post("/solicitudes/<int:request_id>/solicitar-devolucion")
+@login_required
+def solicitar_devolucion_cliente(request_id: int):
+    body = request.get_json(silent=True) or {}
+    try:
+        req = services.request_customer_return(
+            request_id, customer_email=session.get("email") or "", reason=body.get("reason") or "",
+        )
+        return jsonify({
+            "status": "ok", "message": "Solicitud de devolución enviada para revisión.", "request": req,
+        }), 201
+    except ValueError as e:
+        return _ventas_error(e)
+
+
 def _ventas_error(exc: ValueError):
     code = str(exc)
     messages = {
@@ -446,6 +464,8 @@ def _ventas_error(exc: ValueError):
         "invalid_return_line": ("Línea de inspección no válida.", 400),
         "duplicate_return_line": ("Hay líneas de inspección duplicadas.", 400),
         "invalid_return_qty": ("Cantidades de inspección inválidas.", 400),
+        "return_reason_required": ("Describe el motivo de la devolución con al menos 5 caracteres.", 400),
+        "return_already_requested": ("Ya existe una solicitud de devolución pendiente.", 409),
         "cannot_reject_approved": ("No se puede rechazar una solicitud aprobada.", 409),
         "approval_required": ("Debes aprobar la solicitud antes de convertirla.", 409),
         "must_convert_first": ("Primero convierte la solicitud en venta.", 409),

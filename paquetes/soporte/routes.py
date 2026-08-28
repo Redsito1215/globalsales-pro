@@ -94,5 +94,5 @@ def factura_pdf(request_id: int):
     return Response(
         pdf,
         mimetype="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="globtrade-solicitud-{request_id}.pdf"'},
+        headers={"Content-Disposition": f'inline; filename="altavia-trade-solicitud-{request_id}.pdf"'},
     )

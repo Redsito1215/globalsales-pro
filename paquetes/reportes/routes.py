@@ -15,6 +15,11 @@ from shared.mongo import get_db
 reportes_bp = Blueprint("reportes", __name__, url_prefix="/api")
 
 
+def _complex_filters() -> dict[str, str]:
+    allowed = ("start", "end", "category", "region", "channel")
+    return {key: request.args.get(key, "").strip() for key in allowed if request.args.get(key, "").strip()}
+
+
 @reportes_bp.get("/reportes")
 @login_required
 @permission_required("reportes.view")
@@ -55,7 +60,7 @@ def catalog_complex():
 def run_complex(report_id: str):
     limit = min(int(request.args.get("limit", 100)), 500)
     try:
-        data = compuestos.run_complex_report(report_id, limit=limit)
+        data = compuestos.run_complex_report(report_id, limit=limit, filters=_complex_filters())
         return jsonify({"status": "ok", "generated_at": datetime.now(timezone.utc).isoformat(), **data})
     except ValueError as e:
         if str(e) == "unknown_report":
@@ -181,7 +186,7 @@ def export_report_csv(report_id: str):
 def export_complex_pdf(report_id: str):
     limit = min(int(request.args.get("limit", 200)), 500)
     try:
-        data = compuestos.run_complex_report(report_id, limit=limit)
+        data = compuestos.run_complex_report(report_id, limit=limit, filters=_complex_filters())
     except ValueError as e:
         if str(e) == "unknown_report":
             return jsonify({"status": "error", "message": "Informe no encontrado."}), 404
@@ -211,7 +216,7 @@ def export_complex_pdf(report_id: str):
 def export_complex_csv(report_id: str):
     limit = min(int(request.args.get("limit", 500)), 2000)
     try:
-        data = compuestos.run_complex_report(report_id, limit=limit)
+        data = compuestos.run_complex_report(report_id, limit=limit, filters=_complex_filters())
     except ValueError as exc:
         if str(exc) == "unknown_report":
             return jsonify({"status": "error", "message": "Informe no encontrado."}), 404
@@ -246,7 +251,7 @@ def ai_catalog():
     scope = (request.args.get("scope") or "all").strip()
     try:
         data = ai_service.list_ai_catalog(scope=scope)
-        return jsonify({"status": "ok", **data})
+        return jsonify({"status": "ok", **data, "ai": ai_service.engine_status()})
     except Exception:
         return jsonify({"status": "error", "message": "No se pudo cargar el catálogo de informes."}), 500
 
@@ -262,6 +267,8 @@ def ai_recommend():
     try:
         data = ai_service.recommend_reports(prompt=prompt, limit=limit, scope=scope)
         return jsonify({"status": "ok", **data})
+    except ai_service.AIServiceError as exc:
+        return jsonify({"status": "error", "message": exc.message, "code": exc.code}), exc.http_status
     except Exception:
         return jsonify({"status": "error", "message": "No se pudieron obtener recomendaciones."}), 500
 
@@ -282,6 +289,8 @@ def ai_generate():
             prompt=prompt, limit=limit, threshold=threshold, scope=scope
         )
         return jsonify({"status": "ok", **data})
+    except ai_service.AIServiceError as exc:
+        return jsonify({"status": "error", "message": exc.message, "code": exc.code}), exc.http_status
     except ValueError as e:
         code = str(e)
         if code == "prompt_required":

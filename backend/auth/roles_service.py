@@ -62,6 +62,12 @@ def ensure_roles_seed() -> None:
         {"slug": ADMIN_ROLE},
         {"$addToSet": {"permissions": {"$each": list(PERMISSION_CATALOG.keys())}}},
     )
+    # Nueva consola táctica: disponible para los dos roles internos estándar.
+    for slug in ("vendedor", "analista"):
+        col.update_one(
+            {"slug": slug, "active": {"$ne": False}},
+            {"$addToSet": {"pages": "profesional"}},
+        )
 
 
 def list_roles() -> list[dict[str, Any]]:

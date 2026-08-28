@@ -7,7 +7,7 @@
 # App + Airflow (ETL estratégico / informes RC):
 #   docker compose --profile airflow up -d --build
 #
-# Web :5001 | API :8001 | Mongo :27017 | Airflow UI :8080 (admin/admin)
+# Web :5001 | API :8001 | Mongo :27017 | ClickHouse :8123 | Airflow UI :8080
 
 name: globtrade-saas
 
@@ -22,12 +22,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
     AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
-    _PIP_ADDITIONAL_REQUIREMENTS: pymongo>=4.6 pandas>=2.0 pyarrow>=14 pydantic-settings>=2.0 python-dotenv>=1.0
+    _PIP_ADDITIONAL_REQUIREMENTS: pymongo>=4.6 clickhouse-connect>=0.8.15 pandas>=2.0 pyarrow>=14 pydantic-settings>=2.0 python-dotenv>=1.0
     GLOBTRADE_PROJECT: /opt/airflow/project
     PYTHONPATH: /opt/airflow/project:/opt/airflow/project/backend
     MONGO_URI: mongodb://mongo:27017
     MONGO_DB: globtrade_dw
     MONGO_OPS_DB: globtrade_ops
+    CLICKHOUSE_HOST: clickhouse
+    CLICKHOUSE_PORT: "8123"
+    CLICKHOUSE_DATABASE: globtrade_analytics
     CSV_SOURCE: /opt/airflow/project/data/sales.csv
     POCKETBASE_COLLECTION: sales_records
   volumes:
@@ -42,6 +45,8 @@ x-airflow-common: &airflow-common
     mongo:
       condition: service_healthy
     airflow-postgres:
+      condition: service_healthy
+    clickhouse:
       condition: service_healthy
 
 services:
@@ -59,6 +64,25 @@ services:
       timeout: 5s
       retries: 10
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: globtrade-saas-clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: globtrade_analytics
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   api:
     build: .
     container_name: globtrade-saas-api
@@ -73,6 +97,9 @@ services:
       MONGO_OPS_DB: ${MONGO_OPS_DB:-globtrade_ops}
       MONGO_REPLICA_URI: ${MONGO_REPLICA_URI:-}
       MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DATABASE: globtrade_analytics
       API_PORT: "8000"
       CSV_SOURCE: /app/data/sales.csv
     volumes:
@@ -84,6 +111,8 @@ services:
       - ./paquetes:/app/paquetes:ro
     depends_on:
       mongo:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
 
   web:
@@ -102,6 +131,9 @@ services:
       MONGO_OPS_DB: ${MONGO_OPS_DB:-globtrade_ops}
       MONGO_REPLICA_URI: ${MONGO_REPLICA_URI:-}
       MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DATABASE: globtrade_analytics
       WEB_PORT: "5000"
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-globtrade-docker-change-me}
       FLASK_DEBUG: "1"
@@ -116,6 +148,8 @@ services:
       - ./backend/etl:/app/backend/etl:ro
     depends_on:
       mongo:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
 
   etl-mongo:
@@ -214,3 +248,5 @@ volumes:
     name: globtrade_mongo_data
   airflow_pgdata:
     name: globtrade_airflow_pgdata
+  clickhouse_data:
+    name: globtrade_clickhouse_data

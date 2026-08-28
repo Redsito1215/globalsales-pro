@@ -1,5 +1,63 @@
 /* Mis pedidos — cliente B2B */
 const pagoModalState = { requestId: null, staff: false, offline: false, total: 0, idempotencyKey: null };
+const misPedidosState = { rows: [], filter: 'all' };
+
+function misPedidoMatches(req, filter) {
+  const status = req.status || '';
+  const pay = req.payment_status || 'pendiente_pago';
+  if (filter === 'pending_pay') return pay === 'pendiente_pago' && status === 'aprobada';
+  if (filter === 'open') return ['pendiente', 'en_revision', 'aprobada', 'convertida', 'enviada'].includes(status);
+  if (filter === 'delivered') return status === 'entregada' && req.return_request_status !== 'pending';
+  if (filter === 'returns') return ['devolucion_parcial', 'devuelta'].includes(status) || req.return_request_status === 'pending';
+  return true;
+}
+
+function setMisPedidosFilter(filter) {
+  misPedidosState.filter = filter || 'all';
+  document.querySelectorAll('#mis-pedidos-chips [data-order-filter]').forEach(btn => {
+    const active = btn.dataset.orderFilter === misPedidosState.filter;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  renderMisPedidosRows();
+}
+
+function renderMisPedidosRows() {
+  const body = document.getElementById('mis-pedidos-body');
+  if (!body) return;
+  const allRows = misPedidosState.rows || [];
+  const rows = allRows.filter(req => misPedidoMatches(req, misPedidosState.filter));
+  if (!rows.length) {
+    body.innerHTML = typeof opsEmptyRow === 'function'
+      ? opsEmptyRow(7, { title: 'Sin pedidos en este estado', hint: 'Elige otro filtro para revisar tus pedidos.' })
+      : '<tr><td colspan="7">Sin pedidos en este estado.</td></tr>';
+    return;
+  }
+  const noMap = {};
+  [...allRows].sort((a, b) => Number(a.request_id || 0) - Number(b.request_id || 0))
+    .forEach((row, i) => { noMap[row.request_id] = i + 1; });
+  body.innerHTML = rows.map(req => {
+    const lines = (req.lines || []).map(l => `${l.product_name || l.product_id} ×${l.quantity}`).join(', ');
+    const label = typeof solicitudStatusLabel === 'function' ? solicitudStatusLabel(req.status) : req.status;
+    const cls = typeof solicitudStatusClass === 'function' ? solicitudStatusClass(req.status) : 'badge';
+    const pay = req.payment_status || 'pendiente_pago';
+    const payHtml = typeof paymentBadge === 'function' ? paymentBadge(pay) : pay;
+    const canCancel = ['pendiente', 'en_revision'].includes(req.status);
+    const canPay = typeof canClientPayRequest === 'function' ? canClientPayRequest(req) : (pay === 'pendiente_pago' && req.status === 'aprobada');
+    const canRequestReturn = ['entregada', 'devolucion_parcial'].includes(req.status) && req.return_request_status !== 'pending';
+    const n = Number(req.client_order_no) || noMap[req.request_id] || 0;
+    const actions = `<button type="button" class="btn btn-ghost btn-ops" onclick="openSolicitudDetail(${req.request_id})">Detalle</button>
+      <button type="button" class="btn btn-ghost btn-ops" onclick="openSolicitudPdf(${req.request_id})">PDF</button>
+      ${canPay ? `<button type="button" class="btn btn-primary btn-ops" onclick="openPagoModal(${req.request_id})">Pagar con tarjeta</button>` : ''}
+      ${canRequestReturn ? `<button type="button" class="btn btn-ghost btn-ops" onclick="solicitarDevolucionCliente(${req.request_id})">Solicitar devolución</button>` : ''}
+      ${req.return_request_status === 'pending' ? '<span class="badge badge--warn">Devolución solicitada</span>' : ''}
+      ${canCancel ? `<button type="button" class="btn btn-ghost btn-ops" onclick="cancelarMiSolicitud(${req.request_id})">Cancelar</button>` : ''}`;
+    const track = req.tracking_number ? `<span class="table-sub">GT</span> <code>${req.tracking_number}</code>` : '—';
+    return `<tr><td><strong>${n ? `Pedido ${n}` : 'Pedido'}</strong>${req.order_id ? `<div class="table-sub">Venta ${req.order_id}</div>` : ''}</td>
+      <td>${lines}</td><td><span class="${cls}">${label}</span></td><td>${payHtml}</td>
+      <td>${req.created_at || '—'}</td><td>${track}</td><td class="order-actions-cell">${actions}</td></tr>`;
+  }).join('');
+}
 
 function paymentAttemptKey() {
   if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -104,9 +162,10 @@ async function loadMisPedidosPage() {
     return;
   }
   const rows = data.requests || [];
+  misPedidosState.rows = rows;
   if (meta) meta.textContent = `${data.total || 0} pedido${(data.total || 0) === 1 ? '' : 's'}`;
   if (chips) {
-    const counts = { pending_pay: 0, open: 0, delivered: 0 };
+    const counts = { pending_pay: 0, open: 0, delivered: 0, returns: 0 };
     rows.forEach(req => {
       const pay = req.payment_status || 'pendiente_pago';
       const needsPay = pay === 'pendiente_pago'
@@ -114,13 +173,15 @@ async function loadMisPedidosPage() {
         && !['rechazada', 'cancelada', 'devuelta'].includes(req.status);
       if (needsPay) counts.pending_pay++;
       if (['pendiente', 'en_revision', 'aprobada', 'convertida', 'enviada'].includes(req.status)) counts.open++;
-      if (req.status === 'entregada') counts.delivered++;
+      if (req.status === 'entregada' && req.return_request_status !== 'pending') counts.delivered++;
+      if (['devolucion_parcial', 'devuelta'].includes(req.status) || req.return_request_status === 'pending') counts.returns++;
     });
     chips.innerHTML = `
-      <span class="ops-chip"><span>Total</span><strong>${data.total || rows.length}</strong></span>
-      <span class="ops-chip ops-chip--warn"><span>Por pagar</span><strong>${counts.pending_pay}</strong></span>
-      <span class="ops-chip"><span>En curso</span><strong>${counts.open}</strong></span>
-      <span class="ops-chip ops-chip--muted"><span>Entregados</span><strong>${counts.delivered}</strong></span>`;
+      <button type="button" class="ops-chip" data-order-filter="all" onclick="setMisPedidosFilter('all')"><span>Total</span><strong>${data.total || rows.length}</strong></button>
+      <button type="button" class="ops-chip ops-chip--warn" data-order-filter="pending_pay" onclick="setMisPedidosFilter('pending_pay')"><span>Por pagar</span><strong>${counts.pending_pay}</strong></button>
+      <button type="button" class="ops-chip" data-order-filter="open" onclick="setMisPedidosFilter('open')"><span>En curso</span><strong>${counts.open}</strong></button>
+      <button type="button" class="ops-chip ops-chip--muted" data-order-filter="delivered" onclick="setMisPedidosFilter('delivered')"><span>Entregados</span><strong>${counts.delivered}</strong></button>
+      <button type="button" class="ops-chip ops-chip--muted" data-order-filter="returns" onclick="setMisPedidosFilter('returns')"><span>Devoluciones</span><strong>${counts.returns}</strong></button>`;
   }
   if (!rows.length) {
     body.innerHTML = typeof opsEmptyRow === 'function'
@@ -133,42 +194,30 @@ async function loadMisPedidosPage() {
       : '<tr><td colspan="7">Aún no tienes pedidos. Compra en la tienda.</td></tr>';
     return;
   }
-  const noMap = {};
-  [...rows]
-    .sort((a, b) => Number(a.request_id || 0) - Number(b.request_id || 0))
-    .forEach((r, i) => { noMap[r.request_id] = i + 1; });
-  body.innerHTML = rows.map(req => {
-    const lines = (req.lines || []).map(l => `${l.product_name || l.product_id} ×${l.quantity}`).join(', ');
-    const label = typeof solicitudStatusLabel === 'function' ? solicitudStatusLabel(req.status) : req.status;
-    const cls = typeof solicitudStatusClass === 'function' ? solicitudStatusClass(req.status) : 'badge';
-    const pay = req.payment_status || 'pendiente_pago';
-    const payHtml = typeof paymentBadge === 'function' ? paymentBadge(pay) : pay;
-    const canCancel = ['pendiente', 'en_revision'].includes(req.status);
-    const canPay = typeof canClientPayRequest === 'function'
-      ? canClientPayRequest(req)
-      : (pay === 'pendiente_pago' && req.status === 'aprobada');
-    const n = Number(req.client_order_no) || noMap[req.request_id] || 0;
-    const pedidoLabel = n ? `Pedido ${n}` : 'Pedido';
-    const actions = `
-      <button type="button" class="btn btn-ghost btn-ops" onclick="openSolicitudDetail(${req.request_id})">Detalle</button>
-      <button type="button" class="btn btn-ghost btn-ops" onclick="openSolicitudPdf(${req.request_id})">PDF</button>
-      ${canPay ? `<button type="button" class="btn btn-primary btn-ops" onclick="openPagoModal(${req.request_id})">Pagar con tarjeta</button>` : ''}
-      ${canCancel ? `<button type="button" class="btn btn-ghost btn-ops" onclick="cancelarMiSolicitud(${req.request_id})">Cancelar</button>` : ''}`;
-    const track = req.tracking_number
-      ? `<span class="table-sub">GT</span> <code>${req.tracking_number}</code>`
-      : '—';
-    const orderRef = req.order_id ? `<div class="table-sub">Venta ${req.order_id}</div>` : '';
-    return `<tr>
-      <td><strong>${pedidoLabel}</strong>${orderRef}</td>
-      <td>${lines}</td>
-      <td><span class="${cls}">${label}</span></td>
-      <td>${payHtml}</td>
-      <td>${req.created_at || '—'}</td>
-      <td>${track}</td>
-      <td style="white-space:nowrap">${actions}</td>
-    </tr>`;
-  }).join('');
+  setMisPedidosFilter(misPedidosState.filter);
 }
+
+async function solicitarDevolucionCliente(requestId) {
+  if (typeof opsPrompt !== 'function') return;
+  const reason = await opsPrompt({
+    title: 'Solicitar devolución',
+    message: 'Describe brevemente qué producto deseas devolver y el motivo. El equipo revisará cantidades y estado.',
+    label: 'Motivo', confirmLabel: 'Enviar solicitud',
+    validate: value => value.trim().length < 5 ? 'Escribe al menos 5 caracteres.' : null,
+  });
+  if (reason == null) return;
+  const r = await fetch(`${API}/solicitudes/${requestId}/solicitar-devolucion`, {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { notifyErr(data.message || 'No se pudo solicitar la devolución.'); return; }
+  notifyOk(data.message || 'Solicitud de devolución enviada.');
+  loadMisPedidosPage();
+}
+
+window.setMisPedidosFilter = setMisPedidosFilter;
+window.solicitarDevolucionCliente = solicitarDevolucionCliente;
 
 async function openPagoModal(requestId, opts) {
   const o = opts || {};

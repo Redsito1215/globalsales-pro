@@ -11,13 +11,33 @@ function openSolicitudPdf(id) {
   window.open(`${API}/soporte/solicitudes/${id}/factura.pdf`, '_blank', 'noopener');
 }
 
+function formatEcDateTime(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, d] = raw.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  const dt = new Date(raw);
+  if (Number.isNaN(dt.getTime())) return raw.replace('T', ' ').slice(0, 19);
+  return new Intl.DateTimeFormat('es-EC', {
+    timeZone: 'America/Guayaquil',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(dt);
+}
+
 async function showPaymentReceipt(id) {
   const r = await fetch(`${API}/solicitudes/${id}/comprobante`, { credentials: 'same-origin' });
   const data = await r.json();
   if (!r.ok) { notifyErr(data.message || 'No se pudo cargar el comprobante.'); return; }
   const x = data.receipt || {};
   const card = x.card || {};
-  const message = `${x.transaction_reference}\n${x.invoice_number}\nTarjeta ${card.brand || ''} •••• ${card.last4 || ''}\nTotal: $${Number(x.amount || 0).toFixed(2)}\nFecha: ${(x.paid_at || '').replace('T', ' ').slice(0, 19)}`;
+  const message = `${x.transaction_reference}\n${x.invoice_number}\nTarjeta ${card.brand || ''} •••• ${card.last4 || ''}\nTotal: $${Number(x.amount || 0).toFixed(2)}\nFecha: ${formatEcDateTime(x.paid_at)}`;
   if (typeof opsConfirm === 'function') await opsConfirm({ title: 'Comprobante de pago', message, confirmLabel: 'Cerrar' });
 }
 
@@ -63,15 +83,15 @@ async function openSolicitudDetail(id) {
       <div><span class="detail-label">Cliente</span><strong>${req.client_name || '—'}</strong><br><span style="color:var(--muted);font-size:12px">${req.client_email || ''}${req.client_phone ? ' · ' + req.client_phone : ''}</span></div>
       <div><span class="detail-label">Estado</span><span class="${classFn(req.status)}">${labelFn(req.status)}</span></div>
       <div><span class="detail-label">Pago</span>${typeof paymentBadge === 'function' ? paymentBadge(pay) : payLabel}</div>
-      <div><span class="detail-label">Fecha</span>${req.created_at || '—'}</div>
+      <div><span class="detail-label">Fecha</span>${formatEcDateTime(req.created_at)}</div>
       <div><span class="detail-label">País destino</span>${req.country_name || req.country_id || '—'}</div>
       ${req.shipping_destination ? `<div><span class="detail-label">Destino</span>${req.shipping_destination}</div>` : ''}
       <div><span class="detail-label">Canal</span>${req.channel_name || req.channel_id || '—'}</div>
       <div><span class="detail-label">Pedido venta</span>${req.order_id || '—'}</div>
       ${req.tracking_number ? `<div><span class="detail-label">Seguimiento</span><code>${req.tracking_number}</code></div>` : ''}
-      ${req.shipped_at ? `<div><span class="detail-label">Enviado</span>${req.shipped_at}</div>` : ''}
-      ${req.delivered_at ? `<div><span class="detail-label">Entregado</span>${req.delivered_at}</div>` : ''}
-      ${req.paid_at ? `<div><span class="detail-label">Pagado el</span>${req.paid_at}</div>` : ''}
+      ${req.shipped_at ? `<div><span class="detail-label">Enviado</span>${formatEcDateTime(req.shipped_at)}</div>` : ''}
+      ${req.delivered_at ? `<div><span class="detail-label">Entregado</span>${formatEcDateTime(req.delivered_at)}</div>` : ''}
+      ${req.paid_at ? `<div><span class="detail-label">Pagado el</span>${formatEcDateTime(req.paid_at)}</div>` : ''}
       ${req.refund_status ? `<div><span class="detail-label">Reembolso</span>${req.refund_status.replaceAll('_', ' ')} · $${Number(req.return_refund_amount || 0).toFixed(2)}</div>` : ''}
       ${req.status === 'devuelta' ? `<div><span class="detail-label">Devolución</span>${req.return_condition || '—'} · apto ${req.return_restock_units ?? 0} · dañado ${req.return_damaged_units ?? 0}</div>` : ''}
     </div>
@@ -103,7 +123,7 @@ async function openSolicitudDetail(id) {
         const labels = { created: 'Solicitud creada', status_changed: 'Estado actualizado', payment_updated: 'Pago aprobado', payment_failed: 'Intento de pago rechazado', returned: 'Devolución y reembolso' };
         auditHost.innerHTML = `<h3 class="table-title">Línea de tiempo</h3>${(hist.events || []).map(event => `
           <div class="page-meta-strip" style="margin-top:7px"><strong>${labels[event.event_type] || event.event_type}</strong>
-          <span> · ${(event.created_at || '').replace('T', ' ').slice(0, 19)}</span></div>`).join('') || '<p class="modal-sub">Sin eventos.</p>'}`;
+          <span> · ${formatEcDateTime(event.created_at)}</span></div>`).join('') || '<p class="modal-sub">Sin eventos.</p>'}`;
       } catch {
         auditHost.innerHTML = '';
       }
@@ -122,3 +142,4 @@ window.openSolicitudDetail = openSolicitudDetail;
 window.openSolicitudPdf = openSolicitudPdf;
 window.showPaymentReceipt = showPaymentReceipt;
 window.closeSolicitudDetail = closeSolicitudDetail;
+window.formatEcDateTime = formatEcDateTime;

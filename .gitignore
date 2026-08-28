@@ -10,3 +10,5 @@ data/etl_run.log
 data/raw/*
 !data/raw/.gitkeep
 !data/.gitkeep
+frontend/static/uploads/avatars/
+backups/

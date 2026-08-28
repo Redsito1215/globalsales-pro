@@ -28,7 +28,6 @@ async function loadPedidosAdmin() {
       : '<tr><td colspan="6">Sin pedidos</td></tr>';
     return;
   }
-  const admin = window._authUser?.role === 'administrador';
   body.innerHTML = rows.map(row => `
     <tr>
       <td style="font-family:var(--mono)">${row.order_id}</td>
@@ -36,31 +35,12 @@ async function loadPedidosAdmin() {
       <td>${row.item_type}</td>
       <td>${row.units_sold}</td>
       <td>${fmtUSD(row.total_revenue)}</td>
-      <td>${admin
-        ? `<button type="button" class="btn btn-ghost btn-ops" onclick="openPedidoEditModal('${row.order_id}')">Editar</button>
-           <button type="button" class="btn btn-ghost btn-ops" onclick="deletePedido('${row.order_id}')">Eliminar</button>`
-        : '—'}</td>
+      <td><span class="admin-page-meta">Solo lectura</span></td>
     </tr>`).join('');
 }
 
 async function openPedidoEditModal(orderId) {
-  if (window._authUser?.role !== 'administrador') { toast('Solo administradores.', 'warn'); return; }
-  const modal = document.getElementById('pedido-edit-modal');
-  if (!modal) return;
-  const r = await fetch(API + '/sales/orders/' + encodeURIComponent(orderId), { credentials: 'same-origin' });
-  const data = await r.json();
-  if (!r.ok) { toast(data.message || 'No se pudo cargar el pedido', 'danger'); return; }
-  const line = (data.lines && data.lines[0]) || data.order || data;
-  document.getElementById('ep-order-id').value = orderId;
-  document.getElementById('ep-region').value = line.region || '';
-  document.getElementById('ep-country').value = line.country || '';
-  document.getElementById('ep-item').value = line.item_type || '';
-  document.getElementById('ep-channel').value = line.sales_channel || '';
-  document.getElementById('ep-priority').value = line.order_priority || 'M';
-  document.getElementById('ep-units').value = line.units_sold ?? '';
-  document.getElementById('ep-price').value = line.unit_price ?? '';
-  document.getElementById('ep-cost').value = line.unit_cost ?? '';
-  modal.hidden = false;
+  toast(`El pedido ${orderId} es de solo lectura para proteger la trazabilidad.`, 'warn');
 }
 
 function closePedidoEditModal() {
@@ -69,30 +49,8 @@ function closePedidoEditModal() {
 }
 
 async function savePedidoEdit() {
-  if (window._authUser?.role !== 'administrador') { toast('Solo administradores.', 'warn'); return; }
-  const orderId = document.getElementById('ep-order-id').value;
-  const body = {
-    region: document.getElementById('ep-region').value.trim(),
-    country: document.getElementById('ep-country').value.trim(),
-    item_type: document.getElementById('ep-item').value.trim(),
-    sales_channel: document.getElementById('ep-channel').value.trim(),
-    order_priority: document.getElementById('ep-priority').value.trim() || 'M',
-    units_sold: parseInt(document.getElementById('ep-units').value, 10) || 0,
-    unit_price: parseFloat(document.getElementById('ep-price').value) || 0,
-    unit_cost: parseFloat(document.getElementById('ep-cost').value) || 0,
-  };
-  const r = await fetch(API + '/sales/orders/' + encodeURIComponent(orderId), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
-    body: JSON.stringify(body),
-  });
-  const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error al guardar', 'danger'); return; }
-  toast('Pedido actualizado', 'ok');
+  toast('Los pedidos históricos son de solo lectura para proteger informes y auditoría.', 'warn');
   closePedidoEditModal();
-  await loadPedidosAdmin();
-  if (typeof refreshAnalyticsLagBanners === 'function') refreshAnalyticsLagBanners();
 }
 
 async function createPedidoAdmin() {
@@ -120,24 +78,7 @@ async function createPedidoAdmin() {
 }
 
 async function deletePedido(orderId) {
-  if (typeof opsConfirm !== 'function') {
-    toast('No se pudo abrir la confirmación. Recarga la página (Ctrl+F5).', 'danger');
-    return;
-  }
-  const ok = await opsConfirm({
-    title: 'Eliminar pedido',
-    message: `¿Eliminar pedido ${orderId}?`,
-    confirmLabel: 'Eliminar',
-    danger: true,
-  });
-  if (!ok) return;
-  const r = await fetch(API + '/sales/orders/' + encodeURIComponent(orderId), {
-    method: 'DELETE', credentials: 'same-origin',
-  });
-  const data = await r.json();
-  if (!r.ok) { toast(data.message || 'Error al procesar', 'danger'); return; }
-  toast('Pedido eliminado', 'ok');
-  await loadPedidosAdmin();
+  toast(`No se elimina el pedido ${orderId}: queda como evidencia para informes y auditoría.`, 'warn');
 }
 
 function showVentasTab(tab) {
@@ -152,7 +93,7 @@ function showVentasTab(tab) {
   if (panel) panel.hidden = false;
   if (btn) btn.classList.add('active');
   const createBox = document.getElementById('pedidos-create-box');
-  if (createBox) createBox.hidden = window._authUser?.role !== 'administrador';
+  if (createBox) createBox.hidden = true;
   if (tab === 'solicitudes') {
     loadSolicitudes();
     if (typeof refreshAnalyticsLagBanners === 'function') refreshAnalyticsLagBanners();

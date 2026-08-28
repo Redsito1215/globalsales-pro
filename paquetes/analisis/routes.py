@@ -8,6 +8,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from auth.decorators import login_required, permission_required
 from paquetes.tablero import queries
+from paquetes.reportes.pdf_export import generate_report_pdf
 
 analisis_bp = Blueprint("analisis", __name__, url_prefix="/api")
 
@@ -82,3 +83,62 @@ def analysis_export():
         "X-Export-Truncated": "1" if truncated else "0",
     }
     return Response(buf.getvalue(), mimetype="text/csv", headers=headers)
+
+
+@analisis_bp.get("/analysis/export/pdf")
+@login_required
+@permission_required("analysis.export")
+def analysis_export_pdf():
+    """Exporta las ventas filtradas en un documento PDF gerencial."""
+    f = _filters()
+    limit = min(max(int(request.args.get("limit", 5000)), 1), 5000)
+    rows = queries.search_orders(
+        country=request.args.get("country"), item_type=f.get("item_type"),
+        channel=f.get("channel"), priority=f.get("priority"),
+        region=f.get("region"), months=f.get("months"), limit=limit, offset=0,
+    )
+    columns = [
+        "order_id", "country", "region", "item_type", "sales_channel",
+        "order_priority", "order_date", "units_sold", "total_revenue", "total_profit",
+    ]
+    pdf = generate_report_pdf(
+        report_id="VENTAS",
+        title="Ventas filtradas",
+        subtitle="Detalle comercial generado con los filtros seleccionados.",
+        columns=columns,
+        rows=rows,
+        total=len(rows),
+    )
+    return Response(
+        pdf, mimetype="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="altavia-trade-ventas.pdf"'},
+    )
+
+
+@analisis_bp.get("/analysis/preview")
+@login_required
+@permission_required("analysis.export")
+def analysis_preview():
+    """Vista previa liviana con los mismos filtros usados por el PDF."""
+    f = _filters()
+    requested_limit = min(max(int(request.args.get("limit", 5000)), 1), 50000)
+    rows = queries.search_orders(
+        country=request.args.get("country"),
+        item_type=f.get("item_type"),
+        channel=f.get("channel"),
+        priority=f.get("priority"),
+        region=f.get("region"),
+        months=f.get("months"),
+        limit=min(requested_limit, 25),
+        offset=0,
+    )
+    total = queries.count_orders(
+        country=request.args.get("country"), item_type=f.get("item_type"),
+        channel=f.get("channel"), priority=f.get("priority"),
+        region=f.get("region"), months=f.get("months"),
+    )
+    return jsonify({
+        "status": "ok", "rows": rows, "preview_count": len(rows),
+        "total": total, "export_count": min(total, requested_limit),
+        "truncated": total > requested_limit,
+    })

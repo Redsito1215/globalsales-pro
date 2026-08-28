@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from config.settings import settings
 from paquetes.tablero import queries
 
-app = FastAPI(title="GLOBTRADE S.A. API", version="1.0.0")
+app = FastAPI(title="Altavia Trade API", version="1.0.0")
 
 
 @app.get("/health")

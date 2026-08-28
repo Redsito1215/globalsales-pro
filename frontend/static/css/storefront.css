@@ -231,6 +231,14 @@
   justify-content: center;
   flex-shrink: 0;
 }
+
+.sidebar-user-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
 .sidebar-user-name {
   font-size: 0.78rem;
   font-weight: 600;
@@ -1233,6 +1241,9 @@
   font-size: 0.875rem;
   color: var(--shop-classic-text);
   margin-bottom: 0.65rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
 }
 
 .shop-price-slider {
@@ -1282,20 +1293,23 @@
 .shop-collections-nav-classic {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.35rem;
 }
 
 .shop-collection-link {
+  position: relative;
   display: block;
   width: 100%;
   text-align: left;
-  padding: 0.35rem 0;
-  border: none;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
   font-family: inherit;
   font-size: 0.875rem;
   color: var(--shop-classic-muted);
   cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .shop-collection-link span {
@@ -1303,9 +1317,50 @@
   font-size: 0.8rem;
 }
 
-.shop-collection-link:hover,
-.shop-collection-link.active {
+.shop-collection-link:hover {
   color: var(--shop-classic-accent-dark);
+  background: color-mix(in srgb, var(--shop-classic-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--shop-classic-accent) 30%, transparent);
+}
+
+.shop-collection-link.active {
+  color: #fff;
+  background: var(--shop-classic-accent-dark);
+  border-color: var(--shop-classic-accent-dark);
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(23, 104, 93, 0.22);
+}
+
+.shop-collection-link.active::before {
+  content: none;
+}
+
+.shop-collection-link.active span {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.shop-active-category {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: -0.25rem 0 0.9rem;
+  padding: 0.48rem 0.75rem;
+  border-left: 4px solid var(--shop-classic-accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--shop-classic-accent) 10%, #fff);
+  color: var(--shop-classic-text);
+}
+
+.shop-active-category-label {
+  font-size: 0.75rem;
+  color: var(--shop-classic-muted);
+}
+
+.shop-active-category strong {
+  color: var(--shop-classic-accent-dark);
+  font-size: 0.88rem;
 }
 
 .shop-widget--promo {
@@ -1361,6 +1416,27 @@
   width: auto;
   min-width: 200px;
   margin-bottom: 0;
+}
+
+.shop-cart-quantity-input {
+  width: 3.25rem;
+  min-height: 2.1rem;
+  border: 0;
+  border-left: 1px solid var(--shop-classic-border);
+  border-right: 1px solid var(--shop-classic-border);
+  background: var(--input-bg, var(--shop-classic-surface));
+  color: var(--shop-classic-text);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.shop-cart-quantity-input::-webkit-outer-spin-button,
+.shop-cart-quantity-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
 }
 
 .shop-product-grid--classic {
@@ -1624,6 +1700,17 @@ body.shop-page-active .shop-madson-header {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+/* La búsqueda global pertenece al catálogo: ocultarla fuera de Tienda. */
+body.shop-page-active:not(.shop-on-tienda) .shop-madson-search {
+  display: none;
+}
+
+/* Al ocultar la búsqueda fuera de Tienda, conserva las acciones a la derecha.
+   Sin este desplazamiento el flex las colocaba en el espacio vacío izquierdo. */
+body.shop-page-active:not(.shop-on-tienda) .shop-madson-actions {
+  margin-left: auto;
 }
 .shop-madson-search-field {
   display: flex;
@@ -2304,3 +2391,9 @@ body.shop-page-active .shop-madson-header {
     font-size: 1.5rem;
   }
 }
+/* Controles del carrusel institucional */
+.shop-hero-carousel-controls { display:flex; align-items:center; gap:.6rem; margin-top:1rem; }
+.shop-hero-carousel-controls button { width:2rem; height:2rem; padding:0; border:1px solid currentColor; border-radius:50%; background:transparent; color:inherit; cursor:pointer; font-size:1.1rem; }
+#shop-hero-carousel-dots { display:flex; gap:.35rem; }
+#shop-hero-carousel-dots i { width:.45rem; height:.45rem; border-radius:50%; background:currentColor; opacity:.3; }
+#shop-hero-carousel-dots i.is-active { opacity:1; transform:scale(1.2); }

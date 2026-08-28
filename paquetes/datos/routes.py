@@ -1,14 +1,15 @@
 """Rutas Flask — paquete Q4 Datos."""
 from __future__ import annotations
 
-import csv
-import io
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, Response, jsonify, request
 
 from auth.decorators import login_required, permission_required
 from paquetes.datos import services
 from shared.audit import log_audit
+from paquetes.reportes.pdf_export import generate_report_pdf
 
 datos_bp = Blueprint("datos", __name__, url_prefix="/api")
 
@@ -23,18 +24,28 @@ def master_list(name: str):
     try:
         active_arg = (request.args.get("active") or "").strip().lower()
         active = True if active_arg == "true" else False if active_arg == "false" else None
+        category_raw = (request.args.get("category_id") or "").strip()
+        vendor_raw = (request.args.get("vendor_id") or "").strip()
+        if category_raw and not category_raw.isdigit():
+            raise ValueError("invalid_filters")
+        if vendor_raw and not vendor_raw.isdigit():
+            raise ValueError("invalid_filters")
         data = services.list_rows(
             name,
             limit=min(int(request.args.get("limit", 50)), 200),
             offset=max(int(request.args.get("offset", 0)), 0),
             search=(request.args.get("search") or request.args.get("q") or "").strip() or None,
             active=active,
+            category_id=int(category_raw) if category_raw else None,
+            vendor_id=int(vendor_raw) if vendor_raw else None,
         )
         return jsonify({"status": "ok", **data})
     except ValueError as e:
         code = str(e)
         if code == "unknown_table":
             return jsonify({"status": "error", "message": "Tabla maestra no encontrada."}), 404
+        if code == "invalid_filters":
+            return jsonify({"status": "error", "message": "Los filtros de categoría o proveedor no son válidos."}), 400
         raise
 
 
@@ -180,7 +191,7 @@ def audit_log():
 @login_required
 @permission_required("audit.read")
 def audit_log_export():
-    """Exporta como CSV compatible con Excel, aplicando los mismos filtros de pantalla."""
+    """Exporta la auditoría en PDF aplicando los mismos filtros de pantalla."""
     filters = {
         "role": (request.args.get("role") or "").strip() or None,
         "entity": (request.args.get("entity") or "").strip() or None,
@@ -196,19 +207,36 @@ def audit_log_export():
         entries.extend(page["entries"])
         if len(entries) >= page["total"] or not page["entries"]:
             break
-    output = io.StringIO()
-    output.write("\ufeff")
-    writer = csv.writer(output)
-    writer.writerow(["Fecha", "Modulo", "Accion", "Entidad", "Referencia", "Usuario", "Rol", "Cambios"])
-    for row in entries:
-        writer.writerow([
-            row.get("at"), row.get("module"), row.get("action"), row.get("entity"),
-            row.get("entity_id"), row.get("email"), row.get("role"), str(row.get("changes") or row.get("details") or {}),
-        ])
-    log_audit("export", entity="audit_log", details={"rows": len(entries), "filters": filters})
+    action_names = {
+        "export": "Exportó un informe", "update_profile": "Actualizó su perfil",
+        "product_sale_toggle": "Cambió una rebaja", "category_sale_toggle": "Cambió rebaja de categoría",
+        "create_request": "Creó una solicitud", "issue_invoice": "Generó una factura",
+        "shop_sync": "Sincronizó la tienda", "enable": "Habilitó un registro", "disable": "Inhabilitó un registro",
+    }
+    def local_time(value):
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+            return dt.astimezone(ZoneInfo("America/Guayaquil")).strftime("%d/%m/%Y %H:%M:%S")
+        except Exception:
+            return str(value or "-")
+    pdf_rows = [{
+        "fecha": local_time(row.get("at")), "modulo": row.get("module"), "accion": action_names.get(row.get("action"), str(row.get("action") or "").replace("_", " ").capitalize()),
+        "entidad": row.get("entity"), "referencia": row.get("entity_id"),
+        "usuario": row.get("email"), "rol": row.get("role"),
+        "cambios": str(row.get("changes") or row.get("details") or {}),
+    } for row in entries]
+    columns = ["fecha", "modulo", "accion", "entidad", "referencia", "usuario", "rol", "cambios"]
+    pdf = generate_report_pdf(
+        report_id="AUDITORIA", title="Registro de auditoría",
+        subtitle="Historial de acciones administrativas con los filtros aplicados.",
+        columns=columns, rows=pdf_rows, total=len(pdf_rows),
+    )
+    log_audit("export", entity="audit_log", details={"rows": len(entries), "filters": filters, "format": "pdf"})
     return Response(
-        output.getvalue(), mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=auditoria.csv"},
+        pdf, mimetype="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="altavia-trade-auditoria.pdf"'},
     )
 
 
@@ -275,6 +303,7 @@ def _master_error(exc: ValueError):
         "invalid_image_type": ("Formato no permitido. Use JPG, PNG o WEBP.", 400),
         "image_too_large": ("Imagen demasiado grande.", 400),
         "invalid_field": ("Revisa los campos: IDs y precios deben ser números positivos.", 400),
+        "inactive_relation": ("El registro relacionado está inhabilitado o no existe.", 409),
     }
     msg, status = messages.get(code, (code, 400))
     return jsonify({"status": "error", "message": msg, "code": code}), status

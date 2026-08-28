@@ -8,6 +8,7 @@ const SOLICITUD_STATUS_LABELS = {
   convertida: 'Convertida',
   enviada: 'Enviada',
   entregada: 'Entregada',
+  devolucion_parcial: 'Devolución parcial',
   devuelta: 'Devuelta',
   rechazada: 'Rechazada',
   cancelada: 'Cancelada',
@@ -37,7 +38,7 @@ function canConvertWithoutApproval() {
 
 function solicitudStatusClass(status) {
   if (status === 'convertida' || status === 'enviada' || status === 'entregada') return 'badge badge--ok';
-  if (status === 'devuelta') return 'badge badge--warn';
+  if (status === 'devuelta' || status === 'devolucion_parcial') return 'badge badge--warn';
   if (status === 'rechazada' || status === 'cancelada') return 'badge badge--danger';
   if (status === 'aprobada') return 'badge badge--info';
   if (status === 'en_revision') return 'badge badge--warn';
@@ -100,9 +101,10 @@ function solicitudActions(req) {
   const status = req.status;
   const detail = solicitudDetailBtn(req.request_id);
   const pay = payButtons(req);
-  if (status === 'entregada') {
+  if (status === 'entregada' || status === 'devolucion_parcial') {
     return `${detail} ${pay}
-      <button type="button" class="btn btn-primary btn-ops" onclick="devolverSolicitud(${req.request_id})">Devolver</button>
+      <button type="button" class="btn btn-primary btn-ops" onclick="devolverSolicitud(${req.request_id})">${status==='devolucion_parcial'?'Continuar devolución':'Devolver productos'}</button>
+      ${req.return_request_status === 'pending' ? '<span class="badge badge--warn">Solicitada por cliente</span>' : ''}
       <span style="font-size:10px;color:var(--muted)">${req.tracking_number || req.order_id || '—'}</span>`;
   }
   if (status === 'devuelta') {
@@ -163,7 +165,7 @@ async function loadVentasPage() {
   await refreshVentasBadge();
   const pedidosTab = document.querySelector('.ventas-tab-btn[data-tab="pedidos"]');
   const createBox = document.getElementById('pedidos-create-box');
-  if (createBox) createBox.hidden = window._authUser?.role !== 'administrador';
+  if (createBox) createBox.hidden = true;
   if (pedidosTab && !hasPermission('orders.read')) {
     pedidosTab.hidden = true;
   } else if (pedidosTab) {
@@ -309,7 +311,7 @@ async function devolverSolicitud(id) {
   const reason = document.getElementById('devolver-reason');
   if (reason) reason.value = '';
   const cond = document.getElementById('devolver-condition');
-  if (cond) cond.value = 'apto';
+  if (cond) cond.value = 'mixto';
   window._devolverLines = [];
   try {
     const r = await fetch(`${API}/solicitudes/${id}`, { credentials: 'same-origin' });
@@ -320,10 +322,14 @@ async function devolverSolicitud(id) {
     const stock = req.stock_lines || [];
     const byPid = {};
     stock.forEach(s => { byPid[String(s.product_id || '')] = s; });
+    const returned = {};
+    (req.return_events || []).forEach(ev => [...(ev.restock_lines || []), ...(ev.damaged_lines || [])].forEach(x => {
+      returned[Number(x.variant_id)] = (returned[Number(x.variant_id)] || 0) + Number(x.quantity || 0);
+    }));
     window._devolverLines = lines.map(l => {
       const st = byPid[String(l.product_id || '')] || stock.find(s => Number(s.variant_id) === Number(l.variant_id));
       const vid = Number((st && st.variant_id) || l.variant_id || 0);
-      const qty = Number(l.quantity || (st && st.quantity) || 0);
+      const qty = Math.max(0, Number(l.quantity || (st && st.quantity) || 0) - (returned[vid] || 0));
       return {
         variant_id: vid,
         quantity: qty,
@@ -375,7 +381,7 @@ function renderDevolverLines() {
     <tr data-vid="${l.variant_id}">
       <td>${l.label}</td>
       <td>${l.quantity}</td>
-      <td><input type="number" min="0" max="${l.quantity}" value="${l.quantity}" id="dev-ok-${i}" style="width:64px" /></td>
+      <td><input type="number" min="0" max="${l.quantity}" value="0" id="dev-ok-${i}" style="width:64px" /></td>
       <td><input type="number" min="0" max="${l.quantity}" value="0" id="dev-bad-${i}" style="width:64px" /></td>
     </tr>`).join('');
 }
@@ -393,12 +399,13 @@ async function confirmDevolverSolicitud() {
     for (let i = 0; i < lines.length; i++) {
       const ok = parseInt(document.getElementById('dev-ok-' + i)?.value || '0', 10);
       const bad = parseInt(document.getElementById('dev-bad-' + i)?.value || '0', 10);
-      if (ok + bad !== lines[i].quantity) {
-        if (err) err.textContent = `Línea "${lines[i].label}": apto + dañado debe ser ${lines[i].quantity}.`;
+      if (ok + bad > lines[i].quantity) {
+        if (err) err.textContent = `Línea "${lines[i].label}": no puedes devolver más de ${lines[i].quantity}.`;
         return;
       }
-      inspections.push({ variant_id: lines[i].variant_id, restock_qty: ok, damaged_qty: bad });
+      if (ok + bad > 0) inspections.push({ variant_id: lines[i].variant_id, restock_qty: ok, damaged_qty: bad });
     }
+    if (!inspections.length) { if (err) err.textContent = 'Indica al menos una unidad para devolver.'; return; }
     payload.inspections = inspections;
   }
   if (err) err.textContent = '';

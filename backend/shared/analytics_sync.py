@@ -148,6 +148,8 @@ def _row_to_fact(db, row: dict[str, Any], venta_id: int, cache: dict | None = No
         "region_id": _lookup_region_id(db, row.get("region"), cache),
         "country_id": _lookup_country_id(db, row.get("country"), cache),
         "category_id": _lookup_category_id(db, row.get("item_type"), cache),
+        "product_id": int(row.get("product_id") or 0),
+        "product_name": str(row.get("product_name") or ""),
         "channel_id": _lookup_channel_id(db, row.get("sales_channel"), cache),
         "priority_id": _lookup_priority_id(db, row.get("order_priority"), cache),
         "client_id": _lookup_client_id(db, row.get("country"), row.get("sales_channel"), cache),
@@ -160,6 +162,8 @@ def _row_to_fact(db, row: dict[str, Any], venta_id: int, cache: dict | None = No
         "line_revenue": round(u * up, 2),
         "line_cost": round(u * uc, 2),
         "line_profit": round(u * (up - uc), 2),
+        "discount_code": str(row.get("discount_code") or ""),
+        "discount_alloc": float(row.get("discount_alloc") or 0),
     }
 
 
@@ -469,13 +473,21 @@ def get_strategic_lag() -> dict[str, Any]:
 def sync_stale_orders(*, limit: int = 50) -> dict[str, Any]:
     """Sincroniza order_ids recientes de landing que faltan en fact."""
     db = get_db()
-    recent = list(
-        db["sales_records"]
-        .find({}, {"order_id": 1, "_id": 0})
-        .sort([("order_date", -1), ("_id", -1)])
-        .limit(max(limit * 3, 50))
-        .max_time_ms(8000)
-    )
+    try:
+        recent = list(
+            db["sales_records"]
+            .find({}, {"order_id": 1, "_id": 0})
+            .sort([("order_date", -1), ("_id", -1)])
+            .limit(max(limit * 3, 50))
+            .max_time_ms(8000)
+        )
+    except Exception as exc:
+        return {
+            "orders_synced": [],
+            "facts_inserted": 0,
+            "errors": [f"sales_records:{type(exc).__name__}"],
+            "strategic_lagging": True,
+        }
     synced_total = 0
     orders: list[str] = []
     errors: list[str] = []
